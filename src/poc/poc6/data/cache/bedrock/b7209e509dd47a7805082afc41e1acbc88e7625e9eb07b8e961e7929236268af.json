@@ -1,0 +1,27 @@
+{
+  "context_id": "558031269e89b0c1b73f2d9b",
+  "context_hash": "2364818db880d235af34198f6b32597aee8aa9ababd5b4d8eb18d6ddf1ec2001",
+  "asset_id": "GOLD",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "SMALL",
+    "confidence": 0.58,
+    "rationale": "Iran war conflict drives safe-haven gold demand (weight 0.7), partially offset by rate-hike pressure suppressing risk appetite and liquidity (weight -0.6). Net bias slightly bullish."
+  },
+  "usage": {
+    "input_tokens": 246,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 89
+  },
+  "response_hash": "8d9fd2657d634a9ae02423035c1dabb6c01dd516067cb6dfa647070430ef398e",
+  "cache_hit": false,
+  "status": "OK"
+}

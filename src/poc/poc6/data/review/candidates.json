@@ -1,0 +1,1322 @@
+[
+  {
+    "context_id": "c7d71df658e50cd23070c23c",
+    "context_hash": "cc633b4812ab0aa22514e22c441bae83edfe9274cd8db296f7f8af3c8614f857",
+    "context_version": 1,
+    "asset_id": "BRENT_OIL",
+    "window_start": "2026-04-18T08:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "3879a7fe479bf3da24363e5e",
+        "source_id": "GDELT:scoop.co.nz",
+        "title": "Is A Recession Going To Put My Life Savings At Risk ? - Ask Susan",
+        "url": "https://www.scoop.co.nz/stories/BU2604/S00286/is-a-recession-going-to-put-my-life-savings-at-risk-ask-susan.htm",
+        "published_at": "2026-04-18T08:45:00+00:00",
+        "rule": "recession_signal",
+        "event_type": "RECESSION_SIGNAL",
+        "asset_id": "BRENT_OIL",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "e424580a58722097e93de1a1",
+        "source_id": "GDELT:lewrockwell.com",
+        "title": "Iran War : Sleepwalking Into Starvation",
+        "url": "https://www.lewrockwell.com/2026/04/no_author/iran-war-sleepwalking-into-starvation/",
+        "published_at": "2026-04-18T08:00:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "BRENT_OIL",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "81d2ba8389e9e2c3736510c5",
+    "context_hash": "4cafdacd4f3a592458918efea5b46ca60386c8470f2c897c68e13e09db3dd90b",
+    "context_version": 1,
+    "asset_id": "BRENT_OIL",
+    "window_start": "2026-04-20T00:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "280b6c7bf64e502bd696dac4",
+        "source_id": "GDELT:thetimes.com",
+        "title": "UK to  flirt  with recession amid Iran oil shock and inflation",
+        "url": "https://www.thetimes.com/business/economics/article/uk-flirt-recession-iran-oil-shock-inflation-rates-vbfr5gl2p",
+        "published_at": "2026-04-20T00:45:00+00:00",
+        "rule": "recession_signal",
+        "event_type": "RECESSION_SIGNAL",
+        "asset_id": "BRENT_OIL",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "83bee8cf64ac06beaddb29e5",
+        "source_id": "GDELT:businesstimes.com.sg",
+        "title": "ESG loans in South - east Asia fall 46 % in Q1 2026 amid heightened volatility from Iran war",
+        "url": "https://www.businesstimes.com.sg/esg/esg-loans-south-east-asia-fall-46-q1-2026-amid-heightened-volatility-iran-war",
+        "published_at": "2026-04-20T00:45:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "BRENT_OIL",
+        "direction": "UP"
+      },
+      {
+        "event_id": "95a41144513943c65c72b026",
+        "source_id": "GDELT:theshillongtimes.com",
+        "title": "Iran reaffirms Strait of Hormuz blockade as ceasefire winds down",
+        "url": "https://theshillongtimes.com/2026/04/20/iran-reaffirms-strait-of-hormuz-blockade-as-ceasefire-winds-down/",
+        "published_at": "2026-04-20T00:30:00+00:00",
+        "rule": "strait_closure",
+        "event_type": "STRAIT_CLOSURE",
+        "asset_id": "BRENT_OIL",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "7d89c78f425286b5c532476c",
+    "context_hash": "475babf9df593f0648f6fe9c6d012ecf47e85a8a0a1f550fba091ee6d7773ac3",
+    "context_version": 1,
+    "asset_id": "BRENT_OIL",
+    "window_start": "2026-04-20T01:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "01d4fe1d0d900afd9329b0e2",
+        "source_id": "GDELT:eastlothiancourier.com",
+        "title": "UK to narrowly avoid recession and jobless rate to surge , Item Club warns",
+        "url": "https://www.eastlothiancourier.com/news/national/26034517.uk-narrowly-avoid-recession-jobless-rate-surge-item-club-warns/",
+        "published_at": "2026-04-20T01:00:00+00:00",
+        "rule": "recession_signal",
+        "event_type": "RECESSION_SIGNAL",
+        "asset_id": "BRENT_OIL",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "b7349ff07ec70350af778387",
+        "source_id": "GDELT:dailymail.co.uk",
+        "title": "Iran war causes  uncertainty  for Labour housebuilding targets",
+        "url": "https://www.dailymail.co.uk/money/markets/article-15746635/Iran-war-causes-uncertainty-Labour-housebuilding-targets.html",
+        "published_at": "2026-04-20T01:00:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "BRENT_OIL",
+        "direction": "UP"
+      },
+      {
+        "event_id": "0f9c230853ac30d65a046b99",
+        "source_id": "GDELT:investinglive.com",
+        "title": "Iran , UAE clash over Hormuz as oil flows disrupted and costs rise globally",
+        "url": "https://investinglive.com/commodities/iran-uae-clash-over-hormuz-as-oil-flows-disrupted-and-costs-rise-globally-20260419/",
+        "published_at": "2026-04-20T01:00:00+00:00",
+        "rule": "supply_disruption",
+        "event_type": "SUPPLY_DISRUPTION",
+        "asset_id": "BRENT_OIL",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "c041c3a5268a0c4ca2e5dd76",
+    "context_hash": "d4a4b5c53f792ec33acc397e719e4bcf8aca777d3356d0de8d8fbbf3cc1a2f6b",
+    "context_version": 1,
+    "asset_id": "BRENT_OIL",
+    "window_start": "2026-04-24T18:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "d423830f33169028414c9ac1",
+        "source_id": "GDELT:abcnews.com",
+        "title": "Could the standoff in the Strait of Hormuz trigger a global recession ? Economists weigh in",
+        "url": "https://abcnews.com/Business/standoff-strait-hormuz-trigger-global-recession-economists-weigh/story?id=132270330",
+        "published_at": "2026-04-24T18:45:00+00:00",
+        "rule": "recession_signal",
+        "event_type": "RECESSION_SIGNAL",
+        "asset_id": "BRENT_OIL",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "8232a9fa39dfa702ff5dd751",
+        "source_id": "GDELT:manilatimes.net",
+        "title": "Iran war impact seeps ever deeper into global economy",
+        "url": "https://www.manilatimes.net/2026/04/25/business/top-business/iran-war-impact-seeps-ever-deeper-into-global-economy/2328059",
+        "published_at": "2026-04-24T18:30:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "BRENT_OIL",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "6b02f914b1021d1d2e1d78f0",
+    "context_hash": "f78f034f8567658c4446125d8b7c19d3272039bb0760f16369b96738ae244c68",
+    "context_version": 1,
+    "asset_id": "BRENT_OIL",
+    "window_start": "2026-04-24T19:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "b9ba47a1672056113d75787d",
+        "source_id": "GDELT:yoursourceone.com",
+        "title": "Could the standoff in the Strait of Hormuz trigger a global recession ? Economists weigh in",
+        "url": "https://www.yoursourceone.com/business/could-the-standoff-in-the-strait-of-hormuz-trigger-a-global-recession-economists-weigh-in/article_ba4e605a-b150-535f-bbac-70d401b24d78.html",
+        "published_at": "2026-04-24T19:45:00+00:00",
+        "rule": "recession_signal",
+        "event_type": "RECESSION_SIGNAL",
+        "asset_id": "BRENT_OIL",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "21452f94e7c1084999c18087",
+        "source_id": "GDELT:gobankingrates.com",
+        "title": "Should Near ‑ Retirees Fear for Their Savings Amid the Iran War ?",
+        "url": "https://www.gobankingrates.com/retirement/planning/asked-chatgpt-if-soon-to-be-retirees-should-be-worried-savings-iran-war/",
+        "published_at": "2026-04-24T19:00:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "BRENT_OIL",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "753cfbd950d29410b8fd7d94",
+    "context_hash": "19f5fc7d9cee2490ef2ed77d7da7f7aefdd4dc267285c096b1b9777e1da3a19c",
+    "context_version": 1,
+    "asset_id": "BRENT_OIL",
+    "window_start": "2026-05-04T19:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "71efa28afcb044616b1b78df",
+        "source_id": "GDELT:oilandgas360.com",
+        "title": "$125 oil could tip global economy into recession",
+        "url": "https://www.oilandgas360.com/125-oil-could-tip-global-economy-into-recession/",
+        "published_at": "2026-05-04T19:15:00+00:00",
+        "rule": "recession_signal",
+        "event_type": "RECESSION_SIGNAL",
+        "asset_id": "BRENT_OIL",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "cc8664176815961ff1267fa4",
+        "source_id": "GDELT:yahoo.com",
+        "title": "Opinion - Trump obsession with Obama fuels his Iran war strategy",
+        "url": "https://www.yahoo.com/news/articles/opinion-trump-obsession-obama-fuels-133000383.html",
+        "published_at": "2026-05-04T19:45:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "BRENT_OIL",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "70d61c9d962e2af441dcd450",
+    "context_hash": "e4d93f5b8fcecf15c78027bcc0a1204ab6a19ffd245b035d84de79fea82d6ce9",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-04-18T17:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "70402f4c113188e81b3ee4a4",
+        "source_id": "GDELT:marketscreener.com",
+        "title": "ADB chief warns of yen pressure from Japan too - slow rate hikes",
+        "url": "https://www.marketscreener.com/news/adb-chief-warns-of-yen-pressure-from-japan-s-too-slow-rate-hikes-ce7e50d3dd8cfe23",
+        "published_at": "2026-04-18T17:15:00+00:00",
+        "rule": "rate_hike",
+        "event_type": "RATE_DECISION",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "3896c194324820b9297b3d6f",
+        "source_id": "GDELT:el-balad.com",
+        "title": "Experts Challenge U . S . Stock Rally Amid Iran War Ceasefire",
+        "url": "https://www.el-balad.com/16917023",
+        "published_at": "2026-04-18T17:45:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "a300b670c7c24305bb20f739",
+    "context_hash": "9e217df07cdcfd84562cc448c90c8923011a47a4aa165b4fcd61c0e25e8d1a30",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-04-19T06:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "1167e43bb060fc129a541eb5",
+        "source_id": "GDELT:asiaone.com",
+        "title": "ADB chief warns of yen pressure from Japan too - slow rate hikes",
+        "url": "https://www.asiaone.com/money/adb-chief-warns-yen-pressure-japans-too-slow-rate-hikes",
+        "published_at": "2026-04-19T06:15:00+00:00",
+        "rule": "rate_hike",
+        "event_type": "RATE_DECISION",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "4e28ec6c65fdb64a2eed300c",
+        "source_id": "GDELT:businesstimes.com.sg",
+        "title": "Iran war revives stagflation dangers for global economy",
+        "url": "https://www.businesstimes.com.sg/international/iran-war-revives-stagflation-dangers-global-economy",
+        "published_at": "2026-04-19T06:45:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "1bbeb2f8eeb889a9bd2f2532",
+    "context_hash": "44ae086d6ac6a5ff0932b289f1a3ce49de01fd0f3f925888d73515dfe70f5809",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-04-20T00:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "8ca9d2772462391f4d1ecc8f",
+        "source_id": "GDELT:theshillongtimes.com",
+        "title": "Iran reaffirms Strait of Hormuz blockade as ceasefire winds down",
+        "url": "https://theshillongtimes.com/2026/04/20/iran-reaffirms-strait-of-hormuz-blockade-as-ceasefire-winds-down/",
+        "published_at": "2026-04-20T00:30:00+00:00",
+        "rule": "strait_closure",
+        "event_type": "STRAIT_CLOSURE",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "927f5977ac85bab749d8823d",
+        "source_id": "GDELT:businesstimes.com.sg",
+        "title": "ESG loans in South - east Asia fall 46 % in Q1 2026 amid heightened volatility from Iran war",
+        "url": "https://www.businesstimes.com.sg/esg/esg-loans-south-east-asia-fall-46-q1-2026-amid-heightened-volatility-iran-war",
+        "published_at": "2026-04-20T00:45:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      },
+      {
+        "event_id": "50822742ed82d512ae127af5",
+        "source_id": "GDELT:thetimes.com",
+        "title": "UK to  flirt  with recession amid Iran oil shock and inflation",
+        "url": "https://www.thetimes.com/business/economics/article/uk-flirt-recession-iran-oil-shock-inflation-rates-vbfr5gl2p",
+        "published_at": "2026-04-20T00:45:00+00:00",
+        "rule": "recession_signal",
+        "event_type": "RECESSION_SIGNAL",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "9818ee8dc9601108aae6740a",
+    "context_hash": "b3e2caf531de5a7178c124c32953baaff451afab9083d969d51e6c6ad7b715ae",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-04-24T18:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "62d0361b58c1a4ead6e52371",
+        "source_id": "GDELT:manilatimes.net",
+        "title": "War worries , rate hike weigh on peso , stocks",
+        "url": "https://www.manilatimes.net/2026/04/25/business/top-business/war-worries-rate-hike-weigh-on-peso-stocks/2328056",
+        "published_at": "2026-04-24T18:30:00+00:00",
+        "rule": "rate_hike",
+        "event_type": "RATE_DECISION",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "9a9a05c26373a27b9a1376a4",
+        "source_id": "GDELT:manilatimes.net",
+        "title": "Iran war impact seeps ever deeper into global economy",
+        "url": "https://www.manilatimes.net/2026/04/25/business/top-business/iran-war-impact-seeps-ever-deeper-into-global-economy/2328059",
+        "published_at": "2026-04-24T18:30:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      },
+      {
+        "event_id": "1e455e177dfac530b472b332",
+        "source_id": "GDELT:abcnews.com",
+        "title": "Could the standoff in the Strait of Hormuz trigger a global recession ? Economists weigh in",
+        "url": "https://abcnews.com/Business/standoff-strait-hormuz-trigger-global-recession-economists-weigh/story?id=132270330",
+        "published_at": "2026-04-24T18:45:00+00:00",
+        "rule": "recession_signal",
+        "event_type": "RECESSION_SIGNAL",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "3fe0adf27bff651466fcecd7",
+    "context_hash": "a71b5ecb68180773275eb5ecf147d244f530e874d7157a2bdac291519c17c47c",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-04-29T20:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "e2b2f75f22607711706446e0",
+        "source_id": "GDELT:aol.co.uk",
+        "title": "The Bank of England would be wrong to raise interest rates",
+        "url": "https://www.aol.co.uk/articles/bank-england-wrong-raise-interest-192925259.html",
+        "published_at": "2026-04-29T20:00:00+00:00",
+        "rule": "rate_hike",
+        "event_type": "RATE_DECISION",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "6e6e42dd4e8c0237bc6cdc9d",
+        "source_id": "GDELT:pakistantelegraph.com",
+        "title": "60 days later : the US - Israeli war on Iran so far",
+        "url": "http://www.pakistantelegraph.com/news/279019461/60-days-later-the-us-israeli-war-on-iran-so-far",
+        "published_at": "2026-04-29T20:00:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "b5333234b6218fb566bf059b",
+    "context_hash": "93903048ff25a5d47693b97023dce49e3fbb090d7bd04ce19fb7f019e29119bf",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-04-29T23:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "605cb1f518725ebaea059a35",
+        "source_id": "GDELT:calgaryherald.com",
+        "title": "Hawkish  Bank of Canada has economists warning of rate hikes sooner than expected",
+        "url": "https://calgaryherald.com/news/economy/bank-of-canada-rate-hikes-come-sooner-than-expected/wcm/e043dcd7-8f55-4576-bff0-34c6d15b9525",
+        "published_at": "2026-04-29T23:30:00+00:00",
+        "rule": "rate_hike",
+        "event_type": "RATE_DECISION",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "02eafba2746e4c487b5bc5b1",
+        "source_id": "GDELT:bondbuyer.com",
+        "title": "Munis and USTs weaken as Strait of Hormuz blockade drags on",
+        "url": "https://www.bondbuyer.com/news/munis-and-usts-weaken-as-strait-of-hormuz-blockade-drags-on",
+        "published_at": "2026-04-29T23:15:00+00:00",
+        "rule": "strait_closure",
+        "event_type": "STRAIT_CLOSURE",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "c0b0f8ba328298336b538629",
+        "source_id": "GDELT:pasadenastarnews.com",
+        "title": "Airline pilot approaching San Diego airport reports seeing drone , but doesnt strike it – Pasadena Star News",
+        "url": "https://www.pasadenastarnews.com/2026/04/29/airline-pilot-approaching-san-diego-airport-reports-seeing-drone-but-doesnt-strike-it/",
+        "published_at": "2026-04-29T23:45:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      },
+      {
+        "event_id": "4b2ec27f4767cb8fe87781fd",
+        "source_id": "GDELT:morningstar.com",
+        "title": "As Powell Closes Out Term as Fed Chair , Odds of Rate Cut in 2026 Vanish",
+        "url": "https://www.morningstar.com/economy/powell-closes-out-term-fed-chair-odds-rate-cut-2026-vanish",
+        "published_at": "2026-04-29T23:45:00+00:00",
+        "rule": "rate_cut",
+        "event_type": "RATE_DECISION",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "10e5f552086a3a4f8047894d",
+    "context_hash": "b1f043bd83956b784e8a8dfb6ae3387ab217a584478d93d2ccf18c543b434555",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-04-30T00:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "601637a90ed29d94a6a68e80",
+        "source_id": "GDELT:933thedrive.com",
+        "title": "Analysis - BOJ locks in June rate hike in a risky bet that nothing gets worse",
+        "url": "https://www.933thedrive.com/2026/04/29/analysis-boj-locks-in-june-rate-hike-in-a-risky-bet-that-nothing-gets-worse/",
+        "published_at": "2026-04-30T00:15:00+00:00",
+        "rule": "rate_hike",
+        "event_type": "RATE_DECISION",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "1eb3bc1498d6b11dcb71e939",
+        "source_id": "GDELT:rigzone.com",
+        "title": "Oil Surges as Hormuz Blockade Bites",
+        "url": "https://www.rigzone.com/news/wire/oil_surges_as_hormuz_blockade_bites-29-apr-2026-183571-article/",
+        "published_at": "2026-04-30T00:30:00+00:00",
+        "rule": "strait_closure",
+        "event_type": "STRAIT_CLOSURE",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "b5de192143009fd625a332cd",
+        "source_id": "GDELT:theyeshivaworld.com",
+        "title": "$25 BILLION WAR : Pentagon Reveals Massive Cost of U . S . Military Campaign Against Iran",
+        "url": "https://www.theyeshivaworld.com/news/israel-news/2542376/25-billion-war-pentagon-reveals-massive-cost-of-u-s-military-campaign-against-iran.html",
+        "published_at": "2026-04-30T00:00:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      },
+      {
+        "event_id": "9985716ecbbc40cab726a14c",
+        "source_id": "GDELT:breitbart.com",
+        "title": "U . S . Tightens Sanctions as Iran Admits Sting of  Major  Leadership Losses",
+        "url": "https://www.breitbart.com/middle-east/2026/04/29/u-s-tightens-sanctions-as-iran-admits-sting-of-major-leadership-losses/",
+        "published_at": "2026-04-30T00:15:00+00:00",
+        "rule": "sanctions",
+        "event_type": "SANCTIONS",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "651bc37496b21a98d4e152ce",
+    "context_hash": "5f21cafbe3362d0b2b95df4b031704a4b8542776731a2e489896a916b8f073b6",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-05-04T11:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "d75dc8c62b129d7507ad8225",
+        "source_id": "GDELT:investinglive.com",
+        "title": "ECB policymaker Kažimír says that a rate hike in June is all but inevitable",
+        "url": "https://investinglive.com/centralbank/ecb-policymaker-kaimr-says-that-a-rate-hike-in-june-is-all-but-inevitable-20260504/",
+        "published_at": "2026-05-04T11:15:00+00:00",
+        "rule": "rate_hike",
+        "event_type": "RATE_DECISION",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "25d51e8a107a6ab178d810ef",
+        "source_id": "GDELT:lasvegassun.com",
+        "title": "Iran war may become a  phoney Sitzkrieg  - Las Vegas Sun News",
+        "url": "https://lasvegassun.com/news/2026/may/04/iran-war-may-become-a-phoney-sitzkrieg/",
+        "published_at": "2026-05-04T11:45:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "8ec9925067ba141e22be2b3a",
+    "context_hash": "51aad99855c96399249b3be9f61866f5d23c50615c4dd95aa80033aa2fcf94e2",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-05-04T19:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "fa7540ab202256573293a769",
+        "source_id": "GDELT:933thedrive.com",
+        "title": "ECB may need to hike rates in June , Nagel says",
+        "url": "https://www.933thedrive.com/2026/05/04/ecb-may-need-to-hike-rates-in-june-nagel-says/",
+        "published_at": "2026-05-04T19:00:00+00:00",
+        "rule": "rate_hike",
+        "event_type": "RATE_DECISION",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "8cd8483806669f66dd407205",
+        "source_id": "GDELT:yahoo.com",
+        "title": "Opinion - Trump obsession with Obama fuels his Iran war strategy",
+        "url": "https://www.yahoo.com/news/articles/opinion-trump-obsession-obama-fuels-133000383.html",
+        "published_at": "2026-05-04T19:45:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      },
+      {
+        "event_id": "b9a6fe88b9956a57a459d806",
+        "source_id": "GDELT:oilandgas360.com",
+        "title": "$125 oil could tip global economy into recession",
+        "url": "https://www.oilandgas360.com/125-oil-could-tip-global-economy-into-recession/",
+        "published_at": "2026-05-04T19:15:00+00:00",
+        "rule": "recession_signal",
+        "event_type": "RECESSION_SIGNAL",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "c39627dbc02ec0a517e34f3a",
+    "context_hash": "adec1c5e45078dca2de99db67d31467ffa37ee674b37388c7fbbd3aa09a99523",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-05-04T23:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "7b1b416387fc8ecc7c434f82",
+        "source_id": "GDELT:navhindtimes.in",
+        "title": "Iran resumes attacks on UAE as US moves to reopen Hormuz",
+        "url": "https://navhindtimes.in/worldnews/iran-resumes-attacks-on-uae-as-us-moves-to-reopen-hormuz/",
+        "published_at": "2026-05-04T23:45:00+00:00",
+        "rule": "strait_closure",
+        "event_type": "STRAIT_CLOSURE",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "2ced7c91c4ccf0b7aaf66f1d",
+        "source_id": "GDELT:finance.yahoo.com",
+        "title": "Analysis - Asia battles rising , uneven toll of energy crisis caused by Iran war",
+        "url": "https://finance.yahoo.com/sectors/energy/articles/analysis-asia-battles-rising-uneven-230342651.html",
+        "published_at": "2026-05-04T23:30:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "01140fb3cb6bd09e60cdcd1b",
+    "context_hash": "d9eeeebfabca9bbb492954a19049d0654f32fbdbcae83bfbb506dd3f309e6ff4",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-05-05T00:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "a756781660bf9350006b196b",
+        "source_id": "GDELT:theeconomiccollapseblog.com",
+        "title": "California Is Facing A  Fuelmaggedon  As Fighting Erupts In The Middle East And The Strait Of Hormuz Remains Closed",
+        "url": "http://theeconomiccollapseblog.com/california-is-facing-a-fuelmaggedon-as-fighting-erupts-in-the-middle-east-and-the-strait-of-hormuz-remains-closed/",
+        "published_at": "2026-05-05T00:30:00+00:00",
+        "rule": "strait_closure",
+        "event_type": "STRAIT_CLOSURE",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "c5f19991b454a9d5a02e5738",
+        "source_id": "GDELT:jpost.com",
+        "title": "IMF warns of worse outcome if Iran war drags into 2027",
+        "url": "http://www.jpost.com/middle-east/iran-news/article-895128",
+        "published_at": "2026-05-05T00:30:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "4ca9d6a61cddf9cfc7de074a",
+    "context_hash": "9bc9be84d6ff705f836aa4fb24a9e4e49a10f9120207342d8f3558464fc6e519",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-05-05T01:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "b6c3f3a0e4be0bc5e3225cda",
+        "source_id": "GDELT:whdh.com",
+        "title": "The US fights to reopen the Strait of Hormuz as the UAE comes under attack in a test of Iran truce - Boston News , Weather , Sports",
+        "url": "https://whdh.com/news/the-us-fights-to-reopen-the-strait-of-hormuz-as-the-uae-comes-under-attack-in-a-test-of-iran-truce/",
+        "published_at": "2026-05-05T01:00:00+00:00",
+        "rule": "strait_closure",
+        "event_type": "STRAIT_CLOSURE",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "04b788417a3b768409011e07",
+        "source_id": "GDELT:marketscreener.com",
+        "title": "Asia battles rising , uneven toll of energy crisis caused by Iran war",
+        "url": "https://www.marketscreener.com/news/asia-battles-rising-uneven-toll-of-energy-crisis-caused-by-iran-war-ce7f58dfdd81f725",
+        "published_at": "2026-05-05T01:00:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "478cbde45030d9af8a8d71a3",
+    "context_hash": "00525e058e920b20a1bdc73fa7c2a33d10e81ee300102b2c7aa4e2ce1fd01180",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-05-14T09:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "17542977cd4bd5ae02085e06",
+        "source_id": "GDELT:econotimes.com",
+        "title": "BOJ Rate Hike Expectations Grow as Board Member Signals Hawkish Stance",
+        "url": "http://www.econotimes.com/BOJ-Rate-Hike-Expectations-Grow-as-Board-Member-Signals-Hawkish-Stance-1741684",
+        "published_at": "2026-05-14T09:45:00+00:00",
+        "rule": "rate_hike",
+        "event_type": "RATE_DECISION",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "e2eb460cf717f14ae567b671",
+        "source_id": "GDELT:perthnow.com.au",
+        "title": "UK records strong growth but Iran war casts shadow",
+        "url": "https://www.perthnow.com.au/news/business/uk-records-strong-growth-but-iran-war-casts-shadow-c-22285224",
+        "published_at": "2026-05-14T09:30:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "36e6c3088a36866649ac26e9",
+    "context_hash": "ecc9604829a55c1d1276e702ff00e158622b961a68550b21401a3e8abeef10a8",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-05-14T22:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "3019b7b81ec67cf799b0faa6",
+        "source_id": "GDELT:parisguardian.com",
+        "title": "Why the ECB may be forced to raise rates despite weak EU economy",
+        "url": "http://www.parisguardian.com/news/279051014/why-the-ecb-may-be-forced-to-raise-rates-despite-weak-eu-economy",
+        "published_at": "2026-05-14T22:00:00+00:00",
+        "rule": "rate_hike",
+        "event_type": "RATE_DECISION",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "8d66aa33b39e534be081c1ae",
+        "source_id": "GDELT:keprtv.com",
+        "title": "As Trump and Xi discuss Strait of Hormuz closure , Washington mulls pausing gas tax",
+        "url": "https://keprtv.com/news/nation-world/trump-xi-discuss-strait-of-hormuz-closure-washington-mulls-pausing-gas-tax-china-visit-iran-war-blockade-oil",
+        "published_at": "2026-05-14T22:45:00+00:00",
+        "rule": "strait_closure",
+        "event_type": "STRAIT_CLOSURE",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "7f2296f9b1c41a17f2020129",
+        "source_id": "GDELT:finance.yahoo.com",
+        "title": "Dollar Climbs as Inflation Fears Push Bond Yields Higher",
+        "url": "https://finance.yahoo.com/news/dollar-climbs-inflation-fears-push-144557159.html",
+        "published_at": "2026-05-14T22:45:00+00:00",
+        "rule": "inflation_rise",
+        "event_type": "INFLATION_CHANGE",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      },
+      {
+        "event_id": "dd492023154c3d5d5d193120",
+        "source_id": "GDELT:algemeiner.com",
+        "title": "US Senate Blocks Latest Bid to Rein in Trump Iran War Powers , Support Grows",
+        "url": "https://www.algemeiner.com/2026/05/14/us-senate-blocks-latest-bid-rein-in-trump-iran-war-powers-support-grows/",
+        "published_at": "2026-05-14T22:45:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "2acce4b5cdadd63e99a53c1d",
+    "context_hash": "4e6572bdb48bca1238f16c2952c3d29b14d3c75f4665efcb88a7eeca02d1497e",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-05-14T23:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "f4aafe3febcba9e9c9fede55",
+        "source_id": "GDELT:sierraleonetimes.com",
+        "title": "Why the ECB may be forced to raise rates despite weak EU economy",
+        "url": "http://www.sierraleonetimes.com/news/279051014/why-the-ecb-may-be-forced-to-raise-rates-despite-weak-eu-economy",
+        "published_at": "2026-05-14T23:00:00+00:00",
+        "rule": "rate_hike",
+        "event_type": "RATE_DECISION",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "a4e20c781e2ea3ebb18c73fc",
+        "source_id": "GDELT:wnd.com",
+        "title": "A net positive : Chinese supertanker glides through Hormuz blockade as White House touts  good  talks in Beijing * WorldNetDaily * by Daily Caller News Foundation",
+        "url": "https://www.wnd.com/2026/05/net-positive-chinese-supertanker-glides-through-hormuz-blockade/",
+        "published_at": "2026-05-14T23:45:00+00:00",
+        "rule": "strait_closure",
+        "event_type": "STRAIT_CLOSURE",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "d0e0bfb4a60ae58a7b7ed848",
+        "source_id": "GDELT:mining.com",
+        "title": "Gold price steadies as inflation revives higher - rate bets",
+        "url": "https://www.mining.com/gold-prices-steadies-as-inflation-revives-higher-rate-bets/",
+        "published_at": "2026-05-14T23:30:00+00:00",
+        "rule": "inflation_rise",
+        "event_type": "INFLATION_CHANGE",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      },
+      {
+        "event_id": "6c3904e8a9600c33de7cf517",
+        "source_id": "GDELT:themedialine.org",
+        "title": "4 Wounded , One Critically ,  in Rosh Hanikra Drone Strike as Israel - Lebanon Talks Resume in Washington",
+        "url": "https://themedialine.org/headlines/4-wounded-one-critically-in-rosh-hanikra-drone-strike-as-israel-lebanon-talks-resume-in-washington/",
+        "published_at": "2026-05-14T23:45:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "05c8ee6a1de77f2eecd3631b",
+    "context_hash": "05ac8d11c5dac5f5dc16974652f5936287fed58728a2918985063fef68a823b3",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-05-15T00:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "c508e5cba65cd7f148f509ec",
+        "source_id": "GDELT:newyorkstatesman.com",
+        "title": "Why the ECB may be forced to raise rates despite weak EU economy",
+        "url": "http://www.newyorkstatesman.com/news/279051014/why-the-ecb-may-be-forced-to-raise-rates-despite-weak-eu-economy",
+        "published_at": "2026-05-15T00:30:00+00:00",
+        "rule": "rate_hike",
+        "event_type": "RATE_DECISION",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "e3d58b2bffe3aff8450d38fd",
+        "source_id": "GDELT:13wham.com",
+        "title": "As Trump and Xi discuss Strait of Hormuz closure , Washington mulls pausing gas tax",
+        "url": "https://13wham.com/news/nation-world/trump-xi-discuss-strait-of-hormuz-closure-washington-mulls-pausing-gas-tax-china-visit-iran-war-blockade-oil",
+        "published_at": "2026-05-15T00:30:00+00:00",
+        "rule": "strait_closure",
+        "event_type": "STRAIT_CLOSURE",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "840307b79188d81c21e0617c",
+        "source_id": "GDELT:yahoo.com",
+        "title": "3 House Republicans Join Democrats In Opposing Iran War",
+        "url": "https://www.yahoo.com/news/articles/3-house-republicans-join-democrats-233001856.html",
+        "published_at": "2026-05-15T00:30:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "558031269e89b0c1b73f2d9b",
+    "context_hash": "2364818db880d235af34198f6b32597aee8aa9ababd5b4d8eb18d6ddf1ec2001",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-05-15T22:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "797f436fd1ff059863845124",
+        "source_id": "GDELT:9news.com.au",
+        "title": "Australian housing market : Home buyer tighten spending off the back of of consecutive rate hikes",
+        "url": "https://www.9news.com.au/national/cash-rate-hikes-home-buyers-tighten-spending-off-the-back-of-consecutive-increases/85417782-91c4-4667-9715-ccf626d65649",
+        "published_at": "2026-05-15T22:00:00+00:00",
+        "rule": "rate_hike",
+        "event_type": "RATE_DECISION",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "42188f778eea80d437334c56",
+        "source_id": "GDELT:paloaltoonline.com",
+        "title": "California schools , agencies face higher fuel prices from Iran war",
+        "url": "https://www.paloaltoonline.com/calmatters/2026/05/15/california-schools-agencies-face-higher-fuel-prices-from-iran-war/",
+        "published_at": "2026-05-15T22:15:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "05e306322232dffac21c39c9",
+    "context_hash": "dff382c2ec67463f02b2748d65ee22364f1353ba1be07edcd27ae8a3c2abaf60",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-05-15T23:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "40adaef2f92f10bccfe8cbbb",
+        "source_id": "GDELT:bondbuyer.com",
+        "title": "Munis , USTs cheapen in inflation fallout",
+        "url": "https://www.bondbuyer.com/news/munis-usts-cheapen-in-inflation-fallout",
+        "published_at": "2026-05-15T23:30:00+00:00",
+        "rule": "inflation_fall",
+        "event_type": "INFLATION_CHANGE",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "cd0e36be615d52314d1b71ab",
+        "source_id": "GDELT:gdnonline.com",
+        "title": "International Business : Investors begin eyeing Fed rate hike around turn of the year",
+        "url": "https://www.gdnonline.com/Details/1394865",
+        "published_at": "2026-05-15T23:45:00+00:00",
+        "rule": "rate_hike",
+        "event_type": "RATE_DECISION",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "7cf872eba6ac1db321a9f67f",
+        "source_id": "GDELT:naija247news.com",
+        "title": "Nigeria Inflation May Accelerate To 20 % By Year - End , FDC Warns",
+        "url": "https://naija247news.com/694369-2/",
+        "published_at": "2026-05-15T23:00:00+00:00",
+        "rule": "inflation_rise",
+        "event_type": "INFLATION_CHANGE",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      },
+      {
+        "event_id": "a6f19807da50e6f637ae7932",
+        "source_id": "GDELT:timesofindia.indiatimes.com",
+        "title": "BJP : Smallest fuel hike among major economies since Iran war",
+        "url": "https://timesofindia.indiatimes.com/india/bjp-smallest-fuel-hike-among-major-economies-since-iran-war/articleshow/131129766.cms",
+        "published_at": "2026-05-15T23:15:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "228c32ecb0f1a6c832564d3f",
+    "context_hash": "bac72dd344762c099e7c7eef4928cadd3b6ba0f591d4f4f341601d1cf707e4eb",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-05-18T23:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "f5788dacb8688c537dacd558",
+        "source_id": "GDELT:moneytalksnews.com",
+        "title": "Fed Rate Hike Odds Rise as Inflation Surges . What It Means for You",
+        "url": "https://www.moneytalksnews.com/fed-rate-hike-odds-rise-as-inflation-surges-what-it-means-for-you/",
+        "published_at": "2026-05-18T23:30:00+00:00",
+        "rule": "rate_hike",
+        "event_type": "RATE_DECISION",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "f923dd2d1d73177f3b900c34",
+        "source_id": "GDELT:circleid.com",
+        "title": "Economic Stress Is Testing Broadband Recession - Proof Reputation",
+        "url": "https://circleid.com/posts/economic-stress-is-testing-broadbands-recession-proof-reputation",
+        "published_at": "2026-05-18T23:30:00+00:00",
+        "rule": "recession_signal",
+        "event_type": "RECESSION_SIGNAL",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "dd4a37d85b410252fcd16431",
+    "context_hash": "8496b0acce2ec5671b66c2628a3a55a8f8ec64906bac3618ac77a97b0d67c79f",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-05-24T19:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "3b24992c13d738b050e88fe5",
+        "source_id": "GDELT:businessday.co.za",
+        "title": "ECONOMIC WEEK AHEAD | Interest rate hike on the cards as inflation accelerates",
+        "url": "https://www.businessday.co.za/economy/2026-05-24-economic-week-ahead-interest-rate-hike-on-the-cards-as-inflation-accelerates/",
+        "published_at": "2026-05-24T19:30:00+00:00",
+        "rule": "rate_hike",
+        "event_type": "RATE_DECISION",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "e83b763a021af7f2e8b36547",
+        "source_id": "GDELT:businessday.co.za",
+        "title": "ECONOMIC WEEK AHEAD | Interest rate hike on the cards as inflation accelerates",
+        "url": "https://www.businessday.co.za/economy/2026-05-24-economic-week-ahead-interest-rate-hike-on-the-cards-as-inflation-accelerates/",
+        "published_at": "2026-05-24T19:30:00+00:00",
+        "rule": "inflation_rise",
+        "event_type": "INFLATION_CHANGE",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      },
+      {
+        "event_id": "e9d7520ac15b5662f3147bf0",
+        "source_id": "GDELT:nvdaily.com",
+        "title": "Republicans who have drawn a hard line on Iran pan Trump emerging proposal to end the war",
+        "url": "https://www.nvdaily.com/associated_press_national/republicans-who-have-drawn-a-hard-line-on-iran-pan-trumps-emerging-proposal-to-end/article_886ae835-1b4e-58c6-ba13-c0c064af8bae.html",
+        "published_at": "2026-05-24T19:30:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "369f28c9435fbf0cff739d52",
+    "context_hash": "54877deec18ac1f6c7a9e4bb562e7074d43f458eb6c24b2e9d48e9a5daef7c75",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-05-24T20:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "cf8c0bedf9da14f5378615c1",
+        "source_id": "GDELT:thevermilion.com",
+        "title": "Trump announcement :  There is an agreement with Iran , Hormuz will be reopened , Tehran freezes it :  It will remain under our control . What in the draft agreement",
+        "url": "https://www.thevermilion.com/trumps-announcement-there-is-an-agreement-with-iran-hormuz-will-be-reopened-tehran-freezes-it-it-will-remain-under-our-control-whats-in-the-draft-agreement/article_18253/",
+        "published_at": "2026-05-24T20:15:00+00:00",
+        "rule": "strait_closure",
+        "event_type": "STRAIT_CLOSURE",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "cfb2428982c8fdb577c14bfe",
+        "source_id": "GDELT:ksl.com",
+        "title": "Airline miles may not go as far as the Iran war drives up fuel costs and summer fares",
+        "url": "https://www.ksl.com/article/51501657/airline-miles-may-not-go-as-far-as-the-iran-war-drives-up-fuel-costs-and-summer-fares",
+        "published_at": "2026-05-24T20:15:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "fa39a231583d941cb7f546ac",
+    "context_hash": "c38a98a2222b55030e447f960dc93528352a568b8768596586c5929aa1bdba17",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-05-24T21:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "31a2184b9672051577299376",
+        "source_id": "GDELT:keralakaumudi.com",
+        "title": "West Asia conflict : Deal efforts underway to reopen Strait of Hormuz amid tough conditions",
+        "url": "https://keralakaumudi.com/en/en/world/others/west-asia-conflict-deal-efforts-underway-to-reopen-strait-of-hormuz-amid-tough-conditions-1753140",
+        "published_at": "2026-05-24T21:30:00+00:00",
+        "rule": "strait_closure",
+        "event_type": "STRAIT_CLOSURE",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "a1b30c0dc776860c78a01869",
+        "source_id": "GDELT:niagarafallsreview.ca",
+        "title": "Republicans who have drawn a hard line on Iran pan Trump emerging proposal to end the war",
+        "url": "https://www.niagarafallsreview.ca/news/world/united-states/republicans-who-have-drawn-a-hard-line-on-iran-pan-trumps-emerging-proposal-to-end-the-war/article_4fca7e4a-cd4b-5ca8-b1ae-ddc1093afd61.html",
+        "published_at": "2026-05-24T21:30:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "e5f4985a415bc1f3889f9f9e",
+    "context_hash": "30b5419813688af3c256c0f5453a896a1a21a6c1f254f1dd23bfb1c7bd45d5c0",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-05-24T22:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "012026dad1c0ea99f440eba6",
+        "source_id": "GDELT:fox2detroit.com",
+        "title": "Iran latest : US finalizing deal to end war , reopen Strait of Hormuz",
+        "url": "https://www.fox2detroit.com/news/iran-latest-may-24",
+        "published_at": "2026-05-24T22:00:00+00:00",
+        "rule": "strait_closure",
+        "event_type": "STRAIT_CLOSURE",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "66ce71dc5adba47a20653ff0",
+        "source_id": "GDELT:dailykos.com",
+        "title": "BREAKING ? The Iran War Will End in  Day According to Trump , Who Has Been Saying that for Months",
+        "url": "https://www.dailykos.com/stories/2026/5/24/800044263/community/breaking-the-iran-war-will-end-in-days-according-to-trump-who-has-been-saying-that-for-months/",
+        "published_at": "2026-05-24T22:45:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "8bf98f3cd12ca53ab3885e8f",
+    "context_hash": "5ebbd49fee82dee67b112ed2d81f39e0569fe4a5eba516843b839aa404e55224",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-05-25T00:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "29e140879eb21ac6618fb131",
+        "source_id": "GDELT:scmp.com",
+        "title": "Crude oil drops as US inches towards Iran deal to reopen Strait of Hormuz",
+        "url": "https://www.scmp.com/news/article/3354707/crude-oil-drops-us-inches-towards-iran-deal-reopen-strait-hormuz",
+        "published_at": "2026-05-25T00:00:00+00:00",
+        "rule": "strait_closure",
+        "event_type": "STRAIT_CLOSURE",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "9c2801f2c5e9f3da59d37cf6",
+        "source_id": "GDELT:abcnews.com",
+        "title": "GOP who have drawn a hard line on Iran pan Trump emerging proposal to end the war",
+        "url": "https://abcnews.com/Politics/wireStory/republicans-drawn-hard-line-iran-pan-trumps-emerging-133271757",
+        "published_at": "2026-05-25T00:00:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "643aab3e92716ba66dd7735e",
+    "context_hash": "e565df76106eead8f4cc7174f4b4bfd8a1445a993889d433645410273431fc0e",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-06-14T19:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "1fb974ba9c7bf080f08c7d47",
+        "source_id": "GDELT:philstar.com",
+        "title": "BSP rate hike imminent , but analysts split on size",
+        "url": "https://www.philstar.com/business/2026/06/15/2535208/bsp-rate-hike-imminent-analysts-split-size",
+        "published_at": "2026-06-14T19:00:00+00:00",
+        "rule": "rate_hike",
+        "event_type": "RATE_DECISION",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "dbf02254fe1a74a62689e2a2",
+        "source_id": "GDELT:pakistantoday.com.pk",
+        "title": "US - Iran Deal Nears as Hormuz Strait Reopens",
+        "url": "https://www.pakistantoday.com.pk/2026/06/14/closing-in-on-a-deal",
+        "published_at": "2026-06-14T19:00:00+00:00",
+        "rule": "strait_closure",
+        "event_type": "STRAIT_CLOSURE",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "5bd484be715054d6953287e0",
+        "source_id": "GDELT:gazetteseries.co.uk",
+        "title": "Putin and Zelensky each speak to Trump as drone strikes kill two in Russia",
+        "url": "https://www.gazetteseries.co.uk/news/national/26193291.putin-zelensky-speak-trump-drone-strikes-kill-two-russia/",
+        "published_at": "2026-06-14T19:00:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "faf862ad5aef44e2bea5a41c",
+    "context_hash": "1bddd3e44169f256af1e35c4cad57f662b9b18ef0256c4ccee81246e7d658a3a",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-06-14T22:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "342e7ce36d1cb4ac5252a476",
+        "source_id": "GDELT:news.webindia123.com",
+        "title": "Let the oil flow : Trump announces completion of US - Iran peace deal , removes naval blockade on Hormuz",
+        "url": "https://news.webindia123.com/news/Articles/World/20260615/4462553.html",
+        "published_at": "2026-06-14T22:45:00+00:00",
+        "rule": "strait_closure",
+        "event_type": "STRAIT_CLOSURE",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "ee886a6d3b546a551cf16ab2",
+        "source_id": "GDELT:thestar.com",
+        "title": "Deal is reached to end Iran war and Trump orders stop to US naval blockade",
+        "url": "https://www.thestar.com/news/world/middle-east/qatari-mediators-travel-to-tehran-for-final-touches-on-a-possible-deal-to-end-war/article_4b95573b-fecd-509c-880d-0b2f46fba404.html",
+        "published_at": "2026-06-14T22:45:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  },
+  {
+    "context_id": "4ecccdcf541a8de6fc6bc433",
+    "context_hash": "f1292b0301ab7f963489a19239edb4219dcfe97d2a679a4a8da87d9e38c609fa",
+    "context_version": 1,
+    "asset_id": "GOLD",
+    "window_start": "2026-06-14T23:00:00+00:00",
+    "window_minutes": 60,
+    "graph_fixture_version": "p06-graph-v1",
+    "signals": [
+      {
+        "event_id": "095ed35c6ed95adbbc7e05fc",
+        "source_id": "GDELT:fox2detroit.com",
+        "title": "Gas prices wont drop anytime soon despite Strait of Hormuz reopening , EIA says",
+        "url": "https://www.fox2detroit.com/news/gas-prices-wont-drop-anytime-soon-despite-strait-hormuz-reopening-eia-says",
+        "published_at": "2026-06-14T23:45:00+00:00",
+        "rule": "strait_closure",
+        "event_type": "STRAIT_CLOSURE",
+        "asset_id": "GOLD",
+        "direction": "DOWN"
+      },
+      {
+        "event_id": "bed0bdf96f323db597d7eff2",
+        "source_id": "GDELT:breitbart.com",
+        "title": "Brent Crude Falls To Lowest Price Since March 5 on Iran War End",
+        "url": "https://www.breitbart.com/economy/2026/06/14/brent-crude-falls-to-lowest-price-since-march-5-on-iran-wars-end/",
+        "published_at": "2026-06-14T23:45:00+00:00",
+        "rule": "military_conflict",
+        "event_type": "MILITARY_CONFLICT",
+        "asset_id": "GOLD",
+        "direction": "UP"
+      }
+    ],
+    "outcome_joined": false
+  }
+]

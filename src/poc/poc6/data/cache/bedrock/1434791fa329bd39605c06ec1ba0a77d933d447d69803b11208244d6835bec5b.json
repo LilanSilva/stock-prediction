@@ -1,0 +1,27 @@
+{
+  "context_id": "70d61c9d962e2af441dcd450",
+  "context_hash": "e4d93f5b8fcecf15c78027bcc0a1204ab6a19ffd245b035d84de79fea82d6ce9",
+  "asset_id": "GOLD",
+  "mode": "LLM_ONLY",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "SMALL",
+    "confidence": 0.55,
+    "rationale": "Iran war ceasefire uncertainty keeps safe-haven demand elevated. Slow Japan rate hikes weaken yen slightly, mildly supporting dollar-priced gold. Net modest upward bias."
+  },
+  "usage": {
+    "input_tokens": 182,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 86
+  },
+  "response_hash": "111fb0cb13bf540b2b6376303c16aae73682a07c043307488ee0317036f0ae3f",
+  "cache_hit": false,
+  "status": "OK"
+}

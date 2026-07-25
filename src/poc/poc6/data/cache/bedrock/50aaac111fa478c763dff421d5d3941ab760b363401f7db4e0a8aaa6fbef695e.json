@@ -1,0 +1,27 @@
+{
+  "context_id": "3fe0adf27bff651466fcecd7",
+  "context_hash": "a71b5ecb68180773275eb5ecf147d244f530e874d7157a2bdac291519c17c47c",
+  "asset_id": "GOLD",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "MEDIUM",
+    "confidence": 0.65,
+    "rationale": "Military conflict involving US-Israel-Iran drives safe-haven gold demand (weight 0.7). Rate cut signal mildly supportive. Conflict risk dominates, net upward pressure."
+  },
+  "usage": {
+    "input_tokens": 251,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 86
+  },
+  "response_hash": "9f5c1c65ac7d2a4db94a95b1e90f65ca6eccdebe27ca23a665e1867d779628d0",
+  "cache_hit": false,
+  "status": "OK"
+}

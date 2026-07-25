@@ -1,0 +1,27 @@
+{
+  "context_id": "c7d71df658e50cd23070c23c",
+  "context_hash": "cc633b4812ab0aa22514e22c441bae83edfe9274cd8db296f7f8af3c8614f857",
+  "asset_id": "BRENT_OIL",
+  "mode": "LLM_ONLY",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "MEDIUM",
+    "confidence": 0.58,
+    "rationale": "Iran military conflict risk dominates oil supply fears, outweighing recession demand destruction. Geopolitical supply disruption premium typically overrides near-term demand concerns for Brent."
+  },
+  "usage": {
+    "input_tokens": 184,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 84
+  },
+  "response_hash": "0e642d641ba081f74ca4a8197001ecca81c13b3572809535af524c8806a45b7f",
+  "cache_hit": false,
+  "status": "OK"
+}

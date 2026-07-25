@@ -1,0 +1,27 @@
+{
+  "context_id": "753cfbd950d29410b8fd7d94",
+  "context_hash": "19f5fc7d9cee2490ef2ed77d7da7f7aefdd4dc267285c096b1b9777e1da3a19c",
+  "asset_id": "BRENT_OIL",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "SMALL",
+    "confidence": 0.52,
+    "rationale": "Military conflict/Iran war risk (weight 0.6) narrowly outweighs recession demand-destruction signal (weight -0.4), yielding modest upward bias with low conviction."
+  },
+  "usage": {
+    "input_tokens": 246,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 86
+  },
+  "response_hash": "c450f43254bb0eb80f2468421c894a44d04a98366d1f4af61edd09a32c3335bb",
+  "cache_hit": false,
+  "status": "OK"
+}

@@ -1,0 +1,27 @@
+{
+  "context_id": "faf862ad5aef44e2bea5a41c",
+  "context_hash": "1bddd3e44169f256af1e35c4cad57f662b9b18ef0256c4ccee81246e7d658a3a",
+  "asset_id": "GOLD",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "DOWN",
+    "magnitude": "MEDIUM",
+    "confidence": 0.62,
+    "rationale": "Iran peace deal and Hormuz reopening reduce geopolitical risk premium. Conflict resolution outweighs residual uncertainty, net bearish for gold safe-haven demand."
+  },
+  "usage": {
+    "input_tokens": 260,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 82
+  },
+  "response_hash": "3fd17956b5d426ffc5a779a9637ef60c3f7d1b208f2e6ff5943068bd4ccd10a3",
+  "cache_hit": false,
+  "status": "OK"
+}

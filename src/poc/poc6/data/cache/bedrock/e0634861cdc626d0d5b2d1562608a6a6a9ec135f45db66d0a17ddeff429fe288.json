@@ -1,0 +1,27 @@
+{
+  "context_id": "8bf98f3cd12ca53ab3885e8f",
+  "context_hash": "5ebbd49fee82dee67b112ed2d81f39e0569fe4a5eba516843b839aa404e55224",
+  "asset_id": "GOLD",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "SMALL",
+    "confidence": 0.55,
+    "rationale": "Military conflict uncertainty from GOP opposition outweighs oil-driven risk-off relief. Net positive for gold as safe-haven, but partial offset limits magnitude."
+  },
+  "usage": {
+    "input_tokens": 258,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 78
+  },
+  "response_hash": "928bf1208bc7179dcddc3eff01b6eec95120175a7a9e477ed8bed3545dbef3b2",
+  "cache_hit": false,
+  "status": "OK"
+}

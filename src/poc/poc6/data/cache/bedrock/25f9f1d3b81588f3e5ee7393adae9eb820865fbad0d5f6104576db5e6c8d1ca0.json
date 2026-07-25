@@ -1,0 +1,27 @@
+{
+  "context_id": "369f28c9435fbf0cff739d52",
+  "context_hash": "54877deec18ac1f6c7a9e4bb562e7074d43f458eb6c24b2e9d48e9a5daef7c75",
+  "asset_id": "GOLD",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "MEDIUM",
+    "confidence": 0.62,
+    "rationale": "Military conflict signal (weight 0.7) outweighs strait reopening (weight -0.5). Iran war uncertainty sustains safe-haven gold demand despite partial geopolitical de-escalation."
+  },
+  "usage": {
+    "input_tokens": 279,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 89
+  },
+  "response_hash": "00d07d0b54c0468b1242b06696562ac9b2db1869c2872d1138ce5e06233878fe",
+  "cache_hit": false,
+  "status": "OK"
+}

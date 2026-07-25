@@ -1,0 +1,298 @@
+{
+  "attempts": [
+    {
+      "context_hash": "cc633b4812ab0aa22514e22c441bae83edfe9274cd8db296f7f8af3c8614f857",
+      "context_id": "c7d71df658e50cd23070c23c",
+      "estimated_input_tokens": 194,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "4cafdacd4f3a592458918efea5b46ca60386c8470f2c897c68e13e09db3dd90b",
+      "context_id": "81d2ba8389e9e2c3736510c5",
+      "estimated_input_tokens": 257,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "475babf9df593f0648f6fe9c6d012ecf47e85a8a0a1f550fba091ee6d7773ac3",
+      "context_id": "7d89c78f425286b5c532476c",
+      "estimated_input_tokens": 257,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "d4a4b5c53f792ec33acc397e719e4bcf8aca777d3356d0de8d8fbbf3cc1a2f6b",
+      "context_id": "c041c3a5268a0c4ca2e5dd76",
+      "estimated_input_tokens": 204,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "f78f034f8567658c4446125d8b7c19d3272039bb0760f16369b96738ae244c68",
+      "context_id": "6b02f914b1021d1d2e1d78f0",
+      "estimated_input_tokens": 208,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "19f5fc7d9cee2490ef2ed77d7da7f7aefdd4dc267285c096b1b9777e1da3a19c",
+      "context_id": "753cfbd950d29410b8fd7d94",
+      "estimated_input_tokens": 196,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "e4d93f5b8fcecf15c78027bcc0a1204ab6a19ffd245b035d84de79fea82d6ce9",
+      "context_id": "70d61c9d962e2af441dcd450",
+      "estimated_input_tokens": 196,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "9e217df07cdcfd84562cc448c90c8923011a47a4aa165b4fcd61c0e25e8d1a30",
+      "context_id": "a300b670c7c24305bb20f739",
+      "estimated_input_tokens": 194,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "44ae086d6ac6a5ff0932b289f1a3ce49de01fd0f3f925888d73515dfe70f5809",
+      "context_id": "1bbeb2f8eeb889a9bd2f2532",
+      "estimated_input_tokens": 256,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "b3e2caf531de5a7178c124c32953baaff451afab9083d969d51e6c6ad7b715ae",
+      "context_id": "9818ee8dc9601108aae6740a",
+      "estimated_input_tokens": 247,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "a71b5ecb68180773275eb5ecf147d244f530e874d7157a2bdac291519c17c47c",
+      "context_id": "3fe0adf27bff651466fcecd7",
+      "estimated_input_tokens": 192,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "b1f043bd83956b784e8a8dfb6ae3387ab217a584478d93d2ccf18c543b434555",
+      "context_id": "10e5f552086a3a4f8047894d",
+      "estimated_input_tokens": 301,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "5f21cafbe3362d0b2b95df4b031704a4b8542776731a2e489896a916b8f073b6",
+      "context_id": "651bc37496b21a98d4e152ce",
+      "estimated_input_tokens": 199,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "51aad99855c96399249b3be9f61866f5d23c50615c4dd95aa80033aa2fcf94e2",
+      "context_id": "8ec9925067ba141e22be2b3a",
+      "estimated_input_tokens": 240,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "adec1c5e45078dca2de99db67d31467ffa37ee674b37388c7fbbd3aa09a99523",
+      "context_id": "c39627dbc02ec0a517e34f3a",
+      "estimated_input_tokens": 200,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "d9eeeebfabca9bbb492954a19049d0654f32fbdbcae83bfbb506dd3f309e6ff4",
+      "context_id": "01140fb3cb6bd09e60cdcd1b",
+      "estimated_input_tokens": 208,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "9bc9be84d6ff705f836aa4fb24a9e4e49a10f9120207342d8f3558464fc6e519",
+      "context_id": "4ca9d6a61cddf9cfc7de074a",
+      "estimated_input_tokens": 216,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "00525e058e920b20a1bdc73fa7c2a33d10e81ee300102b2c7aa4e2ce1fd01180",
+      "context_id": "478cbde45030d9af8a8d71a3",
+      "estimated_input_tokens": 195,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "ecc9604829a55c1d1276e702ff00e158622b961a68550b21401a3e8abeef10a8",
+      "context_id": "36e6c3088a36866649ac26e9",
+      "estimated_input_tokens": 304,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "4e6572bdb48bca1238f16c2952c3d29b14d3c75f4665efcb88a7eeca02d1497e",
+      "context_id": "2acce4b5cdadd63e99a53c1d",
+      "estimated_input_tokens": 332,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "05ac8d11c5dac5f5dc16974652f5936287fed58728a2918985063fef68a823b3",
+      "context_id": "05c8ee6a1de77f2eecd3631b",
+      "estimated_input_tokens": 250,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "2364818db880d235af34198f6b32597aee8aa9ababd5b4d8eb18d6ddf1ec2001",
+      "context_id": "558031269e89b0c1b73f2d9b",
+      "estimated_input_tokens": 206,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "dff382c2ec67463f02b2748d65ee22364f1353ba1be07edcd27ae8a3c2abaf60",
+      "context_id": "05e306322232dffac21c39c9",
+      "estimated_input_tokens": 299,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "bac72dd344762c099e7c7eef4928cadd3b6ba0f591d4f4f341601d1cf707e4eb",
+      "context_id": "228c32ecb0f1a6c832564d3f",
+      "estimated_input_tokens": 197,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "8496b0acce2ec5671b66c2628a3a55a8f8ec64906bac3618ac77a97b0d67c79f",
+      "context_id": "dd4a37d85b410252fcd16431",
+      "estimated_input_tokens": 261,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "54877deec18ac1f6c7a9e4bb562e7074d43f458eb6c24b2e9d48e9a5daef7c75",
+      "context_id": "369f28c9435fbf0cff739d52",
+      "estimated_input_tokens": 229,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "c38a98a2222b55030e447f960dc93528352a568b8768596586c5929aa1bdba17",
+      "context_id": "fa39a231583d941cb7f546ac",
+      "estimated_input_tokens": 211,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "30b5419813688af3c256c0f5453a896a1a21a6c1f254f1dd23bfb1c7bd45d5c0",
+      "context_id": "e5f4985a415bc1f3889f9f9e",
+      "estimated_input_tokens": 208,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "5ebbd49fee82dee67b112ed2d81f39e0569fe4a5eba516843b839aa404e55224",
+      "context_id": "8bf98f3cd12ca53ab3885e8f",
+      "estimated_input_tokens": 205,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "1bddd3e44169f256af1e35c4cad57f662b9b18ef0256c4ccee81246e7d658a3a",
+      "context_id": "faf862ad5aef44e2bea5a41c",
+      "estimated_input_tokens": 211,
+      "maximum_output_tokens": 120,
+      "mode": "KG_LLM"
+    },
+    {
+      "context_hash": "cc633b4812ab0aa22514e22c441bae83edfe9274cd8db296f7f8af3c8614f857",
+      "context_id": "c7d71df658e50cd23070c23c",
+      "estimated_input_tokens": 150,
+      "maximum_output_tokens": 120,
+      "mode": "LLM_ONLY"
+    },
+    {
+      "context_hash": "4cafdacd4f3a592458918efea5b46ca60386c8470f2c897c68e13e09db3dd90b",
+      "context_id": "81d2ba8389e9e2c3736510c5",
+      "estimated_input_tokens": 194,
+      "maximum_output_tokens": 120,
+      "mode": "LLM_ONLY"
+    },
+    {
+      "context_hash": "475babf9df593f0648f6fe9c6d012ecf47e85a8a0a1f550fba091ee6d7773ac3",
+      "context_id": "7d89c78f425286b5c532476c",
+      "estimated_input_tokens": 193,
+      "maximum_output_tokens": 120,
+      "mode": "LLM_ONLY"
+    },
+    {
+      "context_hash": "d4a4b5c53f792ec33acc397e719e4bcf8aca777d3356d0de8d8fbbf3cc1a2f6b",
+      "context_id": "c041c3a5268a0c4ca2e5dd76",
+      "estimated_input_tokens": 160,
+      "maximum_output_tokens": 120,
+      "mode": "LLM_ONLY"
+    },
+    {
+      "context_hash": "f78f034f8567658c4446125d8b7c19d3272039bb0760f16369b96738ae244c68",
+      "context_id": "6b02f914b1021d1d2e1d78f0",
+      "estimated_input_tokens": 164,
+      "maximum_output_tokens": 120,
+      "mode": "LLM_ONLY"
+    },
+    {
+      "context_hash": "19f5fc7d9cee2490ef2ed77d7da7f7aefdd4dc267285c096b1b9777e1da3a19c",
+      "context_id": "753cfbd950d29410b8fd7d94",
+      "estimated_input_tokens": 152,
+      "maximum_output_tokens": 120,
+      "mode": "LLM_ONLY"
+    },
+    {
+      "context_hash": "e4d93f5b8fcecf15c78027bcc0a1204ab6a19ffd245b035d84de79fea82d6ce9",
+      "context_id": "70d61c9d962e2af441dcd450",
+      "estimated_input_tokens": 154,
+      "maximum_output_tokens": 120,
+      "mode": "LLM_ONLY"
+    },
+    {
+      "context_hash": "9e217df07cdcfd84562cc448c90c8923011a47a4aa165b4fcd61c0e25e8d1a30",
+      "context_id": "a300b670c7c24305bb20f739",
+      "estimated_input_tokens": 152,
+      "maximum_output_tokens": 120,
+      "mode": "LLM_ONLY"
+    },
+    {
+      "context_hash": "44ae086d6ac6a5ff0932b289f1a3ce49de01fd0f3f925888d73515dfe70f5809",
+      "context_id": "1bbeb2f8eeb889a9bd2f2532",
+      "estimated_input_tokens": 193,
+      "maximum_output_tokens": 120,
+      "mode": "LLM_ONLY"
+    },
+    {
+      "context_hash": "b3e2caf531de5a7178c124c32953baaff451afab9083d969d51e6c6ad7b715ae",
+      "context_id": "9818ee8dc9601108aae6740a",
+      "estimated_input_tokens": 185,
+      "maximum_output_tokens": 120,
+      "mode": "LLM_ONLY"
+    }
+  ],
+  "budget": {
+    "calls": 40,
+    "max_calls": 40,
+    "max_input_tokens": 80000,
+    "max_output_tokens": 8000,
+    "provider_input_tokens": 0,
+    "provider_output_tokens": 0,
+    "reserved_input_tokens": 8570,
+    "reserved_output_tokens": 4800
+  },
+  "llm_calls_made": 0,
+  "maximum_list_price_usd": 0.09771,
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1"
+}

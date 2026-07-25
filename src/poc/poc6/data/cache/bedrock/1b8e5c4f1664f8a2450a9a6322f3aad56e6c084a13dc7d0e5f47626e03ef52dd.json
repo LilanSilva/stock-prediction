@@ -1,0 +1,27 @@
+{
+  "context_id": "81d2ba8389e9e2c3736510c5",
+  "context_hash": "4cafdacd4f3a592458918efea5b46ca60386c8470f2c897c68e13e09db3dd90b",
+  "asset_id": "BRENT_OIL",
+  "mode": "LLM_ONLY",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "LARGE",
+    "confidence": 0.82,
+    "rationale": "Strait of Hormuz blockade reaffirmation dominates; supply disruption risk overwhelms recession demand concerns. Iran war escalation reinforces upward pressure on Brent."
+  },
+  "usage": {
+    "input_tokens": 233,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 84
+  },
+  "response_hash": "f93d3912c55aeb0b58a0f3ce81b9044505b36715df9b1324eabadc8300c70011",
+  "cache_hit": false,
+  "status": "OK"
+}

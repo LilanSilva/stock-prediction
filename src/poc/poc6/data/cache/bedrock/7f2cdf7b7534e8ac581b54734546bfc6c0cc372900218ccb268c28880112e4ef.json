@@ -1,0 +1,27 @@
+{
+  "context_id": "fa39a231583d941cb7f546ac",
+  "context_hash": "c38a98a2222b55030e447f960dc93528352a568b8768596586c5929aa1bdba17",
+  "asset_id": "GOLD",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "MEDIUM",
+    "confidence": 0.62,
+    "rationale": "Military conflict persistence outweighs reopening hopes. Republican hardliners blocking Iran deal sustains geopolitical risk premium, keeping gold bid despite Strait negotiation progress."
+  },
+  "usage": {
+    "input_tokens": 255,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 81
+  },
+  "response_hash": "623c8e898adfeb85961b2df880e37f18af40eb0f0dec65dfc00abc8ea7b6d895",
+  "cache_hit": false,
+  "status": "OK"
+}

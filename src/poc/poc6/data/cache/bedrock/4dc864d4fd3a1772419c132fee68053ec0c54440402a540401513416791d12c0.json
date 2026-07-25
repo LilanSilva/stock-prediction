@@ -1,0 +1,27 @@
+{
+  "context_id": "e5f4985a415bc1f3889f9f9e",
+  "context_hash": "30b5419813688af3c256c0f5453a896a1a21a6c1f254f1dd23bfb1c7bd45d5c0",
+  "asset_id": "GOLD",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "DOWN",
+    "magnitude": "SMALL",
+    "confidence": 0.52,
+    "rationale": "Strait reopening deal reduces geopolitical risk premium, outweighing skepticism about Trump's repeated unverified peace claims. Net bearish but uncertainty limits magnitude."
+  },
+  "usage": {
+    "input_tokens": 262,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 81
+  },
+  "response_hash": "d3ce704c5565ff636771e0ec7e40e2dd01c66ccdca241e6cd7b015e62ec5fba0",
+  "cache_hit": false,
+  "status": "OK"
+}

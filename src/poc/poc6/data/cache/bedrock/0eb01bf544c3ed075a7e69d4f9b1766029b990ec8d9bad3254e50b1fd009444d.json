@@ -1,0 +1,27 @@
+{
+  "context_id": "01140fb3cb6bd09e60cdcd1b",
+  "context_hash": "d9eeeebfabca9bbb492954a19049d0654f32fbdbcae83bfbb506dd3f309e6ff4",
+  "asset_id": "GOLD",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "MEDIUM",
+    "confidence": 0.72,
+    "rationale": "Prolonged Iran war risk and IMF warning of worsening outcomes dominate; geopolitical uncertainty drives safe-haven gold demand despite strait closure supply disruption pressures."
+  },
+  "usage": {
+    "input_tokens": 269,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 82
+  },
+  "response_hash": "048fda341de7dc44d30bb6b008445f65e7e0e97dd9cc07b73575a98d7b79487e",
+  "cache_hit": false,
+  "status": "OK"
+}

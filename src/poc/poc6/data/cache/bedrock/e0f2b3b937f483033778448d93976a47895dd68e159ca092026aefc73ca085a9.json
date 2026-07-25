@@ -1,0 +1,27 @@
+{
+  "context_id": "dd4a37d85b410252fcd16431",
+  "context_hash": "8496b0acce2ec5671b66c2628a3a55a8f8ec64906bac3618ac77a97b0d67c79f",
+  "asset_id": "GOLD",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "MEDIUM",
+    "confidence": 0.68,
+    "rationale": "Inflation rise and military conflict geopolitical risk outweigh rate hike headwinds. Net positive weight (0.65+0.70-0.60=0.75) favors gold safe-haven demand."
+  },
+  "usage": {
+    "input_tokens": 327,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 93
+  },
+  "response_hash": "c067b206b15acd09be8468486203c81bbd8c5fd395f352803258d234d4f35226",
+  "cache_hit": false,
+  "status": "OK"
+}

@@ -1,0 +1,27 @@
+{
+  "context_id": "05e306322232dffac21c39c9",
+  "context_hash": "dff382c2ec67463f02b2748d65ee22364f1353ba1be07edcd27ae8a3c2abaf60",
+  "asset_id": "GOLD",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "SMALL",
+    "confidence": 0.55,
+    "rationale": "Military conflict and Nigeria inflation rise (weights +0.70, +0.65) narrowly outweigh US inflation fall and Fed rate hike fears (-0.55, -0.60), yielding modest upward bias."
+  },
+  "usage": {
+    "input_tokens": 389,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 94
+  },
+  "response_hash": "e6e4886d158b371b2b8fc5f831a35b6206ad9ef132769fb3de5c6d598a9bafd5",
+  "cache_hit": false,
+  "status": "OK"
+}

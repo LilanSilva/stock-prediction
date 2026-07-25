@@ -1,0 +1,27 @@
+{
+  "context_id": "228c32ecb0f1a6c832564d3f",
+  "context_hash": "bac72dd344762c099e7c7eef4928cadd3b6ba0f591d4f4f341601d1cf707e4eb",
+  "asset_id": "GOLD",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "SMALL",
+    "confidence": 0.52,
+    "rationale": "Recession signal supports gold as safe haven (+0.5). Rate hike odds weigh bearish (-0.6), but net edge slightly favors upside given recession fear offsetting rate pressure."
+  },
+  "usage": {
+    "input_tokens": 257,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 87
+  },
+  "response_hash": "14f1809193fcb2eb5c1b2da0b1c3136210b641320215aa886853f86486df9246",
+  "cache_hit": false,
+  "status": "OK"
+}

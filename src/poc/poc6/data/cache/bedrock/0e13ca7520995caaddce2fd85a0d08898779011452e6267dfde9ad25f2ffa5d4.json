@@ -1,0 +1,27 @@
+{
+  "context_id": "753cfbd950d29410b8fd7d94",
+  "context_hash": "19f5fc7d9cee2490ef2ed77d7da7f7aefdd4dc267285c096b1b9777e1da3a19c",
+  "asset_id": "BRENT_OIL",
+  "mode": "LLM_ONLY",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "DOWN",
+    "magnitude": "MEDIUM",
+    "confidence": 0.55,
+    "rationale": "Recession fears at $125 oil create strong demand destruction ceiling. Iran conflict risk adds upward pressure but recession signal dominates near-term sentiment."
+  },
+  "usage": {
+    "input_tokens": 177,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 76
+  },
+  "response_hash": "3972615436b0b28cee80922f2e3944a2c70bc7331a0bc555494c6afe375e4abb",
+  "cache_hit": false,
+  "status": "OK"
+}

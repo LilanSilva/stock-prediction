@@ -1,0 +1,27 @@
+{
+  "context_id": "9818ee8dc9601108aae6740a",
+  "context_hash": "b3e2caf531de5a7178c124c32953baaff451afab9083d969d51e6c6ad7b715ae",
+  "asset_id": "GOLD",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "MEDIUM",
+    "confidence": 0.74,
+    "rationale": "Military conflict and recession fears dominate, driving safe-haven gold demand. Rate hike pressure partially offsets but geopolitical risk and Hormuz disruption fears outweigh."
+  },
+  "usage": {
+    "input_tokens": 320,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 83
+  },
+  "response_hash": "d8e16861bc747941c3a0ba420bab34acab86f566ede6be20b5387e3ccdf2f7d6",
+  "cache_hit": false,
+  "status": "OK"
+}

@@ -1,0 +1,10 @@
+{
+  "max_calls": 40,
+  "max_input_tokens": 80000,
+  "max_output_tokens": 8000,
+  "calls": 40,
+  "reserved_input_tokens": 8570,
+  "reserved_output_tokens": 4800,
+  "provider_input_tokens": 10762,
+  "provider_output_tokens": 3357
+}

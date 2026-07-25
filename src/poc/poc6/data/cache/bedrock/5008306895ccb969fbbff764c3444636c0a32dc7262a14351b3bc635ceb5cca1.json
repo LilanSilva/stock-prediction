@@ -1,0 +1,27 @@
+{
+  "context_id": "70d61c9d962e2af441dcd450",
+  "context_hash": "e4d93f5b8fcecf15c78027bcc0a1204ab6a19ffd245b035d84de79fea82d6ce9",
+  "asset_id": "GOLD",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "SMALL",
+    "confidence": 0.58,
+    "rationale": "Military conflict uncertainty (weight 0.7) outweighs slow-rate-hike pressure (weight -0.6). Ceasefire doubts sustain safe-haven gold demand slightly."
+  },
+  "usage": {
+    "input_tokens": 256,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 88
+  },
+  "response_hash": "227a46bc018d555fe60b902edd5805a37a1aae6cb44bb035a373a1934a20dde0",
+  "cache_hit": false,
+  "status": "OK"
+}

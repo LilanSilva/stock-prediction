@@ -1,0 +1,27 @@
+{
+  "context_id": "05c8ee6a1de77f2eecd3631b",
+  "context_hash": "05ac8d11c5dac5f5dc16974652f5936287fed58728a2918985063fef68a823b3",
+  "asset_id": "GOLD",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "NEUTRAL",
+    "magnitude": "SMALL",
+    "confidence": 0.41,
+    "rationale": "Military conflict risk supports gold (+0.7), but ECB rate hike pressure (-0.6) and Hormuz closure uncertainty (-0.5) offset safe-haven demand, leaving net signal near neutral."
+  },
+  "usage": {
+    "input_tokens": 319,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 91
+  },
+  "response_hash": "91fa686530d4c7ad2f036ae9520402696a3437bc7b98a6b947053f30a86db3b0",
+  "cache_hit": false,
+  "status": "OK"
+}

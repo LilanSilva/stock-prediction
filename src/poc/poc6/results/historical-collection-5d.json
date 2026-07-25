@@ -1,0 +1,132 @@
+{
+  "acquired_at_utc": "2026-07-13T20:09:22.249684+00:00",
+  "corpus_path": "data/raw/articles.jsonl",
+  "existing_records": 4336,
+  "added_records": 250,
+  "total_records": 4586,
+  "requests": [
+    {
+      "query_id": "risk_supply",
+      "start": "2026-04-15T00:00:00+00:00",
+      "end": "2026-04-20T00:00:00+00:00",
+      "status": "OK",
+      "fetched": 250,
+      "added": 0
+    },
+    {
+      "query_id": "macro_rates",
+      "start": "2026-04-15T00:00:00+00:00",
+      "end": "2026-04-20T00:00:00+00:00",
+      "status": "OK",
+      "fetched": 250,
+      "added": 0
+    },
+    {
+      "query_id": "risk_supply",
+      "start": "2026-04-20T00:00:00+00:00",
+      "end": "2026-04-25T00:00:00+00:00",
+      "status": "OK",
+      "fetched": 250,
+      "added": 0
+    },
+    {
+      "query_id": "macro_rates",
+      "start": "2026-04-20T00:00:00+00:00",
+      "end": "2026-04-25T00:00:00+00:00",
+      "status": "OK",
+      "fetched": 250,
+      "added": 0
+    },
+    {
+      "query_id": "risk_supply",
+      "start": "2026-04-25T00:00:00+00:00",
+      "end": "2026-04-30T00:00:00+00:00",
+      "status": "OK",
+      "fetched": 250,
+      "added": 0
+    },
+    {
+      "query_id": "macro_rates",
+      "start": "2026-04-25T00:00:00+00:00",
+      "end": "2026-04-30T00:00:00+00:00",
+      "status": "OK",
+      "fetched": 250,
+      "added": 0
+    },
+    {
+      "query_id": "risk_supply",
+      "start": "2026-04-30T00:00:00+00:00",
+      "end": "2026-05-05T00:00:00+00:00",
+      "status": "OK",
+      "fetched": 250,
+      "added": 0
+    },
+    {
+      "query_id": "macro_rates",
+      "start": "2026-04-30T00:00:00+00:00",
+      "end": "2026-05-05T00:00:00+00:00",
+      "status": "OK",
+      "fetched": 250,
+      "added": 0
+    },
+    {
+      "query_id": "risk_supply",
+      "start": "2026-05-05T00:00:00+00:00",
+      "end": "2026-05-10T00:00:00+00:00",
+      "status": "OK",
+      "fetched": 250,
+      "added": 0
+    },
+    {
+      "query_id": "macro_rates",
+      "start": "2026-05-05T00:00:00+00:00",
+      "end": "2026-05-10T00:00:00+00:00",
+      "status": "OK",
+      "fetched": 250,
+      "added": 0
+    },
+    {
+      "query_id": "risk_supply",
+      "start": "2026-05-10T00:00:00+00:00",
+      "end": "2026-05-15T00:00:00+00:00",
+      "status": "OK",
+      "fetched": 250,
+      "added": 0
+    },
+    {
+      "query_id": "macro_rates",
+      "start": "2026-05-10T00:00:00+00:00",
+      "end": "2026-05-15T00:00:00+00:00",
+      "status": "OK",
+      "fetched": 250,
+      "added": 0
+    },
+    {
+      "query_id": "risk_supply",
+      "start": "2026-05-15T00:00:00+00:00",
+      "end": "2026-05-20T00:00:00+00:00",
+      "status": "OK",
+      "fetched": 250,
+      "added": 0
+    },
+    {
+      "query_id": "macro_rates",
+      "start": "2026-05-15T00:00:00+00:00",
+      "end": "2026-05-20T00:00:00+00:00",
+      "status": "OK",
+      "fetched": 250,
+      "added": 0
+    },
+    {
+      "query_id": "risk_supply",
+      "start": "2026-05-20T00:00:00+00:00",
+      "end": "2026-05-25T00:00:00+00:00",
+      "status": "OK",
+      "fetched": 250,
+      "added": 250
+    }
+  ],
+  "circuit_open": false,
+  "llm_calls": 0,
+  "llm_tokens": 0
+}

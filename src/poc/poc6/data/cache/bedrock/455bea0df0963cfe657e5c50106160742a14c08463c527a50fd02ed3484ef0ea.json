@@ -1,0 +1,27 @@
+{
+  "context_id": "2acce4b5cdadd63e99a53c1d",
+  "context_hash": "4e6572bdb48bca1238f16c2952c3d29b14d3c75f4665efcb88a7eeca02d1497e",
+  "asset_id": "GOLD",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "SMALL",
+    "confidence": 0.58,
+    "rationale": "Military conflict and inflation revival favor gold as safe haven. ECB rate hike pressure and Hormuz resolution partially offset gains, leaving modest net upward bias."
+  },
+  "usage": {
+    "input_tokens": 428,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 78
+  },
+  "response_hash": "74e1a66bf4918d3b18df292a5cad8fed2a4715109a3494bbdd9cbb0517c79d30",
+  "cache_hit": false,
+  "status": "OK"
+}

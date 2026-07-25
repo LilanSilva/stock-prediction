@@ -1,0 +1,27 @@
+{
+  "context_id": "651bc37496b21a98d4e152ce",
+  "context_hash": "5f21cafbe3362d0b2b95df4b031704a4b8542776731a2e489896a916b8f073b6",
+  "asset_id": "GOLD",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "SMALL",
+    "confidence": 0.55,
+    "rationale": "Military conflict uncertainty (weight 0.7) slightly outweighs rate hike pressure (weight -0.6), but 'phoney war' framing limits safe-haven demand. Net modest upward bias."
+  },
+  "usage": {
+    "input_tokens": 263,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 92
+  },
+  "response_hash": "928c486669ded0422c41b7c995f2e02e63e8428fb7f9929082d9bebe119cde78",
+  "cache_hit": false,
+  "status": "OK"
+}

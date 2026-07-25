@@ -1,0 +1,27 @@
+{
+  "context_id": "4ca9d6a61cddf9cfc7de074a",
+  "context_hash": "9bc9be84d6ff705f836aa4fb24a9e4e49a10f9120207342d8f3558464fc6e519",
+  "asset_id": "GOLD",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "MEDIUM",
+    "confidence": 0.68,
+    "rationale": "Military conflict and energy crisis fears dominate; strait closure partially offsets but geopolitical risk premium drives safe-haven gold demand upward."
+  },
+  "usage": {
+    "input_tokens": 271,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 74
+  },
+  "response_hash": "7b6512ca19759af1ebd793840076e340d487c9cba695814e3d21e3a39bb334b3",
+  "cache_hit": false,
+  "status": "OK"
+}

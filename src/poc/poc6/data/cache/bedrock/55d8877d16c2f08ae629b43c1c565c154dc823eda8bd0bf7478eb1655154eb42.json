@@ -1,0 +1,27 @@
+{
+  "context_id": "36e6c3088a36866649ac26e9",
+  "context_hash": "ecc9604829a55c1d1276e702ff00e158622b961a68550b21401a3e8abeef10a8",
+  "asset_id": "GOLD",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "MEDIUM",
+    "confidence": 0.63,
+    "rationale": "Military conflict risk and inflation fears dominate, outweighing rate-hike and strait-closure headwinds. Net bullish pressure favors gold as safe-haven and inflation hedge."
+  },
+  "usage": {
+    "input_tokens": 393,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 85
+  },
+  "response_hash": "1fa33eef8e50211d0331e33f373fc061b68518a5479e85d1a45550118a2eac1a",
+  "cache_hit": false,
+  "status": "OK"
+}

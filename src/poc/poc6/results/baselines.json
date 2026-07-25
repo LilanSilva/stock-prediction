@@ -1,0 +1,1438 @@
+{
+  "always_neutral": [
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "BRENT_OIL",
+      "confidence": 0.3333333333333333,
+      "context_hash": "cc633b4812ab0aa22514e22c441bae83edfe9274cd8db296f7f8af3c8614f857",
+      "context_id": "c7d71df658e50cd23070c23c",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "BRENT_OIL",
+      "confidence": 0.3333333333333333,
+      "context_hash": "4cafdacd4f3a592458918efea5b46ca60386c8470f2c897c68e13e09db3dd90b",
+      "context_id": "81d2ba8389e9e2c3736510c5",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "BRENT_OIL",
+      "confidence": 0.3333333333333333,
+      "context_hash": "475babf9df593f0648f6fe9c6d012ecf47e85a8a0a1f550fba091ee6d7773ac3",
+      "context_id": "7d89c78f425286b5c532476c",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "BRENT_OIL",
+      "confidence": 0.3333333333333333,
+      "context_hash": "d4a4b5c53f792ec33acc397e719e4bcf8aca777d3356d0de8d8fbbf3cc1a2f6b",
+      "context_id": "c041c3a5268a0c4ca2e5dd76",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "BRENT_OIL",
+      "confidence": 0.3333333333333333,
+      "context_hash": "f78f034f8567658c4446125d8b7c19d3272039bb0760f16369b96738ae244c68",
+      "context_id": "6b02f914b1021d1d2e1d78f0",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "BRENT_OIL",
+      "confidence": 0.3333333333333333,
+      "context_hash": "19f5fc7d9cee2490ef2ed77d7da7f7aefdd4dc267285c096b1b9777e1da3a19c",
+      "context_id": "753cfbd950d29410b8fd7d94",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "e4d93f5b8fcecf15c78027bcc0a1204ab6a19ffd245b035d84de79fea82d6ce9",
+      "context_id": "70d61c9d962e2af441dcd450",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "9e217df07cdcfd84562cc448c90c8923011a47a4aa165b4fcd61c0e25e8d1a30",
+      "context_id": "a300b670c7c24305bb20f739",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "44ae086d6ac6a5ff0932b289f1a3ce49de01fd0f3f925888d73515dfe70f5809",
+      "context_id": "1bbeb2f8eeb889a9bd2f2532",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "b3e2caf531de5a7178c124c32953baaff451afab9083d969d51e6c6ad7b715ae",
+      "context_id": "9818ee8dc9601108aae6740a",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "a71b5ecb68180773275eb5ecf147d244f530e874d7157a2bdac291519c17c47c",
+      "context_id": "3fe0adf27bff651466fcecd7",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "b1f043bd83956b784e8a8dfb6ae3387ab217a584478d93d2ccf18c543b434555",
+      "context_id": "10e5f552086a3a4f8047894d",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "5f21cafbe3362d0b2b95df4b031704a4b8542776731a2e489896a916b8f073b6",
+      "context_id": "651bc37496b21a98d4e152ce",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "51aad99855c96399249b3be9f61866f5d23c50615c4dd95aa80033aa2fcf94e2",
+      "context_id": "8ec9925067ba141e22be2b3a",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "adec1c5e45078dca2de99db67d31467ffa37ee674b37388c7fbbd3aa09a99523",
+      "context_id": "c39627dbc02ec0a517e34f3a",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "d9eeeebfabca9bbb492954a19049d0654f32fbdbcae83bfbb506dd3f309e6ff4",
+      "context_id": "01140fb3cb6bd09e60cdcd1b",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "9bc9be84d6ff705f836aa4fb24a9e4e49a10f9120207342d8f3558464fc6e519",
+      "context_id": "4ca9d6a61cddf9cfc7de074a",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "00525e058e920b20a1bdc73fa7c2a33d10e81ee300102b2c7aa4e2ce1fd01180",
+      "context_id": "478cbde45030d9af8a8d71a3",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "ecc9604829a55c1d1276e702ff00e158622b961a68550b21401a3e8abeef10a8",
+      "context_id": "36e6c3088a36866649ac26e9",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "4e6572bdb48bca1238f16c2952c3d29b14d3c75f4665efcb88a7eeca02d1497e",
+      "context_id": "2acce4b5cdadd63e99a53c1d",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "05ac8d11c5dac5f5dc16974652f5936287fed58728a2918985063fef68a823b3",
+      "context_id": "05c8ee6a1de77f2eecd3631b",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "2364818db880d235af34198f6b32597aee8aa9ababd5b4d8eb18d6ddf1ec2001",
+      "context_id": "558031269e89b0c1b73f2d9b",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "dff382c2ec67463f02b2748d65ee22364f1353ba1be07edcd27ae8a3c2abaf60",
+      "context_id": "05e306322232dffac21c39c9",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "bac72dd344762c099e7c7eef4928cadd3b6ba0f591d4f4f341601d1cf707e4eb",
+      "context_id": "228c32ecb0f1a6c832564d3f",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "8496b0acce2ec5671b66c2628a3a55a8f8ec64906bac3618ac77a97b0d67c79f",
+      "context_id": "dd4a37d85b410252fcd16431",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "54877deec18ac1f6c7a9e4bb562e7074d43f458eb6c24b2e9d48e9a5daef7c75",
+      "context_id": "369f28c9435fbf0cff739d52",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "c38a98a2222b55030e447f960dc93528352a568b8768596586c5929aa1bdba17",
+      "context_id": "fa39a231583d941cb7f546ac",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "30b5419813688af3c256c0f5453a896a1a21a6c1f254f1dd23bfb1c7bd45d5c0",
+      "context_id": "e5f4985a415bc1f3889f9f9e",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "5ebbd49fee82dee67b112ed2d81f39e0569fe4a5eba516843b839aa404e55224",
+      "context_id": "8bf98f3cd12ca53ab3885e8f",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "ALWAYS_NEUTRAL",
+      "algorithm_version": "p06-neutral-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "1bddd3e44169f256af1e35c4cad57f662b9b18ef0256c4ccee81246e7d658a3a",
+      "context_id": "faf862ad5aef44e2bea5a41c",
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL"
+    }
+  ],
+  "graph_fixture_version": "p06-graph-v1",
+  "graph_only": [
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "BRENT_OIL",
+      "confidence": 0.58,
+      "context_hash": "cc633b4812ab0aa22514e22c441bae83edfe9274cd8db296f7f8af3c8614f857",
+      "context_id": "c7d71df658e50cd23070c23c",
+      "contributing_edges": [
+        {
+          "event_id": "3879a7fe479bf3da24363e5e",
+          "rule": "recession_signal",
+          "weight": -0.4
+        },
+        {
+          "event_id": "e424580a58722097e93de1a1",
+          "rule": "military_conflict",
+          "weight": 0.6
+        }
+      ],
+      "direction": "UP",
+      "magnitude": "SMALL",
+      "signed_score": 0.2
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "BRENT_OIL",
+      "confidence": 0.7316,
+      "context_hash": "4cafdacd4f3a592458918efea5b46ca60386c8470f2c897c68e13e09db3dd90b",
+      "context_id": "81d2ba8389e9e2c3736510c5",
+      "contributing_edges": [
+        {
+          "event_id": "280b6c7bf64e502bd696dac4",
+          "rule": "recession_signal",
+          "weight": -0.4
+        },
+        {
+          "event_id": "83bee8cf64ac06beaddb29e5",
+          "rule": "military_conflict",
+          "weight": 0.6
+        },
+        {
+          "event_id": "95a41144513943c65c72b026",
+          "rule": "strait_closure",
+          "weight": 0.9
+        }
+      ],
+      "direction": "UP",
+      "magnitude": "MEDIUM",
+      "signed_score": 1.1
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "BRENT_OIL",
+      "confidence": 0.7316,
+      "context_hash": "475babf9df593f0648f6fe9c6d012ecf47e85a8a0a1f550fba091ee6d7773ac3",
+      "context_id": "7d89c78f425286b5c532476c",
+      "contributing_edges": [
+        {
+          "event_id": "01d4fe1d0d900afd9329b0e2",
+          "rule": "recession_signal",
+          "weight": -0.4
+        },
+        {
+          "event_id": "b7349ff07ec70350af778387",
+          "rule": "military_conflict",
+          "weight": 0.6
+        },
+        {
+          "event_id": "0f9c230853ac30d65a046b99",
+          "rule": "supply_disruption",
+          "weight": 0.9
+        }
+      ],
+      "direction": "UP",
+      "magnitude": "MEDIUM",
+      "signed_score": 1.1
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "BRENT_OIL",
+      "confidence": 0.58,
+      "context_hash": "d4a4b5c53f792ec33acc397e719e4bcf8aca777d3356d0de8d8fbbf3cc1a2f6b",
+      "context_id": "c041c3a5268a0c4ca2e5dd76",
+      "contributing_edges": [
+        {
+          "event_id": "d423830f33169028414c9ac1",
+          "rule": "recession_signal",
+          "weight": -0.4
+        },
+        {
+          "event_id": "8232a9fa39dfa702ff5dd751",
+          "rule": "military_conflict",
+          "weight": 0.6
+        }
+      ],
+      "direction": "UP",
+      "magnitude": "SMALL",
+      "signed_score": 0.2
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "BRENT_OIL",
+      "confidence": 0.58,
+      "context_hash": "f78f034f8567658c4446125d8b7c19d3272039bb0760f16369b96738ae244c68",
+      "context_id": "6b02f914b1021d1d2e1d78f0",
+      "contributing_edges": [
+        {
+          "event_id": "b9ba47a1672056113d75787d",
+          "rule": "recession_signal",
+          "weight": -0.4
+        },
+        {
+          "event_id": "21452f94e7c1084999c18087",
+          "rule": "military_conflict",
+          "weight": 0.6
+        }
+      ],
+      "direction": "UP",
+      "magnitude": "SMALL",
+      "signed_score": 0.2
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "BRENT_OIL",
+      "confidence": 0.58,
+      "context_hash": "19f5fc7d9cee2490ef2ed77d7da7f7aefdd4dc267285c096b1b9777e1da3a19c",
+      "context_id": "753cfbd950d29410b8fd7d94",
+      "contributing_edges": [
+        {
+          "event_id": "71efa28afcb044616b1b78df",
+          "rule": "recession_signal",
+          "weight": -0.4
+        },
+        {
+          "event_id": "cc8664176815961ff1267fa4",
+          "rule": "military_conflict",
+          "weight": 0.6
+        }
+      ],
+      "direction": "UP",
+      "magnitude": "SMALL",
+      "signed_score": 0.2
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.5308,
+      "context_hash": "e4d93f5b8fcecf15c78027bcc0a1204ab6a19ffd245b035d84de79fea82d6ce9",
+      "context_id": "70d61c9d962e2af441dcd450",
+      "contributing_edges": [
+        {
+          "event_id": "70402f4c113188e81b3ee4a4",
+          "rule": "rate_hike",
+          "weight": -0.6
+        },
+        {
+          "event_id": "3896c194324820b9297b3d6f",
+          "rule": "military_conflict",
+          "weight": 0.7
+        }
+      ],
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL",
+      "signed_score": 0.1
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.5308,
+      "context_hash": "9e217df07cdcfd84562cc448c90c8923011a47a4aa165b4fcd61c0e25e8d1a30",
+      "context_id": "a300b670c7c24305bb20f739",
+      "contributing_edges": [
+        {
+          "event_id": "1167e43bb060fc129a541eb5",
+          "rule": "rate_hike",
+          "weight": -0.6
+        },
+        {
+          "event_id": "4e28ec6c65fdb64a2eed300c",
+          "rule": "military_conflict",
+          "weight": 0.7
+        }
+      ],
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL",
+      "signed_score": 0.1
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.6647,
+      "context_hash": "44ae086d6ac6a5ff0932b289f1a3ce49de01fd0f3f925888d73515dfe70f5809",
+      "context_id": "1bbeb2f8eeb889a9bd2f2532",
+      "contributing_edges": [
+        {
+          "event_id": "8ca9d2772462391f4d1ecc8f",
+          "rule": "strait_closure",
+          "weight": -0.5
+        },
+        {
+          "event_id": "927f5977ac85bab749d8823d",
+          "rule": "military_conflict",
+          "weight": 0.7
+        },
+        {
+          "event_id": "50822742ed82d512ae127af5",
+          "rule": "recession_signal",
+          "weight": 0.5
+        }
+      ],
+      "direction": "UP",
+      "magnitude": "MEDIUM",
+      "signed_score": 0.7
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.6333,
+      "context_hash": "b3e2caf531de5a7178c124c32953baaff451afab9083d969d51e6c6ad7b715ae",
+      "context_id": "9818ee8dc9601108aae6740a",
+      "contributing_edges": [
+        {
+          "event_id": "62d0361b58c1a4ead6e52371",
+          "rule": "rate_hike",
+          "weight": -0.6
+        },
+        {
+          "event_id": "9a9a05c26373a27b9a1376a4",
+          "rule": "military_conflict",
+          "weight": 0.7
+        },
+        {
+          "event_id": "1e455e177dfac530b472b332",
+          "rule": "recession_signal",
+          "weight": 0.5
+        }
+      ],
+      "direction": "UP",
+      "magnitude": "MEDIUM",
+      "signed_score": 0.6
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.5308,
+      "context_hash": "a71b5ecb68180773275eb5ecf147d244f530e874d7157a2bdac291519c17c47c",
+      "context_id": "3fe0adf27bff651466fcecd7",
+      "contributing_edges": [
+        {
+          "event_id": "e2b2f75f22607711706446e0",
+          "rule": "rate_hike",
+          "weight": -0.6
+        },
+        {
+          "event_id": "6e6e42dd4e8c0237bc6cdc9d",
+          "rule": "military_conflict",
+          "weight": 0.7
+        }
+      ],
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL",
+      "signed_score": 0.1
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.5255,
+      "context_hash": "b1f043bd83956b784e8a8dfb6ae3387ab217a584478d93d2ccf18c543b434555",
+      "context_id": "10e5f552086a3a4f8047894d",
+      "contributing_edges": [
+        {
+          "event_id": "601637a90ed29d94a6a68e80",
+          "rule": "rate_hike",
+          "weight": -0.6
+        },
+        {
+          "event_id": "1eb3bc1498d6b11dcb71e939",
+          "rule": "strait_closure",
+          "weight": -0.5
+        },
+        {
+          "event_id": "b5de192143009fd625a332cd",
+          "rule": "military_conflict",
+          "weight": 0.7
+        },
+        {
+          "event_id": "9985716ecbbc40cab726a14c",
+          "rule": "sanctions",
+          "weight": 0.55
+        }
+      ],
+      "direction": "UP",
+      "magnitude": "SMALL",
+      "signed_score": 0.15
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.5308,
+      "context_hash": "5f21cafbe3362d0b2b95df4b031704a4b8542776731a2e489896a916b8f073b6",
+      "context_id": "651bc37496b21a98d4e152ce",
+      "contributing_edges": [
+        {
+          "event_id": "d75dc8c62b129d7507ad8225",
+          "rule": "rate_hike",
+          "weight": -0.6
+        },
+        {
+          "event_id": "25d51e8a107a6ab178d810ef",
+          "rule": "military_conflict",
+          "weight": 0.7
+        }
+      ],
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL",
+      "signed_score": 0.1
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.6333,
+      "context_hash": "51aad99855c96399249b3be9f61866f5d23c50615c4dd95aa80033aa2fcf94e2",
+      "context_id": "8ec9925067ba141e22be2b3a",
+      "contributing_edges": [
+        {
+          "event_id": "fa7540ab202256573293a769",
+          "rule": "rate_hike",
+          "weight": -0.6
+        },
+        {
+          "event_id": "8cd8483806669f66dd407205",
+          "rule": "military_conflict",
+          "weight": 0.7
+        },
+        {
+          "event_id": "b9a6fe88b9956a57a459d806",
+          "rule": "recession_signal",
+          "weight": 0.5
+        }
+      ],
+      "direction": "UP",
+      "magnitude": "MEDIUM",
+      "signed_score": 0.6
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.5667,
+      "context_hash": "adec1c5e45078dca2de99db67d31467ffa37ee674b37388c7fbbd3aa09a99523",
+      "context_id": "c39627dbc02ec0a517e34f3a",
+      "contributing_edges": [
+        {
+          "event_id": "7b1b416387fc8ecc7c434f82",
+          "rule": "strait_closure",
+          "weight": -0.5
+        },
+        {
+          "event_id": "2ced7c91c4ccf0b7aaf66f1d",
+          "rule": "military_conflict",
+          "weight": 0.7
+        }
+      ],
+      "direction": "UP",
+      "magnitude": "SMALL",
+      "signed_score": 0.2
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.5667,
+      "context_hash": "d9eeeebfabca9bbb492954a19049d0654f32fbdbcae83bfbb506dd3f309e6ff4",
+      "context_id": "01140fb3cb6bd09e60cdcd1b",
+      "contributing_edges": [
+        {
+          "event_id": "a756781660bf9350006b196b",
+          "rule": "strait_closure",
+          "weight": -0.5
+        },
+        {
+          "event_id": "c5f19991b454a9d5a02e5738",
+          "rule": "military_conflict",
+          "weight": 0.7
+        }
+      ],
+      "direction": "UP",
+      "magnitude": "SMALL",
+      "signed_score": 0.2
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.5667,
+      "context_hash": "9bc9be84d6ff705f836aa4fb24a9e4e49a10f9120207342d8f3558464fc6e519",
+      "context_id": "4ca9d6a61cddf9cfc7de074a",
+      "contributing_edges": [
+        {
+          "event_id": "b6c3f3a0e4be0bc5e3225cda",
+          "rule": "strait_closure",
+          "weight": -0.5
+        },
+        {
+          "event_id": "04b788417a3b768409011e07",
+          "rule": "military_conflict",
+          "weight": 0.7
+        }
+      ],
+      "direction": "UP",
+      "magnitude": "SMALL",
+      "signed_score": 0.2
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.5308,
+      "context_hash": "00525e058e920b20a1bdc73fa7c2a33d10e81ee300102b2c7aa4e2ce1fd01180",
+      "context_id": "478cbde45030d9af8a8d71a3",
+      "contributing_edges": [
+        {
+          "event_id": "17542977cd4bd5ae02085e06",
+          "rule": "rate_hike",
+          "weight": -0.6
+        },
+        {
+          "event_id": "e2eb460cf717f14ae567b671",
+          "rule": "military_conflict",
+          "weight": 0.7
+        }
+      ],
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL",
+      "signed_score": 0.1
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.5408,
+      "context_hash": "ecc9604829a55c1d1276e702ff00e158622b961a68550b21401a3e8abeef10a8",
+      "context_id": "36e6c3088a36866649ac26e9",
+      "contributing_edges": [
+        {
+          "event_id": "3019b7b81ec67cf799b0faa6",
+          "rule": "rate_hike",
+          "weight": -0.6
+        },
+        {
+          "event_id": "8d66aa33b39e534be081c1ae",
+          "rule": "strait_closure",
+          "weight": -0.5
+        },
+        {
+          "event_id": "7f2296f9b1c41a17f2020129",
+          "rule": "inflation_rise",
+          "weight": 0.65
+        },
+        {
+          "event_id": "dd492023154c3d5d5d193120",
+          "rule": "military_conflict",
+          "weight": 0.7
+        }
+      ],
+      "direction": "UP",
+      "magnitude": "SMALL",
+      "signed_score": 0.25
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.5408,
+      "context_hash": "4e6572bdb48bca1238f16c2952c3d29b14d3c75f4665efcb88a7eeca02d1497e",
+      "context_id": "2acce4b5cdadd63e99a53c1d",
+      "contributing_edges": [
+        {
+          "event_id": "f4aafe3febcba9e9c9fede55",
+          "rule": "rate_hike",
+          "weight": -0.6
+        },
+        {
+          "event_id": "a4e20c781e2ea3ebb18c73fc",
+          "rule": "strait_closure",
+          "weight": -0.5
+        },
+        {
+          "event_id": "d0e0bfb4a60ae58a7b7ed848",
+          "rule": "inflation_rise",
+          "weight": 0.65
+        },
+        {
+          "event_id": "6c3904e8a9600c33de7cf517",
+          "rule": "military_conflict",
+          "weight": 0.7
+        }
+      ],
+      "direction": "UP",
+      "magnitude": "SMALL",
+      "signed_score": 0.25
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.5889,
+      "context_hash": "05ac8d11c5dac5f5dc16974652f5936287fed58728a2918985063fef68a823b3",
+      "context_id": "05c8ee6a1de77f2eecd3631b",
+      "contributing_edges": [
+        {
+          "event_id": "c508e5cba65cd7f148f509ec",
+          "rule": "rate_hike",
+          "weight": -0.6
+        },
+        {
+          "event_id": "e3d58b2bffe3aff8450d38fd",
+          "rule": "strait_closure",
+          "weight": -0.5
+        },
+        {
+          "event_id": "840307b79188d81c21e0617c",
+          "rule": "military_conflict",
+          "weight": 0.7
+        }
+      ],
+      "direction": "DOWN",
+      "magnitude": "SMALL",
+      "signed_score": -0.4
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.5308,
+      "context_hash": "2364818db880d235af34198f6b32597aee8aa9ababd5b4d8eb18d6ddf1ec2001",
+      "context_id": "558031269e89b0c1b73f2d9b",
+      "contributing_edges": [
+        {
+          "event_id": "797f436fd1ff059863845124",
+          "rule": "rate_hike",
+          "weight": -0.6
+        },
+        {
+          "event_id": "42188f778eea80d437334c56",
+          "rule": "military_conflict",
+          "weight": 0.7
+        }
+      ],
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL",
+      "signed_score": 0.1
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.532,
+      "context_hash": "dff382c2ec67463f02b2748d65ee22364f1353ba1be07edcd27ae8a3c2abaf60",
+      "context_id": "05e306322232dffac21c39c9",
+      "contributing_edges": [
+        {
+          "event_id": "40adaef2f92f10bccfe8cbbb",
+          "rule": "inflation_fall",
+          "weight": -0.55
+        },
+        {
+          "event_id": "cd0e36be615d52314d1b71ab",
+          "rule": "rate_hike",
+          "weight": -0.6
+        },
+        {
+          "event_id": "7cf872eba6ac1db321a9f67f",
+          "rule": "inflation_rise",
+          "weight": 0.65
+        },
+        {
+          "event_id": "a6f19807da50e6f637ae7932",
+          "rule": "military_conflict",
+          "weight": 0.7
+        }
+      ],
+      "direction": "UP",
+      "magnitude": "SMALL",
+      "signed_score": 0.2
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.5364,
+      "context_hash": "bac72dd344762c099e7c7eef4928cadd3b6ba0f591d4f4f341601d1cf707e4eb",
+      "context_id": "228c32ecb0f1a6c832564d3f",
+      "contributing_edges": [
+        {
+          "event_id": "f5788dacb8688c537dacd558",
+          "rule": "rate_hike",
+          "weight": -0.6
+        },
+        {
+          "event_id": "f923dd2d1d73177f3b900c34",
+          "rule": "recession_signal",
+          "weight": 0.5
+        }
+      ],
+      "direction": "NEUTRAL",
+      "magnitude": "SMALL",
+      "signed_score": -0.1
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.6538,
+      "context_hash": "8496b0acce2ec5671b66c2628a3a55a8f8ec64906bac3618ac77a97b0d67c79f",
+      "context_id": "dd4a37d85b410252fcd16431",
+      "contributing_edges": [
+        {
+          "event_id": "3b24992c13d738b050e88fe5",
+          "rule": "rate_hike",
+          "weight": -0.6
+        },
+        {
+          "event_id": "e83b763a021af7f2e8b36547",
+          "rule": "inflation_rise",
+          "weight": 0.65
+        },
+        {
+          "event_id": "e9d7520ac15b5662f3147bf0",
+          "rule": "military_conflict",
+          "weight": 0.7
+        }
+      ],
+      "direction": "UP",
+      "magnitude": "MEDIUM",
+      "signed_score": 0.75
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.5667,
+      "context_hash": "54877deec18ac1f6c7a9e4bb562e7074d43f458eb6c24b2e9d48e9a5daef7c75",
+      "context_id": "369f28c9435fbf0cff739d52",
+      "contributing_edges": [
+        {
+          "event_id": "cf8c0bedf9da14f5378615c1",
+          "rule": "strait_closure",
+          "weight": -0.5
+        },
+        {
+          "event_id": "cfb2428982c8fdb577c14bfe",
+          "rule": "military_conflict",
+          "weight": 0.7
+        }
+      ],
+      "direction": "UP",
+      "magnitude": "SMALL",
+      "signed_score": 0.2
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.5667,
+      "context_hash": "c38a98a2222b55030e447f960dc93528352a568b8768596586c5929aa1bdba17",
+      "context_id": "fa39a231583d941cb7f546ac",
+      "contributing_edges": [
+        {
+          "event_id": "31a2184b9672051577299376",
+          "rule": "strait_closure",
+          "weight": -0.5
+        },
+        {
+          "event_id": "a1b30c0dc776860c78a01869",
+          "rule": "military_conflict",
+          "weight": 0.7
+        }
+      ],
+      "direction": "UP",
+      "magnitude": "SMALL",
+      "signed_score": 0.2
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.5667,
+      "context_hash": "30b5419813688af3c256c0f5453a896a1a21a6c1f254f1dd23bfb1c7bd45d5c0",
+      "context_id": "e5f4985a415bc1f3889f9f9e",
+      "contributing_edges": [
+        {
+          "event_id": "012026dad1c0ea99f440eba6",
+          "rule": "strait_closure",
+          "weight": -0.5
+        },
+        {
+          "event_id": "66ce71dc5adba47a20653ff0",
+          "rule": "military_conflict",
+          "weight": 0.7
+        }
+      ],
+      "direction": "UP",
+      "magnitude": "SMALL",
+      "signed_score": 0.2
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.5667,
+      "context_hash": "5ebbd49fee82dee67b112ed2d81f39e0569fe4a5eba516843b839aa404e55224",
+      "context_id": "8bf98f3cd12ca53ab3885e8f",
+      "contributing_edges": [
+        {
+          "event_id": "29e140879eb21ac6618fb131",
+          "rule": "strait_closure",
+          "weight": -0.5
+        },
+        {
+          "event_id": "9c2801f2c5e9f3da59d37cf6",
+          "rule": "military_conflict",
+          "weight": 0.7
+        }
+      ],
+      "direction": "UP",
+      "magnitude": "SMALL",
+      "signed_score": 0.2
+    },
+    {
+      "algorithm": "GRAPH_ONLY",
+      "algorithm_version": "p06-graph-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.5667,
+      "context_hash": "1bddd3e44169f256af1e35c4cad57f662b9b18ef0256c4ccee81246e7d658a3a",
+      "context_id": "faf862ad5aef44e2bea5a41c",
+      "contributing_edges": [
+        {
+          "event_id": "342e7ce36d1cb4ac5252a476",
+          "rule": "strait_closure",
+          "weight": -0.5
+        },
+        {
+          "event_id": "ee886a6d3b546a551cf16ab2",
+          "rule": "military_conflict",
+          "weight": 0.7
+        }
+      ],
+      "direction": "UP",
+      "magnitude": "SMALL",
+      "signed_score": 0.2
+    }
+  ],
+  "outcomes_loaded": false,
+  "predeclared_majority": [
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "BRENT_OIL",
+      "confidence": 0.3333333333333333,
+      "context_hash": "cc633b4812ab0aa22514e22c441bae83edfe9274cd8db296f7f8af3c8614f857",
+      "context_id": "c7d71df658e50cd23070c23c",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "BRENT_OIL",
+      "confidence": 0.3333333333333333,
+      "context_hash": "4cafdacd4f3a592458918efea5b46ca60386c8470f2c897c68e13e09db3dd90b",
+      "context_id": "81d2ba8389e9e2c3736510c5",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "BRENT_OIL",
+      "confidence": 0.3333333333333333,
+      "context_hash": "475babf9df593f0648f6fe9c6d012ecf47e85a8a0a1f550fba091ee6d7773ac3",
+      "context_id": "7d89c78f425286b5c532476c",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "BRENT_OIL",
+      "confidence": 0.3333333333333333,
+      "context_hash": "d4a4b5c53f792ec33acc397e719e4bcf8aca777d3356d0de8d8fbbf3cc1a2f6b",
+      "context_id": "c041c3a5268a0c4ca2e5dd76",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "BRENT_OIL",
+      "confidence": 0.3333333333333333,
+      "context_hash": "f78f034f8567658c4446125d8b7c19d3272039bb0760f16369b96738ae244c68",
+      "context_id": "6b02f914b1021d1d2e1d78f0",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "BRENT_OIL",
+      "confidence": 0.3333333333333333,
+      "context_hash": "19f5fc7d9cee2490ef2ed77d7da7f7aefdd4dc267285c096b1b9777e1da3a19c",
+      "context_id": "753cfbd950d29410b8fd7d94",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "e4d93f5b8fcecf15c78027bcc0a1204ab6a19ffd245b035d84de79fea82d6ce9",
+      "context_id": "70d61c9d962e2af441dcd450",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "9e217df07cdcfd84562cc448c90c8923011a47a4aa165b4fcd61c0e25e8d1a30",
+      "context_id": "a300b670c7c24305bb20f739",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "44ae086d6ac6a5ff0932b289f1a3ce49de01fd0f3f925888d73515dfe70f5809",
+      "context_id": "1bbeb2f8eeb889a9bd2f2532",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "b3e2caf531de5a7178c124c32953baaff451afab9083d969d51e6c6ad7b715ae",
+      "context_id": "9818ee8dc9601108aae6740a",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "a71b5ecb68180773275eb5ecf147d244f530e874d7157a2bdac291519c17c47c",
+      "context_id": "3fe0adf27bff651466fcecd7",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "b1f043bd83956b784e8a8dfb6ae3387ab217a584478d93d2ccf18c543b434555",
+      "context_id": "10e5f552086a3a4f8047894d",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "5f21cafbe3362d0b2b95df4b031704a4b8542776731a2e489896a916b8f073b6",
+      "context_id": "651bc37496b21a98d4e152ce",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "51aad99855c96399249b3be9f61866f5d23c50615c4dd95aa80033aa2fcf94e2",
+      "context_id": "8ec9925067ba141e22be2b3a",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "adec1c5e45078dca2de99db67d31467ffa37ee674b37388c7fbbd3aa09a99523",
+      "context_id": "c39627dbc02ec0a517e34f3a",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "d9eeeebfabca9bbb492954a19049d0654f32fbdbcae83bfbb506dd3f309e6ff4",
+      "context_id": "01140fb3cb6bd09e60cdcd1b",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "9bc9be84d6ff705f836aa4fb24a9e4e49a10f9120207342d8f3558464fc6e519",
+      "context_id": "4ca9d6a61cddf9cfc7de074a",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "00525e058e920b20a1bdc73fa7c2a33d10e81ee300102b2c7aa4e2ce1fd01180",
+      "context_id": "478cbde45030d9af8a8d71a3",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "ecc9604829a55c1d1276e702ff00e158622b961a68550b21401a3e8abeef10a8",
+      "context_id": "36e6c3088a36866649ac26e9",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "4e6572bdb48bca1238f16c2952c3d29b14d3c75f4665efcb88a7eeca02d1497e",
+      "context_id": "2acce4b5cdadd63e99a53c1d",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "05ac8d11c5dac5f5dc16974652f5936287fed58728a2918985063fef68a823b3",
+      "context_id": "05c8ee6a1de77f2eecd3631b",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "2364818db880d235af34198f6b32597aee8aa9ababd5b4d8eb18d6ddf1ec2001",
+      "context_id": "558031269e89b0c1b73f2d9b",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "dff382c2ec67463f02b2748d65ee22364f1353ba1be07edcd27ae8a3c2abaf60",
+      "context_id": "05e306322232dffac21c39c9",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "bac72dd344762c099e7c7eef4928cadd3b6ba0f591d4f4f341601d1cf707e4eb",
+      "context_id": "228c32ecb0f1a6c832564d3f",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "8496b0acce2ec5671b66c2628a3a55a8f8ec64906bac3618ac77a97b0d67c79f",
+      "context_id": "dd4a37d85b410252fcd16431",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "54877deec18ac1f6c7a9e4bb562e7074d43f458eb6c24b2e9d48e9a5daef7c75",
+      "context_id": "369f28c9435fbf0cff739d52",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "c38a98a2222b55030e447f960dc93528352a568b8768596586c5929aa1bdba17",
+      "context_id": "fa39a231583d941cb7f546ac",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "30b5419813688af3c256c0f5453a896a1a21a6c1f254f1dd23bfb1c7bd45d5c0",
+      "context_id": "e5f4985a415bc1f3889f9f9e",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "5ebbd49fee82dee67b112ed2d81f39e0569fe4a5eba516843b839aa404e55224",
+      "context_id": "8bf98f3cd12ca53ab3885e8f",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    },
+    {
+      "algorithm": "PREDECLARED_MAJORITY",
+      "algorithm_version": "p06-majority-v1",
+      "asset_id": "GOLD",
+      "confidence": 0.3333333333333333,
+      "context_hash": "1bddd3e44169f256af1e35c4cad57f662b9b18ef0256c4ccee81246e7d658a3a",
+      "context_id": "faf862ad5aef44e2bea5a41c",
+      "declaration": "UP fixed before outcome join; not learned from evaluation outcomes",
+      "direction": "UP",
+      "magnitude": "SMALL"
+    }
+  ],
+  "weights": {
+    "inflation_fall": {
+      "GOLD": -0.55
+    },
+    "inflation_rise": {
+      "GOLD": 0.65
+    },
+    "military_conflict": {
+      "BRENT_OIL": 0.6,
+      "GOLD": 0.7
+    },
+    "rate_cut": {
+      "GOLD": 0.6
+    },
+    "rate_hike": {
+      "GOLD": -0.6
+    },
+    "recession_signal": {
+      "BRENT_OIL": -0.4,
+      "GOLD": 0.5
+    },
+    "sanctions": {
+      "BRENT_OIL": 0.5,
+      "GOLD": 0.55
+    },
+    "strait_closure": {
+      "BRENT_OIL": 0.9,
+      "GOLD": -0.5
+    },
+    "supply_disruption": {
+      "BRENT_OIL": 0.9
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "context_id": "10e5f552086a3a4f8047894d",
+  "context_hash": "b1f043bd83956b784e8a8dfb6ae3387ab217a584478d93d2ccf18c543b434555",
+  "asset_id": "GOLD",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "LARGE",
+    "confidence": 0.78,
+    "rationale": "Military conflict and sanctions against Iran dominate with combined weight 1.25 vs -1.1 downside. Geopolitical risk and safe-haven demand drive gold strongly higher."
+  },
+  "usage": {
+    "input_tokens": 394,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 85
+  },
+  "response_hash": "be0a85c6611aecbaca4454309bd7391958791c7b703ab1ac9df3ea6740f9ad56",
+  "cache_hit": false,
+  "status": "OK"
+}

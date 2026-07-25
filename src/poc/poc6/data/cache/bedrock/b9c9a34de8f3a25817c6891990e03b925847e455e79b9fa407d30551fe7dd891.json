@@ -1,0 +1,27 @@
+{
+  "context_id": "81d2ba8389e9e2c3736510c5",
+  "context_hash": "4cafdacd4f3a592458918efea5b46ca60386c8470f2c897c68e13e09db3dd90b",
+  "asset_id": "BRENT_OIL",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "LARGE",
+    "confidence": 0.82,
+    "rationale": "Hormuz blockade reaffirmation dominates with weight 0.9; military conflict adds 0.6. Recession demand destruction (-0.4) partially offsets but supply disruption risk prevails."
+  },
+  "usage": {
+    "input_tokens": 334,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 91
+  },
+  "response_hash": "567589eec30561a21e5e65be6d4629d0a58dbe63d26ee7b4053360ad766fc562",
+  "cache_hit": false,
+  "status": "OK"
+}

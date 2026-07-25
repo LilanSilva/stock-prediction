@@ -1,0 +1,27 @@
+{
+  "context_id": "c7d71df658e50cd23070c23c",
+  "context_hash": "cc633b4812ab0aa22514e22c441bae83edfe9274cd8db296f7f8af3c8614f857",
+  "asset_id": "BRENT_OIL",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "SMALL",
+    "confidence": 0.55,
+    "rationale": "Military conflict involving Iran (supply disruption risk, weight 0.6) outweighs recession demand destruction signal (weight -0.4), yielding modest net upward pressure."
+  },
+  "usage": {
+    "input_tokens": 255,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 84
+  },
+  "response_hash": "c0fcae6f618949421ff39888f4a2e45c60dc2858c2aa0377dfe88309152e4d48",
+  "cache_hit": false,
+  "status": "OK"
+}

@@ -1,0 +1,27 @@
+{
+  "context_id": "c041c3a5268a0c4ca2e5dd76",
+  "context_hash": "d4a4b5c53f792ec33acc397e719e4bcf8aca777d3356d0de8d8fbbf3cc1a2f6b",
+  "asset_id": "BRENT_OIL",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "MEDIUM",
+    "confidence": 0.62,
+    "rationale": "Military conflict supply disruption weight (0.6) outweighs recession demand destruction signal (-0.4). Hormuz tensions support upward price pressure despite recession risk."
+  },
+  "usage": {
+    "input_tokens": 255,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 82
+  },
+  "response_hash": "0c335fad86da1c61aa7426ba734f05314d97c28d3eefb9be36cd5a2d3b7f8ace",
+  "cache_hit": false,
+  "status": "OK"
+}

@@ -1,0 +1,27 @@
+{
+  "context_id": "a300b670c7c24305bb20f739",
+  "context_hash": "9e217df07cdcfd84562cc448c90c8923011a47a4aa165b4fcd61c0e25e8d1a30",
+  "asset_id": "GOLD",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "MEDIUM",
+    "confidence": 0.68,
+    "rationale": "Iran conflict stagflation fears dominate, boosting gold as safe-haven. Slow Japan rate hikes mildly bearish but outweighed by geopolitical risk premium."
+  },
+  "usage": {
+    "input_tokens": 249,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 84
+  },
+  "response_hash": "4b0d0d0870614b7c441e8349459ba72ea747d213c0604d3c9e417b0f4643dafd",
+  "cache_hit": false,
+  "status": "OK"
+}

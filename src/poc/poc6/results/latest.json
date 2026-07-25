@@ -1,0 +1,109 @@
+{
+  "poc": "POC-6",
+  "run_started_at": "2026-07-13T16:47:11.891387+00:00",
+  "run_finished_at": "2026-07-13T16:47:13.511047+00:00",
+  "llm_calls": 0,
+  "llm_input_tokens": 0,
+  "llm_output_tokens": 0,
+  "estimated_llm_cost_usd": 0.0,
+  "source_gate": {
+    "sources": [
+      {
+        "source_id": "DI",
+        "status": "OK",
+        "articles": 20
+      },
+      {
+        "source_id": "DN",
+        "status": "OK",
+        "articles": 111
+      },
+      {
+        "source_id": "SVD",
+        "status": "OK",
+        "articles": 30
+      },
+      {
+        "source_id": "AFTONBLADET",
+        "status": "OK",
+        "articles": 39
+      }
+    ],
+    "article_count": 200,
+    "unique_article_count": 192,
+    "signal_count": 8,
+    "conflict_context_count": 0,
+    "minimum_required_contexts": 30,
+    "gate_passed": false,
+    "contexts": []
+  },
+  "price_gate": {
+    "yahoo": [
+      {
+        "asset_id": "GOLD",
+        "symbol": "GC=F",
+        "status": "OK",
+        "instrument_type": "FUTURE",
+        "currency": "USD",
+        "provider_exchange": "CMX",
+        "provider_timezone": "America/New_York",
+        "expected_calendar": "COMEX",
+        "expected_timezone": "America/New_York",
+        "timezone_matches": true,
+        "observation_count": 19,
+        "first_observation": {
+          "session_label_utc": "2026-06-15T04:00:00+00:00",
+          "close": 4328.0
+        },
+        "last_observation": {
+          "session_label_utc": "2026-07-13T04:00:00+00:00",
+          "close": 3999.60009765625
+        }
+      },
+      {
+        "asset_id": "BRENT_OIL",
+        "symbol": "BZ=F",
+        "status": "OK",
+        "instrument_type": "FUTURE",
+        "currency": "USD",
+        "provider_exchange": "NYM",
+        "provider_timezone": "America/New_York",
+        "expected_calendar": "ICE_EUROPE",
+        "expected_timezone": "Europe/London",
+        "timezone_matches": false,
+        "observation_count": 19,
+        "first_observation": {
+          "session_label_utc": "2026-06-15T04:00:00+00:00",
+          "close": 83.16999816894531
+        },
+        "last_observation": {
+          "session_label_utc": "2026-07-13T04:00:00+00:00",
+          "close": 79.94999694824219
+        }
+      }
+    ],
+    "stooq": [
+      {
+        "symbol": "^gold",
+        "status": "INVALID_RESPONSE",
+        "valid_csv": false
+      },
+      {
+        "symbol": "^oil",
+        "status": "INVALID_RESPONSE",
+        "valid_csv": false
+      }
+    ],
+    "yahoo_available": true,
+    "calendar_consistent": false,
+    "stooq_fallback_validated": false,
+    "roll_policy_defined": false,
+    "gate_passed": false,
+    "notes": [
+      "Yahoo daily timestamps are provider session labels, not official settlement observation times.",
+      "The POC requires a pre-declared continuous-futures rollover policy."
+    ]
+  },
+  "decision": "REVISE",
+  "reason": "POC-6 early-stop rule applied before paid inference: a reproducible conflict dataset and/or auditable market-data policy is not yet available."
+}

@@ -1,0 +1,43 @@
+{
+  "reviewed_by": "Codex manual title/provenance review",
+  "reviewed_at": "2026-07-13T20:15:00+00:00",
+  "outcomes_visible": false,
+  "accepted_context_ids": [
+    "c7d71df658e50cd23070c23c",
+    "81d2ba8389e9e2c3736510c5",
+    "7d89c78f425286b5c532476c",
+    "c041c3a5268a0c4ca2e5dd76",
+    "6b02f914b1021d1d2e1d78f0",
+    "753cfbd950d29410b8fd7d94",
+    "70d61c9d962e2af441dcd450",
+    "a300b670c7c24305bb20f739",
+    "1bbeb2f8eeb889a9bd2f2532",
+    "9818ee8dc9601108aae6740a",
+    "3fe0adf27bff651466fcecd7",
+    "10e5f552086a3a4f8047894d",
+    "651bc37496b21a98d4e152ce",
+    "8ec9925067ba141e22be2b3a",
+    "c39627dbc02ec0a517e34f3a",
+    "01140fb3cb6bd09e60cdcd1b",
+    "4ca9d6a61cddf9cfc7de074a",
+    "478cbde45030d9af8a8d71a3",
+    "36e6c3088a36866649ac26e9",
+    "2acce4b5cdadd63e99a53c1d",
+    "05c8ee6a1de77f2eecd3631b",
+    "558031269e89b0c1b73f2d9b",
+    "05e306322232dffac21c39c9",
+    "228c32ecb0f1a6c832564d3f",
+    "dd4a37d85b410252fcd16431",
+    "369f28c9435fbf0cff739d52",
+    "fa39a231583d941cb7f546ac",
+    "e5f4985a415bc1f3889f9f9e",
+    "8bf98f3cd12ca53ab3885e8f",
+    "faf862ad5aef44e2bea5a41c"
+  ],
+  "excluded": {
+    "b5333234b6218fb566bf059b": "Airport-drone strike false positive and negated rate-cut headline.",
+    "643aab3e92716ba66dd7735e": "Headline says the Strait reopened; it is not a closure force.",
+    "4ecccdcf541a8de6fc6bc433": "Headline describes conditions after reopening; it is not a closure force."
+  },
+  "review_note": "Headlines describing attempts or negotiations to reopen were retained only when they also established that the closure/blockade was still active at publication time. No market prices or outcome directions were available during review."
+}

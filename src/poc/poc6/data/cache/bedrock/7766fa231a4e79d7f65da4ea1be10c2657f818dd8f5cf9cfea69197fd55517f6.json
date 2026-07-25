@@ -1,0 +1,27 @@
+{
+  "context_id": "478cbde45030d9af8a8d71a3",
+  "context_hash": "00525e058e920b20a1bdc73fa7c2a33d10e81ee300102b2c7aa4e2ce1fd01180",
+  "asset_id": "GOLD",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "SMALL",
+    "confidence": 0.58,
+    "rationale": "Iran conflict drives safe-haven gold demand (weight 0.7). BOJ hawkish signal pressures gold via stronger yen (weight -0.6). Conflict edge marginally dominates."
+  },
+  "usage": {
+    "input_tokens": 249,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 88
+  },
+  "response_hash": "2240963eb38a65926d90540514f9954b710330de0781f4006f2998f9c73c0100",
+  "cache_hit": false,
+  "status": "OK"
+}

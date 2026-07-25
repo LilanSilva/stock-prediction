@@ -1,0 +1,27 @@
+{
+  "context_id": "8ec9925067ba141e22be2b3a",
+  "context_hash": "51aad99855c96399249b3be9f61866f5d23c50615c4dd95aa80033aa2fcf94e2",
+  "asset_id": "GOLD",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "MEDIUM",
+    "confidence": 0.65,
+    "rationale": "Military conflict risk and recession fears outweigh ECB rate hike pressure. Safe-haven demand drives gold higher despite negative rate headwind."
+  },
+  "usage": {
+    "input_tokens": 304,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 74
+  },
+  "response_hash": "5d9d9229b6e6d704fb51f3d77b6f384aa17aa414b828bb7764bdcd709a28ad6e",
+  "cache_hit": false,
+  "status": "OK"
+}

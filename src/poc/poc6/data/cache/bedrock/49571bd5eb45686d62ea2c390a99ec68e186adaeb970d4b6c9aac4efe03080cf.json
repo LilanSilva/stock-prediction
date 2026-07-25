@@ -1,0 +1,27 @@
+{
+  "context_id": "9818ee8dc9601108aae6740a",
+  "context_hash": "b3e2caf531de5a7178c124c32953baaff451afab9083d969d51e6c6ad7b715ae",
+  "asset_id": "GOLD",
+  "mode": "LLM_ONLY",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "LARGE",
+    "confidence": 0.82,
+    "rationale": "Military conflict, Hormuz recession fears, and rate cuts all drive safe-haven gold demand. Geopolitical risk dominates; peso weakness adds minor offset."
+  },
+  "usage": {
+    "input_tokens": 212,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 79
+  },
+  "response_hash": "6fe2d34df44a523ebd5159c47cabba18768a0ac2fa4298b32eadb99306fbb3b4",
+  "cache_hit": false,
+  "status": "OK"
+}

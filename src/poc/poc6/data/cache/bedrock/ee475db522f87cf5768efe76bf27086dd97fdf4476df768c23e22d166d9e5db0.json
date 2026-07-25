@@ -1,0 +1,27 @@
+{
+  "context_id": "7d89c78f425286b5c532476c",
+  "context_hash": "475babf9df593f0648f6fe9c6d012ecf47e85a8a0a1f550fba091ee6d7773ac3",
+  "asset_id": "BRENT_OIL",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "LARGE",
+    "confidence": 0.82,
+    "rationale": "Hormuz supply disruption and Iran-UAE conflict dominate with combined weights of 1.5 vs -0.4 recession drag. Strait closure risk sharply tightens physical oil supply."
+  },
+  "usage": {
+    "input_tokens": 324,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 89
+  },
+  "response_hash": "e9325843eb2b8c22628ebd2b9106bc6380c0960be8ad4a8eaab7689178cd6441",
+  "cache_hit": false,
+  "status": "OK"
+}

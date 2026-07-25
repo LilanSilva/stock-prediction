@@ -1,0 +1,27 @@
+{
+  "context_id": "7d89c78f425286b5c532476c",
+  "context_hash": "475babf9df593f0648f6fe9c6d012ecf47e85a8a0a1f550fba091ee6d7773ac3",
+  "asset_id": "BRENT_OIL",
+  "mode": "LLM_ONLY",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "LARGE",
+    "confidence": 0.82,
+    "rationale": "Hormuz disruption directly threatens major oil transit chokepoint, overriding UK recession demand concerns. Iran-UAE conflict creates acute supply shock with immediate price pressure."
+  },
+  "usage": {
+    "input_tokens": 219,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 80
+  },
+  "response_hash": "91055762b5beb51015df0e78fdbfc996d0a1daab8f5759ad734b502d1ad36989",
+  "cache_hit": false,
+  "status": "OK"
+}

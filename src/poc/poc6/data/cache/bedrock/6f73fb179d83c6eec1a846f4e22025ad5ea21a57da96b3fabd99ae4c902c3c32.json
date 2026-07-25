@@ -1,0 +1,27 @@
+{
+  "context_id": "6b02f914b1021d1d2e1d78f0",
+  "context_hash": "f78f034f8567658c4446125d8b7c19d3272039bb0760f16369b96738ae244c68",
+  "asset_id": "BRENT_OIL",
+  "mode": "LLM_ONLY",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "MEDIUM",
+    "confidence": 0.62,
+    "rationale": "Iran war signals direct supply disruption risk in Hormuz, lifting oil prices. Recession fears partially offset gains but supply shock dominates near-term."
+  },
+  "usage": {
+    "input_tokens": 197,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 77
+  },
+  "response_hash": "1e2689fe5423459111579c62cfa674d81f57a6e634e5f6ee763396dafcc50066",
+  "cache_hit": false,
+  "status": "OK"
+}

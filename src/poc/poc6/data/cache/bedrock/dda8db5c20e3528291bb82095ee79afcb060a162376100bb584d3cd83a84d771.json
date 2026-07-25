@@ -1,0 +1,27 @@
+{
+  "context_id": "c39627dbc02ec0a517e34f3a",
+  "context_hash": "adec1c5e45078dca2de99db67d31467ffa37ee674b37388c7fbbd3aa09a99523",
+  "asset_id": "GOLD",
+  "mode": "KG_LLM",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "MEDIUM",
+    "confidence": 0.65,
+    "rationale": "Military conflict weight (0.7) outweighs strait closure (-0.5). Ongoing Iran war and Asia energy crisis sustain safe-haven gold demand despite partial Hormuz reopening."
+  },
+  "usage": {
+    "input_tokens": 258,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 87
+  },
+  "response_hash": "7d752a3fa9a21aea20c9c99d342eb295ab4e52b655741f08cf1ea63e150aa3db",
+  "cache_hit": false,
+  "status": "OK"
+}

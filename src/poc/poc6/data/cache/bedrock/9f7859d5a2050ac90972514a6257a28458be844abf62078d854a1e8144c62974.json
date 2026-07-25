@@ -1,0 +1,27 @@
+{
+  "context_id": "1bbeb2f8eeb889a9bd2f2532",
+  "context_hash": "44ae086d6ac6a5ff0932b289f1a3ce49de01fd0f3f925888d73515dfe70f5809",
+  "asset_id": "GOLD",
+  "mode": "LLM_ONLY",
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "prediction": {
+    "direction": "UP",
+    "magnitude": "LARGE",
+    "confidence": 0.82,
+    "rationale": "Strait closure sustains oil shock, UK recession risk and war volatility drive safe-haven demand strongly into gold. Geopolitical stress dominates; no meaningful bearish offset."
+  },
+  "usage": {
+    "input_tokens": 228,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 83
+  },
+  "response_hash": "132423c4cf0e9d53a61590f60740d643187895daf9ea218187bed3aa91e14891",
+  "cache_hit": false,
+  "status": "OK"
+}

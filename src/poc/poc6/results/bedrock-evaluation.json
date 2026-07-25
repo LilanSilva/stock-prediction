@@ -1,0 +1,1097 @@
+{
+  "budget": {
+    "calls": 40,
+    "max_calls": 40,
+    "max_input_tokens": 80000,
+    "max_output_tokens": 8000,
+    "provider_input_tokens": 10762,
+    "provider_output_tokens": 3357,
+    "reserved_input_tokens": 8570,
+    "reserved_output_tokens": 4800
+  },
+  "maximum_list_price_usd": 0.09771,
+  "model_id": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "p06-arbiter-v1",
+  "results": [
+    {
+      "asset_id": "BRENT_OIL",
+      "cache_hit": false,
+      "context_hash": "cc633b4812ab0aa22514e22c441bae83edfe9274cd8db296f7f8af3c8614f857",
+      "context_id": "c7d71df658e50cd23070c23c",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.55,
+        "direction": "UP",
+        "magnitude": "SMALL",
+        "rationale": "Military conflict involving Iran (supply disruption risk, weight 0.6) outweighs recession demand destruction signal (weight -0.4), yielding modest net upward pressure."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "c0fcae6f618949421ff39888f4a2e45c60dc2858c2aa0377dfe88309152e4d48",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 255,
+        "output_tokens": 84
+      }
+    },
+    {
+      "asset_id": "BRENT_OIL",
+      "cache_hit": false,
+      "context_hash": "4cafdacd4f3a592458918efea5b46ca60386c8470f2c897c68e13e09db3dd90b",
+      "context_id": "81d2ba8389e9e2c3736510c5",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.82,
+        "direction": "UP",
+        "magnitude": "LARGE",
+        "rationale": "Hormuz blockade reaffirmation dominates with weight 0.9; military conflict adds 0.6. Recession demand destruction (-0.4) partially offsets but supply disruption risk prevails."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "567589eec30561a21e5e65be6d4629d0a58dbe63d26ee7b4053360ad766fc562",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 334,
+        "output_tokens": 91
+      }
+    },
+    {
+      "asset_id": "BRENT_OIL",
+      "cache_hit": false,
+      "context_hash": "475babf9df593f0648f6fe9c6d012ecf47e85a8a0a1f550fba091ee6d7773ac3",
+      "context_id": "7d89c78f425286b5c532476c",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.82,
+        "direction": "UP",
+        "magnitude": "LARGE",
+        "rationale": "Hormuz supply disruption and Iran-UAE conflict dominate with combined weights of 1.5 vs -0.4 recession drag. Strait closure risk sharply tightens physical oil supply."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "e9325843eb2b8c22628ebd2b9106bc6380c0960be8ad4a8eaab7689178cd6441",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 324,
+        "output_tokens": 89
+      }
+    },
+    {
+      "asset_id": "BRENT_OIL",
+      "cache_hit": false,
+      "context_hash": "d4a4b5c53f792ec33acc397e719e4bcf8aca777d3356d0de8d8fbbf3cc1a2f6b",
+      "context_id": "c041c3a5268a0c4ca2e5dd76",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.62,
+        "direction": "UP",
+        "magnitude": "MEDIUM",
+        "rationale": "Military conflict supply disruption weight (0.6) outweighs recession demand destruction signal (-0.4). Hormuz tensions support upward price pressure despite recession risk."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "0c335fad86da1c61aa7426ba734f05314d97c28d3eefb9be36cd5a2d3b7f8ace",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 255,
+        "output_tokens": 82
+      }
+    },
+    {
+      "asset_id": "BRENT_OIL",
+      "cache_hit": false,
+      "context_hash": "f78f034f8567658c4446125d8b7c19d3272039bb0760f16369b96738ae244c68",
+      "context_id": "6b02f914b1021d1d2e1d78f0",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.62,
+        "direction": "UP",
+        "magnitude": "MEDIUM",
+        "rationale": "Iran War military conflict (weight +0.6) outweighs recession demand-destruction signal (-0.4). Hormuz supply disruption risk dominates near-term Brent pricing."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "6a2e1d994d90fde9f7e04dfaa4df34d855c1e8d3c2b382a0e23b98182729d96e",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 267,
+        "output_tokens": 87
+      }
+    },
+    {
+      "asset_id": "BRENT_OIL",
+      "cache_hit": false,
+      "context_hash": "19f5fc7d9cee2490ef2ed77d7da7f7aefdd4dc267285c096b1b9777e1da3a19c",
+      "context_id": "753cfbd950d29410b8fd7d94",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.52,
+        "direction": "UP",
+        "magnitude": "SMALL",
+        "rationale": "Military conflict/Iran war risk (weight 0.6) narrowly outweighs recession demand-destruction signal (weight -0.4), yielding modest upward bias with low conviction."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "c450f43254bb0eb80f2468421c894a44d04a98366d1f4af61edd09a32c3335bb",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 246,
+        "output_tokens": 86
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "e4d93f5b8fcecf15c78027bcc0a1204ab6a19ffd245b035d84de79fea82d6ce9",
+      "context_id": "70d61c9d962e2af441dcd450",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.58,
+        "direction": "UP",
+        "magnitude": "SMALL",
+        "rationale": "Military conflict uncertainty (weight 0.7) outweighs slow-rate-hike pressure (weight -0.6). Ceasefire doubts sustain safe-haven gold demand slightly."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "227a46bc018d555fe60b902edd5805a37a1aae6cb44bb035a373a1934a20dde0",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 256,
+        "output_tokens": 88
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "9e217df07cdcfd84562cc448c90c8923011a47a4aa165b4fcd61c0e25e8d1a30",
+      "context_id": "a300b670c7c24305bb20f739",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.68,
+        "direction": "UP",
+        "magnitude": "MEDIUM",
+        "rationale": "Iran conflict stagflation fears dominate, boosting gold as safe-haven. Slow Japan rate hikes mildly bearish but outweighed by geopolitical risk premium."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "4b0d0d0870614b7c441e8349459ba72ea747d213c0604d3c9e417b0f4643dafd",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 249,
+        "output_tokens": 84
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "44ae086d6ac6a5ff0932b289f1a3ce49de01fd0f3f925888d73515dfe70f5809",
+      "context_id": "1bbeb2f8eeb889a9bd2f2532",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.78,
+        "direction": "UP",
+        "magnitude": "LARGE",
+        "rationale": "Military conflict and recession signals dominate; strait closure is bearish for oil but gold benefits as safe-haven amid war, inflation, and recession fears. Net bullish."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "08bf1e871bd1e3b3a2a2813f7b59e88b25b62b3bc1f8b886af705e6052bed217",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 330,
+        "output_tokens": 80
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "b3e2caf531de5a7178c124c32953baaff451afab9083d969d51e6c6ad7b715ae",
+      "context_id": "9818ee8dc9601108aae6740a",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.74,
+        "direction": "UP",
+        "magnitude": "MEDIUM",
+        "rationale": "Military conflict and recession fears dominate, driving safe-haven gold demand. Rate hike pressure partially offsets but geopolitical risk and Hormuz disruption fears outweigh."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "d8e16861bc747941c3a0ba420bab34acab86f566ede6be20b5387e3ccdf2f7d6",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 320,
+        "output_tokens": 83
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "a71b5ecb68180773275eb5ecf147d244f530e874d7157a2bdac291519c17c47c",
+      "context_id": "3fe0adf27bff651466fcecd7",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.65,
+        "direction": "UP",
+        "magnitude": "MEDIUM",
+        "rationale": "Military conflict involving US-Israel-Iran drives safe-haven gold demand (weight 0.7). Rate cut signal mildly supportive. Conflict risk dominates, net upward pressure."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "9f5c1c65ac7d2a4db94a95b1e90f65ca6eccdebe27ca23a665e1867d779628d0",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 251,
+        "output_tokens": 86
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "b1f043bd83956b784e8a8dfb6ae3387ab217a584478d93d2ccf18c543b434555",
+      "context_id": "10e5f552086a3a4f8047894d",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.78,
+        "direction": "UP",
+        "magnitude": "LARGE",
+        "rationale": "Military conflict and sanctions against Iran dominate with combined weight 1.25 vs -1.1 downside. Geopolitical risk and safe-haven demand drive gold strongly higher."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "be0a85c6611aecbaca4454309bd7391958791c7b703ab1ac9df3ea6740f9ad56",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 394,
+        "output_tokens": 85
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "5f21cafbe3362d0b2b95df4b031704a4b8542776731a2e489896a916b8f073b6",
+      "context_id": "651bc37496b21a98d4e152ce",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.55,
+        "direction": "UP",
+        "magnitude": "SMALL",
+        "rationale": "Military conflict uncertainty (weight 0.7) slightly outweighs rate hike pressure (weight -0.6), but 'phoney war' framing limits safe-haven demand. Net modest upward bias."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "928c486669ded0422c41b7c995f2e02e63e8428fb7f9929082d9bebe119cde78",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 263,
+        "output_tokens": 92
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "51aad99855c96399249b3be9f61866f5d23c50615c4dd95aa80033aa2fcf94e2",
+      "context_id": "8ec9925067ba141e22be2b3a",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.65,
+        "direction": "UP",
+        "magnitude": "MEDIUM",
+        "rationale": "Military conflict risk and recession fears outweigh ECB rate hike pressure. Safe-haven demand drives gold higher despite negative rate headwind."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "5d9d9229b6e6d704fb51f3d77b6f384aa17aa414b828bb7764bdcd709a28ad6e",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 304,
+        "output_tokens": 74
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "adec1c5e45078dca2de99db67d31467ffa37ee674b37388c7fbbd3aa09a99523",
+      "context_id": "c39627dbc02ec0a517e34f3a",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.65,
+        "direction": "UP",
+        "magnitude": "MEDIUM",
+        "rationale": "Military conflict weight (0.7) outweighs strait closure (-0.5). Ongoing Iran war and Asia energy crisis sustain safe-haven gold demand despite partial Hormuz reopening."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "7d752a3fa9a21aea20c9c99d342eb295ab4e52b655741f08cf1ea63e150aa3db",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 258,
+        "output_tokens": 87
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "d9eeeebfabca9bbb492954a19049d0654f32fbdbcae83bfbb506dd3f309e6ff4",
+      "context_id": "01140fb3cb6bd09e60cdcd1b",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.72,
+        "direction": "UP",
+        "magnitude": "MEDIUM",
+        "rationale": "Prolonged Iran war risk and IMF warning of worsening outcomes dominate; geopolitical uncertainty drives safe-haven gold demand despite strait closure supply disruption pressures."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "048fda341de7dc44d30bb6b008445f65e7e0e97dd9cc07b73575a98d7b79487e",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 269,
+        "output_tokens": 82
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "9bc9be84d6ff705f836aa4fb24a9e4e49a10f9120207342d8f3558464fc6e519",
+      "context_id": "4ca9d6a61cddf9cfc7de074a",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.68,
+        "direction": "UP",
+        "magnitude": "MEDIUM",
+        "rationale": "Military conflict and energy crisis fears dominate; strait closure partially offsets but geopolitical risk premium drives safe-haven gold demand upward."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "7b6512ca19759af1ebd793840076e340d487c9cba695814e3d21e3a39bb334b3",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 271,
+        "output_tokens": 74
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "00525e058e920b20a1bdc73fa7c2a33d10e81ee300102b2c7aa4e2ce1fd01180",
+      "context_id": "478cbde45030d9af8a8d71a3",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.58,
+        "direction": "UP",
+        "magnitude": "SMALL",
+        "rationale": "Iran conflict drives safe-haven gold demand (weight 0.7). BOJ hawkish signal pressures gold via stronger yen (weight -0.6). Conflict edge marginally dominates."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "2240963eb38a65926d90540514f9954b710330de0781f4006f2998f9c73c0100",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 249,
+        "output_tokens": 88
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "ecc9604829a55c1d1276e702ff00e158622b961a68550b21401a3e8abeef10a8",
+      "context_id": "36e6c3088a36866649ac26e9",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.63,
+        "direction": "UP",
+        "magnitude": "MEDIUM",
+        "rationale": "Military conflict risk and inflation fears dominate, outweighing rate-hike and strait-closure headwinds. Net bullish pressure favors gold as safe-haven and inflation hedge."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "1fa33eef8e50211d0331e33f373fc061b68518a5479e85d1a45550118a2eac1a",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 393,
+        "output_tokens": 85
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "4e6572bdb48bca1238f16c2952c3d29b14d3c75f4665efcb88a7eeca02d1497e",
+      "context_id": "2acce4b5cdadd63e99a53c1d",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.58,
+        "direction": "UP",
+        "magnitude": "SMALL",
+        "rationale": "Military conflict and inflation revival favor gold as safe haven. ECB rate hike pressure and Hormuz resolution partially offset gains, leaving modest net upward bias."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "74e1a66bf4918d3b18df292a5cad8fed2a4715109a3494bbdd9cbb0517c79d30",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 428,
+        "output_tokens": 78
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "05ac8d11c5dac5f5dc16974652f5936287fed58728a2918985063fef68a823b3",
+      "context_id": "05c8ee6a1de77f2eecd3631b",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.41,
+        "direction": "NEUTRAL",
+        "magnitude": "SMALL",
+        "rationale": "Military conflict risk supports gold (+0.7), but ECB rate hike pressure (-0.6) and Hormuz closure uncertainty (-0.5) offset safe-haven demand, leaving net signal near neutral."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "91fa686530d4c7ad2f036ae9520402696a3437bc7b98a6b947053f30a86db3b0",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 319,
+        "output_tokens": 91
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "2364818db880d235af34198f6b32597aee8aa9ababd5b4d8eb18d6ddf1ec2001",
+      "context_id": "558031269e89b0c1b73f2d9b",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.58,
+        "direction": "UP",
+        "magnitude": "SMALL",
+        "rationale": "Iran war conflict drives safe-haven gold demand (weight 0.7), partially offset by rate-hike pressure suppressing risk appetite and liquidity (weight -0.6). Net bias slightly bullish."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "8d9fd2657d634a9ae02423035c1dabb6c01dd516067cb6dfa647070430ef398e",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 246,
+        "output_tokens": 89
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "dff382c2ec67463f02b2748d65ee22364f1353ba1be07edcd27ae8a3c2abaf60",
+      "context_id": "05e306322232dffac21c39c9",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.55,
+        "direction": "UP",
+        "magnitude": "SMALL",
+        "rationale": "Military conflict and Nigeria inflation rise (weights +0.70, +0.65) narrowly outweigh US inflation fall and Fed rate hike fears (-0.55, -0.60), yielding modest upward bias."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "e6e4886d158b371b2b8fc5f831a35b6206ad9ef132769fb3de5c6d598a9bafd5",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 389,
+        "output_tokens": 94
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "bac72dd344762c099e7c7eef4928cadd3b6ba0f591d4f4f341601d1cf707e4eb",
+      "context_id": "228c32ecb0f1a6c832564d3f",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.52,
+        "direction": "UP",
+        "magnitude": "SMALL",
+        "rationale": "Recession signal supports gold as safe haven (+0.5). Rate hike odds weigh bearish (-0.6), but net edge slightly favors upside given recession fear offsetting rate pressure."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "14f1809193fcb2eb5c1b2da0b1c3136210b641320215aa886853f86486df9246",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 257,
+        "output_tokens": 87
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "8496b0acce2ec5671b66c2628a3a55a8f8ec64906bac3618ac77a97b0d67c79f",
+      "context_id": "dd4a37d85b410252fcd16431",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.68,
+        "direction": "UP",
+        "magnitude": "MEDIUM",
+        "rationale": "Inflation rise and military conflict geopolitical risk outweigh rate hike headwinds. Net positive weight (0.65+0.70-0.60=0.75) favors gold safe-haven demand."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "c067b206b15acd09be8468486203c81bbd8c5fd395f352803258d234d4f35226",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 327,
+        "output_tokens": 93
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "54877deec18ac1f6c7a9e4bb562e7074d43f458eb6c24b2e9d48e9a5daef7c75",
+      "context_id": "369f28c9435fbf0cff739d52",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.62,
+        "direction": "UP",
+        "magnitude": "MEDIUM",
+        "rationale": "Military conflict signal (weight 0.7) outweighs strait reopening (weight -0.5). Iran war uncertainty sustains safe-haven gold demand despite partial geopolitical de-escalation."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "00d07d0b54c0468b1242b06696562ac9b2db1869c2872d1138ce5e06233878fe",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 279,
+        "output_tokens": 89
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "c38a98a2222b55030e447f960dc93528352a568b8768596586c5929aa1bdba17",
+      "context_id": "fa39a231583d941cb7f546ac",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.62,
+        "direction": "UP",
+        "magnitude": "MEDIUM",
+        "rationale": "Military conflict persistence outweighs reopening hopes. Republican hardliners blocking Iran deal sustains geopolitical risk premium, keeping gold bid despite Strait negotiation progress."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "623c8e898adfeb85961b2df880e37f18af40eb0f0dec65dfc00abc8ea7b6d895",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 255,
+        "output_tokens": 81
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "30b5419813688af3c256c0f5453a896a1a21a6c1f254f1dd23bfb1c7bd45d5c0",
+      "context_id": "e5f4985a415bc1f3889f9f9e",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.52,
+        "direction": "DOWN",
+        "magnitude": "SMALL",
+        "rationale": "Strait reopening deal reduces geopolitical risk premium, outweighing skepticism about Trump's repeated unverified peace claims. Net bearish but uncertainty limits magnitude."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "d3ce704c5565ff636771e0ec7e40e2dd01c66ccdca241e6cd7b015e62ec5fba0",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 262,
+        "output_tokens": 81
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "5ebbd49fee82dee67b112ed2d81f39e0569fe4a5eba516843b839aa404e55224",
+      "context_id": "8bf98f3cd12ca53ab3885e8f",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.55,
+        "direction": "UP",
+        "magnitude": "SMALL",
+        "rationale": "Military conflict uncertainty from GOP opposition outweighs oil-driven risk-off relief. Net positive for gold as safe-haven, but partial offset limits magnitude."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "928bf1208bc7179dcddc3eff01b6eec95120175a7a9e477ed8bed3545dbef3b2",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 258,
+        "output_tokens": 78
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "1bddd3e44169f256af1e35c4cad57f662b9b18ef0256c4ccee81246e7d658a3a",
+      "context_id": "faf862ad5aef44e2bea5a41c",
+      "mode": "KG_LLM",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.62,
+        "direction": "DOWN",
+        "magnitude": "MEDIUM",
+        "rationale": "Iran peace deal and Hormuz reopening reduce geopolitical risk premium. Conflict resolution outweighs residual uncertainty, net bearish for gold safe-haven demand."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "3fd17956b5d426ffc5a779a9637ef60c3f7d1b208f2e6ff5943068bd4ccd10a3",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 260,
+        "output_tokens": 82
+      }
+    },
+    {
+      "asset_id": "BRENT_OIL",
+      "cache_hit": false,
+      "context_hash": "cc633b4812ab0aa22514e22c441bae83edfe9274cd8db296f7f8af3c8614f857",
+      "context_id": "c7d71df658e50cd23070c23c",
+      "mode": "LLM_ONLY",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.58,
+        "direction": "UP",
+        "magnitude": "MEDIUM",
+        "rationale": "Iran military conflict risk dominates oil supply fears, outweighing recession demand destruction. Geopolitical supply disruption premium typically overrides near-term demand concerns for Brent."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "0e642d641ba081f74ca4a8197001ecca81c13b3572809535af524c8806a45b7f",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 184,
+        "output_tokens": 84
+      }
+    },
+    {
+      "asset_id": "BRENT_OIL",
+      "cache_hit": false,
+      "context_hash": "4cafdacd4f3a592458918efea5b46ca60386c8470f2c897c68e13e09db3dd90b",
+      "context_id": "81d2ba8389e9e2c3736510c5",
+      "mode": "LLM_ONLY",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.82,
+        "direction": "UP",
+        "magnitude": "LARGE",
+        "rationale": "Strait of Hormuz blockade reaffirmation dominates; supply disruption risk overwhelms recession demand concerns. Iran war escalation reinforces upward pressure on Brent."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "f93d3912c55aeb0b58a0f3ce81b9044505b36715df9b1324eabadc8300c70011",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 233,
+        "output_tokens": 84
+      }
+    },
+    {
+      "asset_id": "BRENT_OIL",
+      "cache_hit": false,
+      "context_hash": "475babf9df593f0648f6fe9c6d012ecf47e85a8a0a1f550fba091ee6d7773ac3",
+      "context_id": "7d89c78f425286b5c532476c",
+      "mode": "LLM_ONLY",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.82,
+        "direction": "UP",
+        "magnitude": "LARGE",
+        "rationale": "Hormuz disruption directly threatens major oil transit chokepoint, overriding UK recession demand concerns. Iran-UAE conflict creates acute supply shock with immediate price pressure."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "91055762b5beb51015df0e78fdbfc996d0a1daab8f5759ad734b502d1ad36989",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 219,
+        "output_tokens": 80
+      }
+    },
+    {
+      "asset_id": "BRENT_OIL",
+      "cache_hit": false,
+      "context_hash": "d4a4b5c53f792ec33acc397e719e4bcf8aca777d3356d0de8d8fbbf3cc1a2f6b",
+      "context_id": "c041c3a5268a0c4ca2e5dd76",
+      "mode": "LLM_ONLY",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.55,
+        "direction": "UP",
+        "magnitude": "MEDIUM",
+        "rationale": "Hormuz military conflict directly threatens oil supply routes, lifting Brent. Recession demand fears partially offset supply disruption premium, limiting magnitude."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "da80a108946b2b24ca8b3a9a438e6260dcc0e85d8c633947a6673eae80206572",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 186,
+        "output_tokens": 75
+      }
+    },
+    {
+      "asset_id": "BRENT_OIL",
+      "cache_hit": false,
+      "context_hash": "f78f034f8567658c4446125d8b7c19d3272039bb0760f16369b96738ae244c68",
+      "context_id": "6b02f914b1021d1d2e1d78f0",
+      "mode": "LLM_ONLY",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.62,
+        "direction": "UP",
+        "magnitude": "MEDIUM",
+        "rationale": "Iran war signals direct supply disruption risk in Hormuz, lifting oil prices. Recession fears partially offset gains but supply shock dominates near-term."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "1e2689fe5423459111579c62cfa674d81f57a6e634e5f6ee763396dafcc50066",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 197,
+        "output_tokens": 77
+      }
+    },
+    {
+      "asset_id": "BRENT_OIL",
+      "cache_hit": false,
+      "context_hash": "19f5fc7d9cee2490ef2ed77d7da7f7aefdd4dc267285c096b1b9777e1da3a19c",
+      "context_id": "753cfbd950d29410b8fd7d94",
+      "mode": "LLM_ONLY",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.55,
+        "direction": "DOWN",
+        "magnitude": "MEDIUM",
+        "rationale": "Recession fears at $125 oil create strong demand destruction ceiling. Iran conflict risk adds upward pressure but recession signal dominates near-term sentiment."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "3972615436b0b28cee80922f2e3944a2c70bc7331a0bc555494c6afe375e4abb",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 177,
+        "output_tokens": 76
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "e4d93f5b8fcecf15c78027bcc0a1204ab6a19ffd245b035d84de79fea82d6ce9",
+      "context_id": "70d61c9d962e2af441dcd450",
+      "mode": "LLM_ONLY",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.55,
+        "direction": "UP",
+        "magnitude": "SMALL",
+        "rationale": "Iran war ceasefire uncertainty keeps safe-haven demand elevated. Slow Japan rate hikes weaken yen slightly, mildly supporting dollar-priced gold. Net modest upward bias."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "111fb0cb13bf540b2b6376303c16aae73682a07c043307488ee0317036f0ae3f",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 182,
+        "output_tokens": 86
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "9e217df07cdcfd84562cc448c90c8923011a47a4aa165b4fcd61c0e25e8d1a30",
+      "context_id": "a300b670c7c24305bb20f739",
+      "mode": "LLM_ONLY",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.72,
+        "direction": "UP",
+        "magnitude": "MEDIUM",
+        "rationale": "Iran conflict revives stagflation fears, boosting gold as safe-haven. Slow Japan rate hikes weaken yen slightly, adding modest dollar softness support for gold."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "fc8de9aca7685d663ceecf6e7b8925ba6790e39e3bc3d0b128f6baf1662c355a",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 176,
+        "output_tokens": 83
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "44ae086d6ac6a5ff0932b289f1a3ce49de01fd0f3f925888d73515dfe70f5809",
+      "context_id": "1bbeb2f8eeb889a9bd2f2532",
+      "mode": "LLM_ONLY",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.82,
+        "direction": "UP",
+        "magnitude": "LARGE",
+        "rationale": "Strait closure sustains oil shock, UK recession risk and war volatility drive safe-haven demand strongly into gold. Geopolitical stress dominates; no meaningful bearish offset."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "132423c4cf0e9d53a61590f60740d643187895daf9ea218187bed3aa91e14891",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 228,
+        "output_tokens": 83
+      }
+    },
+    {
+      "asset_id": "GOLD",
+      "cache_hit": false,
+      "context_hash": "b3e2caf531de5a7178c124c32953baaff451afab9083d969d51e6c6ad7b715ae",
+      "context_id": "9818ee8dc9601108aae6740a",
+      "mode": "LLM_ONLY",
+      "model_id": "eu.anthropic.claude-sonnet-4-6",
+      "prediction": {
+        "confidence": 0.82,
+        "direction": "UP",
+        "magnitude": "LARGE",
+        "rationale": "Military conflict, Hormuz recession fears, and rate cuts all drive safe-haven gold demand. Geopolitical risk dominates; peso weakness adds minor offset."
+      },
+      "prompt_version": "p06-arbiter-v1",
+      "response_hash": "6fe2d34df44a523ebd5159c47cabba18768a0ac2fa4298b32eadb99306fbb3b4",
+      "status": "OK",
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "input_tokens": 212,
+        "output_tokens": 79
+      }
+    }
+  ]
+}

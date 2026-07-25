@@ -1,0 +1,43 @@
+{
+  "registry_version": "poc6-yahoo-reference-v1",
+  "status": "APPROVED_FOR_POC_ONLY",
+  "price_kind": "PROVIDER_DAILY_CLOSE",
+  "is_adjusted": false,
+  "session_policy": {
+    "calendar": "YAHOO_RETURNED_FUTURES_SESSIONS",
+    "completion_time": "17:00 America/New_York",
+    "baseline": "last returned session completed at decision_at",
+    "settlement": "next returned session after baseline",
+    "holiday_rule": "absence from the frozen provider series means non-session"
+  },
+  "rollover_policy": {
+    "id": "PROVIDER_MANAGED_CONTINUOUS_INCLUDE_ALL_V1",
+    "rule": "Include every positive raw close returned by the frozen Yahoo continuous series, including provider-managed contract transitions; perform no adjustment or outcome-based exclusion.",
+    "limitation": "The series is a provider-managed continuous reference and is not an official contract settlement history."
+  },
+  "fallback": null,
+  "assets": {
+    "GOLD": {
+      "provider": "Yahoo Finance chart",
+      "provider_symbol": "GC=F",
+      "economic_identity": "COMEX Gold futures continuous reference",
+      "expected_exchange": "CMX",
+      "timezone": "America/New_York",
+      "currency": "USD"
+    },
+    "BRENT_OIL": {
+      "provider": "Yahoo Finance chart",
+      "provider_symbol": "BZ=F",
+      "economic_identity": "NYMEX Brent Crude Oil Last Day Financial futures continuous reference",
+      "expected_exchange": "NYM",
+      "timezone": "America/New_York",
+      "currency": "USD"
+    }
+  },
+  "evidence": [
+    "https://finance.yahoo.com/quote/GC%3DF/",
+    "https://finance.yahoo.com/quote/BZ%3DF/",
+    "https://www.cmegroup.com/markets/metals/precious/gold.contractSpecs.html",
+    "https://www.cmegroup.com/markets/energy/crude-oil/brent-crude-oil-last-day.contractSpecs.html"
+  ]
+}
