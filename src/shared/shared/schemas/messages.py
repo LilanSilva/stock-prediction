@@ -1,0 +1,331 @@
+"""Canonical message contracts as Pydantic v2 models.
+
+These models are the executable source of truth for the contracts described in
+docs/contracts/message-contracts.md. Every field name, enum value, and routing key here matches
+that document. The legacy per-task schema examples (single-DB `close`, `window_close_at`, signed
+weights, `source` instead of `source_id`, etc.) are non-authoritative and intentionally NOT used.
+
+Envelope (all messages): message_id, correlation_id, causation_id, occurred_at, schema_version.
+Enum values use uppercase snake case. Asset values are canonical asset IDs (GOLD, BRENT_OIL).
+"""
+
+from __future__ import annotations
+
+import uuid
+from datetime import UTC, date, datetime
+from decimal import Decimal
+from enum import StrEnum
+from typing import Annotated
+
+from pydantic import (
+    AfterValidator,
+    AwareDatetime,
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    HttpUrl,
+)
+
+# --- Routing keys (docs/contracts/message-contracts.md "Exchange and bindings") ---
+
+EXCHANGE = "feed.events"
+
+
+class RoutingKey(StrEnum):
+    ARTICLE_INGESTED = "article.ingested"
+    EVENT_DETECTED = "event.detected"
+    PREDICTION_MADE = "prediction.made"
+    PRICE_REQUESTED = "price.requested"
+    PRICE_OBSERVED = "price.observed"
+    PREDICTION_SCORED = "prediction.scored"
+
+
+# --- Canonical enums ---
+
+
+class AssetId(StrEnum):
+    """Canonical assets approved for the initial POC."""
+
+    GOLD = "GOLD"
+    BRENT_OIL = "BRENT_OIL"
+
+
+class EventType(StrEnum):
+    """docs/reference/event-taxonomy.md (version 1.0)."""
+
+    MILITARY_CONFLICT = "MILITARY_CONFLICT"
+    STRAIT_CLOSURE = "STRAIT_CLOSURE"
+    SUPPLY_DISRUPTION = "SUPPLY_DISRUPTION"
+    SANCTIONS = "SANCTIONS"
+    RATE_DECISION = "RATE_DECISION"
+    INFLATION_CHANGE = "INFLATION_CHANGE"
+    RECESSION_SIGNAL = "RECESSION_SIGNAL"
+    CORPORATE_EARNINGS = "CORPORATE_EARNINGS"
+    POLITICAL_TRANSITION = "POLITICAL_TRANSITION"
+    NATURAL_DISASTER = "NATURAL_DISASTER"
+    OTHER = "OTHER"
+
+
+class Direction(StrEnum):
+    UP = "UP"
+    DOWN = "DOWN"
+    NEUTRAL = "NEUTRAL"
+
+
+class Magnitude(StrEnum):
+    SMALL = "SMALL"
+    MEDIUM = "MEDIUM"
+    LARGE = "LARGE"
+
+
+class Horizon(StrEnum):
+    ONE_TRADING_DAY = "ONE_TRADING_DAY"
+
+
+class ExtractionMethod(StrEnum):
+    LOCAL = "LOCAL"
+    LLM_ASSISTED = "LLM_ASSISTED"
+
+
+class DecisionMethod(StrEnum):
+    # POC-6 STOP: M1 emits GRAPH_ONLY. LLM_ARBITRATED stays in the contract for a future approved
+    # controlled hypothesis but must not be produced in M1.
+    GRAPH_ONLY = "GRAPH_ONLY"
+    LLM_ARBITRATED = "LLM_ARBITRATED"
+
+
+class PriceKind(StrEnum):
+    PROVIDER_DAILY_CLOSE = "PROVIDER_DAILY_CLOSE"
+    OFFICIAL_SETTLEMENT = "OFFICIAL_SETTLEMENT"
+
+
+class LlmStatus(StrEnum):
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
+
+
+def _assume_utc_for_naive(value: object) -> object:
+    if isinstance(value, datetime) and value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value
+
+
+def _normalize_to_utc(value: datetime) -> datetime:
+    return value.astimezone(UTC)
+
+
+UtcDatetime = Annotated[
+    AwareDatetime,
+    BeforeValidator(_assume_utc_for_naive),
+    AfterValidator(_normalize_to_utc),
+]
+NonEmptyStr = Annotated[str, Field(min_length=1)]
+
+
+# --- Shared value objects ---
+
+
+class SourceRef(BaseModel):
+    model_config = ConfigDict(frozen=True, str_strip_whitespace=True)
+
+    article_id: uuid.UUID
+    source_id: NonEmptyStr
+    canonical_url: HttpUrl
+    title: NonEmptyStr
+    published_at: UtcDatetime
+
+
+class FactConflictValue(BaseModel):
+    model_config = ConfigDict(frozen=True, str_strip_whitespace=True)
+
+    source_id: NonEmptyStr
+    value: NonEmptyStr
+
+
+class FactConflict(BaseModel):
+    model_config = ConfigDict(frozen=True, str_strip_whitespace=True)
+
+    field: NonEmptyStr
+    values: list[FactConflictValue]
+    resolution: str | None = None
+
+
+class LlmMetadata(BaseModel):
+    model_config = ConfigDict(frozen=True, str_strip_whitespace=True)
+
+    prompt_version: NonEmptyStr
+    model: NonEmptyStr
+    context_hash: NonEmptyStr
+    input_tokens: Annotated[int, Field(ge=0)]
+    output_tokens: Annotated[int, Field(ge=0)]
+    latency_ms: Annotated[int, Field(ge=0)]
+    attempt_count: Annotated[int, Field(ge=1)]
+    status: LlmStatus
+
+
+class ContributingEdge(BaseModel):
+    model_config = ConfigDict(frozen=True, str_strip_whitespace=True)
+
+    edge_id: NonEmptyStr
+    direction: Direction
+    current_weight: Annotated[float, Field(ge=0.0, le=1.0)]
+    influence_weight: Annotated[float, Field(ge=0.0, le=1.0)]
+    path: NonEmptyStr
+
+
+class CloseObservation(BaseModel):
+    model_config = ConfigDict(frozen=True, str_strip_whitespace=True)
+
+    session: date
+    close: Annotated[Decimal, Field(gt=0)]
+    provider_bar_time: AwareDatetime | None = None
+    fetched_at: UtcDatetime
+    source: NonEmptyStr
+    provider_symbol: NonEmptyStr
+    price_kind: PriceKind
+    is_adjusted: bool
+    registry_version: NonEmptyStr
+
+
+# --- Envelope base ---
+
+
+class FeedMessage(BaseModel):
+    """Common envelope for every domain message.
+
+    Immutable after construction. All datetime fields are timezone-aware UTC: naive datetimes are
+    coerced to UTC rather than rejected, so producers that forget tzinfo still emit valid messages.
+    """
+
+    model_config = ConfigDict(
+        frozen=True,
+        populate_by_name=True,
+        str_strip_whitespace=True,
+        use_enum_values=False,
+    )
+
+    message_id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    correlation_id: uuid.UUID
+    causation_id: uuid.UUID | None = None
+    occurred_at: UtcDatetime
+    schema_version: NonEmptyStr = "1.0"
+
+    @classmethod
+    def from_amqp_body(cls, body: bytes) -> "FeedMessage":  # noqa: UP037
+        """Deserialize from an AMQP message body (UTF-8 JSON bytes)."""
+        return cls.model_validate_json(body.decode("utf-8"))
+
+    def to_amqp_body(self) -> bytes:
+        """Serialize to an AMQP message body (UTF-8 JSON bytes)."""
+        return self.model_dump_json().encode("utf-8")
+
+
+# --- Messages ---
+
+
+class ArticleIngested(FeedMessage):
+    """Routing key: article.ingested. Producer: Ingestion. Raw HTML is never published."""
+
+    article_id: uuid.UUID
+    source_id: NonEmptyStr
+    canonical_url: HttpUrl
+    title: NonEmptyStr
+    body: str
+    published_at: UtcDatetime
+    language: Annotated[str, Field(pattern=r"^[a-z]{2}$")]
+    country: Annotated[str, Field(pattern=r"^[A-Z]{2}$")]
+    content_hash: NonEmptyStr
+
+
+class EventDetected(FeedMessage):
+    """Routing key: event.detected. Producer: Cleansing."""
+
+    event_id: uuid.UUID
+    cluster_id: uuid.UUID
+    canonical_summary: NonEmptyStr
+    event_type: EventType
+    actor: str | None = None
+    action: str | None = None
+    object: str | None = None
+    entities: list[str] = Field(default_factory=list)
+    affected_asset_ids: list[AssetId] = Field(default_factory=list)
+    first_seen_at: UtcDatetime
+    last_seen_at: UtcDatetime
+    sources: list[SourceRef] = Field(default_factory=list)
+    fact_conflicts: list[FactConflict] = Field(default_factory=list)
+    extraction_method: ExtractionMethod
+    llm_metadata: LlmMetadata | None = None
+
+
+class PredictionMade(FeedMessage):
+    """Routing key: prediction.made. Producer: Prediction. M1 decision_method is GRAPH_ONLY."""
+
+    prediction_id: uuid.UUID
+    context_id: uuid.UUID
+    context_version: int
+    event_ids: list[uuid.UUID]
+    asset_id: AssetId
+    direction: Direction
+    magnitude: Magnitude
+    confidence: Annotated[float, Field(ge=0.0, le=1.0)]
+    horizon: Horizon
+    rationale: Annotated[str, Field(min_length=1, max_length=2000)]
+    contributing_edges: list[ContributingEdge] = Field(default_factory=list)
+    decision_at: UtcDatetime
+    supersedes_prediction_id: uuid.UUID | None = None
+    decision_method: DecisionMethod
+    llm_metadata: LlmMetadata | None = None
+
+
+class PriceRequested(FeedMessage):
+    """Routing key: price.requested. Sole producer: Verification. Carries both sessions."""
+
+    request_id: uuid.UUID
+    prediction_id: uuid.UUID
+    asset_id: AssetId
+    baseline_session: date
+    settlement_session: date
+    market_calendar: NonEmptyStr
+
+
+class PriceObserved(FeedMessage):
+    """Routing key: price.observed. Producer: Market Data. Carries both closes."""
+
+    request_id: uuid.UUID
+    prediction_id: uuid.UUID
+    asset_id: AssetId
+    baseline: CloseObservation
+    settlement: CloseObservation
+
+
+class PredictionScored(FeedMessage):
+    """Routing key: prediction.scored. Producer: Verification."""
+
+    prediction_id: uuid.UUID
+    context_id: uuid.UUID
+    asset_id: AssetId
+    predicted_direction: Direction
+    actual_direction: Direction
+    predicted_magnitude: Magnitude
+    actual_magnitude: Magnitude
+    confidence: Annotated[float, Field(ge=0.0, le=1.0)]
+    actual_return: float
+    is_correct: bool
+    score: Annotated[float, Field(ge=0.0, le=1.0)]
+    contributing_edges: list[ContributingEdge] = Field(default_factory=list)
+    source_ids: list[NonEmptyStr] = Field(default_factory=list)
+    baseline: CloseObservation
+    settlement: CloseObservation
+    scored_at: UtcDatetime
+
+
+# Map each message model to the routing key it is published with.
+ROUTING_KEY_BY_MESSAGE: dict[type[FeedMessage], RoutingKey] = {
+    ArticleIngested: RoutingKey.ARTICLE_INGESTED,
+    EventDetected: RoutingKey.EVENT_DETECTED,
+    PredictionMade: RoutingKey.PREDICTION_MADE,
+    PriceRequested: RoutingKey.PRICE_REQUESTED,
+    PriceObserved: RoutingKey.PRICE_OBSERVED,
+    PredictionScored: RoutingKey.PREDICTION_SCORED,
+}
