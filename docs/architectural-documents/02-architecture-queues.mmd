@@ -1,0 +1,34 @@
+flowchart LR
+    EX{{feed.events topic exchange}}
+
+    I[Ingestion] -->|article.ingested| EX
+    EX --> QA[cleansing.articles]
+    QA --> C[Cleansing]
+
+    C -->|event.detected| EX
+    EX --> QE[prediction.events]
+    QE --> P[Prediction and context aggregator]
+
+    P -->|prediction.made| EX
+    EX --> QVP[verification.predictions]
+    QVP --> V[Verification]
+    EX --> QGP[gateway.predictions.live]
+    QGP --> G[API Gateway WebSocket]
+
+    V -->|price.requested| EX
+    EX --> QPR[market-data.price-requests]
+    QPR --> M[Market Data]
+
+    M -->|price.observed| EX
+    EX --> QPX[verification.prices]
+    QPX --> V
+
+    V -->|prediction.scored| EX
+    EX --> QCS[credibility.scored]
+    QCS --> CR[Credibility]
+    EX --> QGS[gateway.scored.live]
+    QGS --> G
+
+    classDef q fill:#fff3cd,stroke:#b8860b,color:#000
+    class QA,QE,QVP,QGP,QPR,QPX,QCS,QGS q
+

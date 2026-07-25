@@ -1,0 +1,37 @@
+sequenceDiagram
+    autonumber
+    participant T as Scheduler
+    participant I as Ingestion
+    participant EX as feed.events
+    participant C as Cleansing
+    participant P as Prediction Context Aggregator
+    participant KG as Neo4j
+    participant LLM as LLM Gateway
+
+    T->>I: Fire bounded polling job
+    I->>I: Poll approved RSS sources and optional circuit-broken GDELT
+    I->>EX: article.ingested
+    EX->>C: cleansing.articles
+    C->>C: SimHash, BGE-m3, taxonomy Gate 2
+    alt Deterministic extraction is valid
+        C->>C: Build canonical EventDetected locally
+    else Ambiguous merge or fact conflict
+        C->>LLM: Compact untrusted article excerpts
+        LLM-->>C: Schema-constrained event fields
+    end
+    C->>EX: event.detected
+    EX->>P: prediction.events
+    P->>P: Add event to asset context window
+    Note over P: Context closes at watermark or creates a newer version for late events
+    P->>KG: Fetch relevant paths for all events in context
+    KG-->>P: Signed weighted forces by canonical asset
+    alt All retained forces agree
+        P->>P: Deterministic GRAPH_ONLY prediction
+    else Forces conflict in M1
+        P->>P: Graph-only policy records conflicting force evidence
+    else Future approved arbitration experiment
+        P->>LLM: One compact call for asset and context version
+        LLM-->>P: Direction, confidence, magnitude, short rationale
+    end
+    P->>P: Store immutable prediction and optional LLM metadata
+    P->>EX: prediction.made

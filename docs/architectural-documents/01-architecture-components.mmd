@@ -1,0 +1,59 @@
+flowchart TB
+    user([User])
+
+    subgraph FG[Foreground]
+        dash[8. Dashboard Web UI]
+        api[7. API Gateway / BFF]
+    end
+
+    subgraph BG[Asynchronous pipeline]
+        ingest[1. Ingestion]
+        cleanse[2. Cleansing]
+        predict[3. Prediction plus context aggregator]
+        market[4. Market Data]
+        verify[5. Verification]
+        cred[6. Credibility]
+        bus{{feed.events topic exchange}}
+    end
+
+    subgraph PG[One PostgreSQL database]
+        rawdb[(ingestion schema)]
+        evdb[(cleansing schema plus pgvector)]
+        prdb[(prediction schema)]
+        pxdb[(market_data schema)]
+        outdb[(verification schema)]
+        credb[(credibility schema)]
+    end
+
+    kgdb[(Neo4j causal graph)]
+    llm[LLM gateway]
+
+    user --> dash
+    dash <-->|REST and WebSocket| api
+    api -->|read-only| PG
+    api -->|read-only graph view| kgdb
+
+    ingest -->|article.ingested| bus
+    bus -->|cleansing.articles| cleanse
+    cleanse -->|event.detected| bus
+    bus -->|prediction.events| predict
+    predict -->|prediction.made| bus
+    bus -->|verification.predictions| verify
+    verify -->|price.requested| bus
+    bus -->|market-data.price-requests| market
+    market -->|price.observed| bus
+    bus -->|verification.prices| verify
+    verify -->|prediction.scored| bus
+    bus -->|credibility.scored| cred
+
+    cleanse -. ambiguous only .-> llm
+    predict -. future approved arbitration only .-> llm
+    predict --> kgdb
+    cred -->|idempotent edge updates| kgdb
+
+    ingest --- rawdb
+    cleanse --- evdb
+    predict --- prdb
+    market --- pxdb
+    verify --- outdb
+    cred --- credb

@@ -1,0 +1,25 @@
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant D as Dashboard
+    participant A as API Gateway
+    participant PG as PostgreSQL read model
+    participant KG as Neo4j
+    participant EX as feed.events
+
+    U->>D: Open local POC dashboard
+    D->>A: GET /predictions
+    A->>PG: Read approved schemas/views
+    PG-->>A: Predictions and outcomes
+    A-->>D: Paginated response using canonical asset IDs
+    D->>A: GET /graph/assets/GOLD
+    A->>KG: Read graph projection
+    KG-->>A: Relevant nodes and edges
+    A-->>D: Graph response
+
+    Note over A,D: Live updates use Gateway-specific queues
+    EX->>A: gateway.predictions.live
+    A-->>D: prediction update
+    EX->>A: gateway.scored.live
+    A-->>D: score update
+

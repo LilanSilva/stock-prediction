@@ -1,0 +1,33 @@
+sequenceDiagram
+    autonumber
+    participant EX as feed.events
+    participant V as Verification
+    participant M as Market Data
+    participant PG as PostgreSQL
+    participant CR as Credibility
+    participant KG as Neo4j
+
+    EX->>V: verification.predictions receives PredictionMade
+    V->>PG: Store pending outcome idempotently
+    V->>V: Resolve baseline and settlement sessions
+    V->>PG: Persist scheduled evaluation and outbox event
+    V->>EX: price.requested with both sessions
+    EX->>M: market-data.price-requests
+    M->>PG: Persist request before acknowledgement
+    Note over M: Pending work is rehydrated after restart
+    M->>M: Fetch both approved reference closes under registry and roll policy
+    M->>PG: Store baseline and settlement observations
+    M->>EX: price.observed
+    EX->>V: verification.prices
+    V->>V: Calculate close-to-close return and deadband
+    V->>PG: Atomically store score and outbox event
+    V->>EX: prediction.scored
+    EX->>CR: credibility.scored
+    CR->>PG: Check processed-prediction ledger
+    alt Already processed
+        CR->>CR: Acknowledge without update
+    else New score
+        CR->>CR: Update edge, arbiter, and source-utility targets separately
+        CR->>KG: Apply directional edge updates
+        CR->>PG: Commit history and processed ledger
+    end

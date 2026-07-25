@@ -1,0 +1,132 @@
+# Feed Analyzer local development stack.
+#
+# Topology follows the frozen contracts, not the legacy per-service-database draft:
+#   - ONE PostgreSQL database (feed) with service-owned schemas (see infra/postgres).
+#   - Neo4j for the causal knowledge graph only.
+#   - RabbitMQ with the durable topic exchange `feed.events` (see infra/rabbitmq).
+#
+# Copy .env.example to .env and fill in secrets before running:
+#   docker compose -f infra/docker-compose.yml up -d
+
+services:
+  feed-postgres:
+    # The community `pgvector/pgvector` image is blocked by org registry policy, so we build a
+    # local image from the allowed official `postgres:16` base with pgvector installed.
+    build:
+      context: ./postgres-image
+    image: feed-analyzer/postgres-pgvector:16
+    container_name: feed-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-feed_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-feed}
+    ports:
+      - "5432:5432"
+    volumes:
+      # Init scripts run in alphabetical order on first start (empty data volume).
+      - ./postgres/:/docker-entrypoint-initdb.d/:ro
+      - feed-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-feed_user} -d ${POSTGRES_DB:-feed}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - feed-net
+
+  feed-neo4j:
+    image: neo4j:5.20-community
+    container_name: feed-neo4j
+    environment:
+      NEO4J_AUTH: ${NEO4J_AUTH:?NEO4J_AUTH must be set in .env}
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+      NEO4J_dbms_security_procedures_allowlist: apoc.*
+      NEO4J_server_memory_heap_initial__size: 512m
+      NEO4J_server_memory_heap_max__size: 1G
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - ./neo4j/init/:/seed/:ro
+      - feed-neo4j-data:/data
+      - feed-neo4j-logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -O /dev/null -q http://localhost:7474 || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 8
+      start_period: 20s
+    networks:
+      - feed-net
+
+  # Neo4j does not auto-run Cypher on start, so a one-shot init container seeds it
+  # once Neo4j is healthy. Idempotent via MERGE, so re-runs are safe.
+  feed-neo4j-seed:
+    image: neo4j:5.20-community
+    container_name: feed-neo4j-seed
+    restart: "no"
+    depends_on:
+      feed-neo4j:
+        condition: service_healthy
+    environment:
+      NEO4J_SEED_PASSWORD: ${NEO4J_PASSWORD:?NEO4J_PASSWORD must be set in .env}
+    volumes:
+      - ./neo4j/init/:/seed/:ro
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        set -e
+        for f in /seed/*.cypher; do
+          echo "Running $$f";
+          cypher-shell -a bolt://feed-neo4j:7687 -u neo4j -p "$$NEO4J_SEED_PASSWORD" --file "$$f";
+        done
+        echo "Neo4j seed complete";
+    networks:
+      - feed-net
+
+  feed-rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: feed-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-feed_user}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?RABBITMQ_DEFAULT_PASS must be set in .env}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+      - ./rabbitmq/render-definitions.sh:/usr/local/bin/render-definitions.sh:ro
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - feed-rabbitmq-data:/var/lib/rabbitmq
+    # Render the definitions (injecting the broker user + permissions from env, hashing the password
+    # at runtime) before starting the broker. `tr -d` guards against CRLF line endings on Windows.
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        set -e
+        tr -d '\r' < /usr/local/bin/render-definitions.sh > /tmp/render-definitions.sh
+        bash /tmp/render-definitions.sh
+        exec docker-entrypoint.sh rabbitmq-server
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - feed-net
+
+volumes:
+  feed-postgres-data:
+  feed-neo4j-data:
+  feed-neo4j-logs:
+  feed-rabbitmq-data:
+
+networks:
+  feed-net:
+    name: feed-net
+    driver: bridge

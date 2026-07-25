@@ -1,0 +1,268 @@
+{
+  "rabbitmq_version": "3.13.0",
+  "vhosts": [
+    { "name": "/" }
+  ],
+  "users": [],
+  "permissions": [],
+  "parameters": [],
+  "policies": [],
+  "exchanges": [
+    {
+      "name": "feed.events",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "feed.dlx",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "cleansing.articles",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic",
+        "x-dead-letter-exchange": "feed.dlx",
+        "x-dead-letter-routing-key": "article.ingested"
+      }
+    },
+    {
+      "name": "prediction.events",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic",
+        "x-dead-letter-exchange": "feed.dlx",
+        "x-dead-letter-routing-key": "event.detected"
+      }
+    },
+    {
+      "name": "verification.predictions",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic",
+        "x-dead-letter-exchange": "feed.dlx",
+        "x-dead-letter-routing-key": "prediction.made"
+      }
+    },
+    {
+      "name": "market-data.price-requests",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic",
+        "x-dead-letter-exchange": "feed.dlx",
+        "x-dead-letter-routing-key": "price.requested"
+      }
+    },
+    {
+      "name": "verification.prices",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic",
+        "x-dead-letter-exchange": "feed.dlx",
+        "x-dead-letter-routing-key": "price.observed"
+      }
+    },
+    {
+      "name": "credibility.scored",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic",
+        "x-dead-letter-exchange": "feed.dlx",
+        "x-dead-letter-routing-key": "prediction.scored"
+      }
+    },
+    {
+      "name": "cleansing.articles.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": { "x-queue-type": "classic" }
+    },
+    {
+      "name": "prediction.events.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": { "x-queue-type": "classic" }
+    },
+    {
+      "name": "verification.predictions.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": { "x-queue-type": "classic" }
+    },
+    {
+      "name": "market-data.price-requests.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": { "x-queue-type": "classic" }
+    },
+    {
+      "name": "verification.prices.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": { "x-queue-type": "classic" }
+    },
+    {
+      "name": "credibility.scored.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": { "x-queue-type": "classic" }
+    },
+    {
+      "name": "gateway.predictions.live",
+      "vhost": "/",
+      "durable": false,
+      "auto_delete": false,
+      "arguments": { "x-queue-type": "classic" }
+    },
+    {
+      "name": "gateway.scored.live",
+      "vhost": "/",
+      "durable": false,
+      "auto_delete": false,
+      "arguments": { "x-queue-type": "classic" }
+    }
+  ],
+  "bindings": [
+    {
+      "source": "feed.events",
+      "vhost": "/",
+      "destination": "cleansing.articles",
+      "destination_type": "queue",
+      "routing_key": "article.ingested",
+      "arguments": {}
+    },
+    {
+      "source": "feed.events",
+      "vhost": "/",
+      "destination": "prediction.events",
+      "destination_type": "queue",
+      "routing_key": "event.detected",
+      "arguments": {}
+    },
+    {
+      "source": "feed.events",
+      "vhost": "/",
+      "destination": "verification.predictions",
+      "destination_type": "queue",
+      "routing_key": "prediction.made",
+      "arguments": {}
+    },
+    {
+      "source": "feed.events",
+      "vhost": "/",
+      "destination": "gateway.predictions.live",
+      "destination_type": "queue",
+      "routing_key": "prediction.made",
+      "arguments": {}
+    },
+    {
+      "source": "feed.events",
+      "vhost": "/",
+      "destination": "market-data.price-requests",
+      "destination_type": "queue",
+      "routing_key": "price.requested",
+      "arguments": {}
+    },
+    {
+      "source": "feed.events",
+      "vhost": "/",
+      "destination": "verification.prices",
+      "destination_type": "queue",
+      "routing_key": "price.observed",
+      "arguments": {}
+    },
+    {
+      "source": "feed.events",
+      "vhost": "/",
+      "destination": "credibility.scored",
+      "destination_type": "queue",
+      "routing_key": "prediction.scored",
+      "arguments": {}
+    },
+    {
+      "source": "feed.events",
+      "vhost": "/",
+      "destination": "gateway.scored.live",
+      "destination_type": "queue",
+      "routing_key": "prediction.scored",
+      "arguments": {}
+    },
+    {
+      "source": "feed.dlx",
+      "vhost": "/",
+      "destination": "cleansing.articles.dlq",
+      "destination_type": "queue",
+      "routing_key": "article.ingested",
+      "arguments": {}
+    },
+    {
+      "source": "feed.dlx",
+      "vhost": "/",
+      "destination": "prediction.events.dlq",
+      "destination_type": "queue",
+      "routing_key": "event.detected",
+      "arguments": {}
+    },
+    {
+      "source": "feed.dlx",
+      "vhost": "/",
+      "destination": "verification.predictions.dlq",
+      "destination_type": "queue",
+      "routing_key": "prediction.made",
+      "arguments": {}
+    },
+    {
+      "source": "feed.dlx",
+      "vhost": "/",
+      "destination": "market-data.price-requests.dlq",
+      "destination_type": "queue",
+      "routing_key": "price.requested",
+      "arguments": {}
+    },
+    {
+      "source": "feed.dlx",
+      "vhost": "/",
+      "destination": "verification.prices.dlq",
+      "destination_type": "queue",
+      "routing_key": "price.observed",
+      "arguments": {}
+    },
+    {
+      "source": "feed.dlx",
+      "vhost": "/",
+      "destination": "credibility.scored.dlq",
+      "destination_type": "queue",
+      "routing_key": "prediction.scored",
+      "arguments": {}
+    }
+  ]
+}
