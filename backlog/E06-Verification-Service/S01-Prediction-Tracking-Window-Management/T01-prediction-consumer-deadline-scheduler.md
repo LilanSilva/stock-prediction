@@ -52,10 +52,10 @@ The Verification Service sits between the Prediction Service and the Credibility
 
 ### 1. Project layout
 
-All code lives under `services/verification/`. Create the following files if they do not exist:
+All code lives under `src/services/verification/`. Create the following files if they do not exist:
 
 ```
-services/verification/
+src/services/verification/
   app/
     __init__.py
     main.py              # FastAPI app + lifespan startup/shutdown
@@ -253,7 +253,7 @@ prometheus-client>=0.20
 7. `PriceObserved` messages consumed from the `prices` queue are persisted to `price_observations` table (upsert by `request_id`).
 8. All database operations use `AsyncSession`; no synchronous SQLAlchemy calls.
 9. Unit tests in `tests/test_prediction_consumer.py` and `tests/test_scheduler.py` pass under `pytest`.
-10. `ruff check services/verification/` and `mypy services/verification/` report zero errors.
+10. `ruff check src/services/verification/` and `mypy src/services/verification/` report zero errors.
 
 ## Implementation Notes
 
@@ -267,12 +267,12 @@ prometheus-client>=0.20
 
 ## Definition of Done
 
-- [ ] Unit tests pass (`pytest services/verification/tests/`)
-- [ ] `ruff check services/verification/` exits 0
-- [ ] `mypy services/verification/` exits 0
+- [ ] Unit tests pass (`pytest src/services/verification/tests/`)
+- [ ] `ruff check src/services/verification/` exits 0
+- [ ] `mypy src/services/verification/` exits 0
 - [ ] `outcomes` table DDL migration file exists at `infra/postgres/init/03_verification.sql`
 - [ ] `price_observations` table DDL migration exists in the same file
-- [ ] `services/verification/requirements.txt` is complete and pinned to minor versions
+- [ ] `src/services/verification/requirements.txt` is complete and pinned to minor versions
 - [ ] Service starts cleanly in Docker Compose (`docker-compose up verification`)
 - [ ] A manually published `PredictionMade` message results in a visible `PENDING` row in Postgres
 - [ ] A scheduler job fires after the configured window and publishes `PriceRequested` when no price exists

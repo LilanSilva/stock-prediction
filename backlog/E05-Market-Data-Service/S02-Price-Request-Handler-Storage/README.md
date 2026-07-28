@@ -30,7 +30,7 @@ This story wires the Market Data Service into the RabbitMQ pipeline and provides
 ## How to Test End-to-End
 
 1. Start infrastructure: `docker compose -f infra/docker-compose.yml up -d postgres rabbitmq`
-2. Run DB migrations: `alembic upgrade head` from `services/market-data/`
+2. Run DB migrations: `alembic upgrade head` from `src/services/market-data/`
 3. Start the service: `docker compose up market-data`
 4. Observe startup backfill log: `backfill_complete assets=3 days=90`
 5. Publish a test `PriceRequested` message to the `price-requests` queue:
@@ -46,4 +46,4 @@ This story wires the Market Data Service into the RabbitMQ pipeline and provides
    - A row exists in the `prices` table for `asset_symbol='GC=F'`
    - A `PriceObserved` message appears in the `prices` queue with `request_id='test-001'`
 7. Publish the same request again; verify no duplicate row in Postgres and no error log (idempotent upsert).
-8. Run unit tests: `pytest services/market-data/tests/ -v`
+8. Run unit tests: `pytest src/services/market-data/tests/ -v`

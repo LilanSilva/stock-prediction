@@ -16,7 +16,7 @@ This service closes the pipeline loop: every prediction that gets scored feeds b
 
 ## Architecture Context
 
-**Service:** `services/credibility/`
+**Service:** `src/services/credibility/`
 
 **Consumes queue:** `scored-predictions` (message: `PredictionScored`)
 

@@ -256,7 +256,7 @@ If the LLM call fails or returns invalid JSON, retry up to 2 times with exponent
 ### File Layout
 
 ```
-services/cleansing/
+src/services/cleansing/
   merger/
     __init__.py
     prompt.py         # build_merge_prompt(), EVENT_TYPE_TAXONOMY
@@ -280,7 +280,7 @@ services/cleansing/
 9. A cluster with `status='error'` is skipped in the next polling cycle (not retried indefinitely).
 10. The `events` Postgres table contains a row matching the published `event_id`.
 11. `FOR UPDATE SKIP LOCKED` is used in the cluster query (verifiable by inspecting the SQL in the code).
-12. Unit tests in `services/cleansing/tests/test_merger.py` cover: prompt generation, JSON parsing, Pydantic validation, retry logic (mocked LLM), and publish call verification.
+12. Unit tests in `src/services/cleansing/tests/test_merger.py` cover: prompt generation, JSON parsing, Pydantic validation, retry logic (mocked LLM), and publish call verification.
 
 ## Implementation Notes
 
@@ -297,13 +297,17 @@ services/cleansing/
 
 ## Definition of Done
 
-- [ ] Unit tests pass (`pytest services/cleansing/tests/test_merger.py`)
-- [ ] Code passes `ruff check services/cleansing/merger/` with zero errors
-- [ ] Code passes `mypy services/cleansing/merger/` with no type errors
-- [ ] `events` and `raw_articles` tables created via migrations 007 and 008
-- [ ] Published messages validate against `EventDetected` Pydantic schema
-- [ ] `FOR UPDATE SKIP LOCKED` in cluster query
-- [ ] LLM retry logic (max 3 attempts) with `'error'` status on permanent failure
-- [ ] `CLUSTER_POLL_INTERVAL_SECONDS` environment variable respected
-- [ ] `event_id` validated as UUID; replaced with generated UUID if LLM returns invalid value
-- [ ] Integration test: publish 2 matching articles to `raw-news`, wait for cluster to become ready, verify `EventDetected` on `events` queue
+> Verified against the delivered flat-module implementation; legacy `merger/`, migration `007`/`008`,
+> and `raw-news`/`events` queue names are superseded by `cleansing/merge.py`, the `cleansing.events`
+> table + transactional outbox, and the canonical `cleansing.articles` → `event.detected` routing.
+
+- [x] Unit tests pass (`tests/test_merge.py` — local build, conflict detection, LLM merge success/empty/failure)
+- [x] Code passes `ruff check .` with zero errors
+- [x] Code passes `mypy cleansing` with no type errors (`cleansing/merge.py`)
+- [x] `cleansing.events` table + outbox created by `apply_schema` (sources embedded in the event; no separate `raw_articles`)
+- [x] Published messages validate against the `EventDetected` Pydantic schema — live-verified
+- [x] `FOR UPDATE SKIP LOCKED` used in the ready-cluster claim query
+- [x] Bounded LLM retries (transport + malformed-output) with `ERROR_RETRYABLE` on failure — live-verified degradation
+- [x] Close interval configurable via `CLEANSING_CLOSE_INTERVAL_SECONDS` (replaces `CLUSTER_POLL_INTERVAL_SECONDS`)
+- [x] `event_id` is server-generated as a UUID and never taken from model output (defense in depth)
+- [x] End-to-end: multi-source cluster → `EventDetected` — live-verified, including one `LLM_ASSISTED` merge

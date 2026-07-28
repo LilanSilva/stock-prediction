@@ -12,13 +12,13 @@ The service writes predictions to Postgres and publishes `PredictionMade`. Verif
 
 | Story | Name | Description |
 |---|---|---|
-| S01 | Knowledge Graph Setup & Seeding | Neo4j schema, Cypher queries, and initial seed data (~30 causal edges) covering GOLD, OIL, USD, OMXS30, SPX |
+| S01 | Knowledge Graph Setup & Seeding | Neo4j schema, Cypher queries, and seed data (≥15 canonical `CAUSES` edges) covering the POC assets GOLD and BRENT_OIL. **Delivered:** the canonical graph is already seeded by E01 (`infra/neo4j/init/`); graph access lives in the shared `shared.graph` client. The legacy `Event`/`AFFECTS`/`GC=F`/USD/OMXS30/SPX schema below is superseded (see contract freeze). |
 | S02 | Prediction Engine | Multi-event context aggregation, graph-only prediction, prediction storage and publishing |
 
 ## Architecture Context
 
 ### Service Location
-`services/prediction/`
+`src/services/prediction/`
 
 ### Queues
 | Queue | Direction | Message |
@@ -50,5 +50,5 @@ The service writes predictions to Postgres and publishes `PredictionMade`. Verif
 5. Every prediction triggers a `PredictionMade` message only; Verification later publishes `PriceRequested`.
 6. If Neo4j returns no firing edges for an event, no prediction is produced and no messages are published.
 7. Graph/query failures are caught, logged, and do not crash the service.
-8. The Neo4j seed script populates at least 30 causal AFFECTS edges covering GOLD, OIL, USD, OMXS30, and SPX.
+8. The Neo4j seed populates at least 15 canonical `CAUSES` edges over the POC assets GOLD and BRENT_OIL (USD/OMXS30/SP500 are deferred assets; provider symbols like `GC=F` live only in Market Data adapters).
 9. All unit tests pass under `pytest`; ruff and mypy report zero errors.

@@ -1,5 +1,10 @@
 # T01: Event-to-Graph Matcher
 
+> **Delivered:** implemented as `prediction/pipeline.py` (context aggregation + close sweep),
+> `prediction/context.py` (event-time windows), and `prediction/decision.py` (graph-only policy),
+> reading the canonical graph via the shared `shared.graph.CausalGraphClient.get_firing_edges`.
+> Single-hop for M1 (the seed has no Asset→Asset edges). No `shared.llm` import.
+
 ## Current Decision
 
 M1 Prediction Service uses graph-only prediction. This task must not wire an LLM arbiter or call the shared LLM gateway.
@@ -51,8 +56,8 @@ No `LLM_*` configuration is required by Prediction in M1.
 2. Duplicate event delivery does not create duplicate context membership.
 3. `_match_graph` returns force bundles keyed by canonical `asset_id`.
 4. Empty graph results are acknowledged and recorded without publishing a prediction.
-5. Multi-hop edges retain path provenance and are assigned to the downstream affected asset.
+5. Single-hop firing edges retain factor/asset path provenance and are assigned to the affected asset (multi-hop is deferred — the canonical seed has no Asset→Asset edges).
 6. The output is passed to graph-only decision policy, not an LLM arbiter.
 7. No code imports provider SDKs or `shared.llm`.
 8. Unit tests cover empty graph, single-asset, multi-asset, duplicate event, and exception paths.
-9. `ruff check services/prediction/` and `mypy services/prediction/` pass.
+9. `ruff check src/services/prediction/` and `mypy src/services/prediction/` pass.

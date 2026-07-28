@@ -2,7 +2,7 @@
 
 ## Context
 
-The Ingestion Service (`services/ingestion/`) runs as a long-lived background process. Operators and automated health checks need visibility into whether the service is functioning — did the last poll succeed? Are all sources returning articles? This task implements:
+The Ingestion Service (`src/services/ingestion/`) runs as a long-lived background process. Operators and automated health checks need visibility into whether the service is functioning — did the last poll succeed? Are all sources returning articles? This task implements:
 
 1. A `GET /health` FastAPI endpoint returning machine-readable status.
 2. Structured JSON logging for every poll cycle.
@@ -21,9 +21,9 @@ This is the observability layer used by Docker health checks, Kubernetes livenes
 **Last hour article count**: The health endpoint reports `articles_last_hour` — count of rows in `raw_news` where `fetched_at >= NOW() - INTERVAL '1 hour'`. This gives operators a quick measure of ingestion volume.
 
 File locations:
-- `services/ingestion/routers/health.py` — FastAPI router with `/health` endpoint
-- `services/ingestion/services/health_service.py` — business logic querying DB
-- `services/ingestion/logging_config.py` — logging setup
+- `src/services/ingestion/routers/health.py` — FastAPI router with `/health` endpoint
+- `src/services/ingestion/services/health_service.py` — business logic querying DB
+- `src/services/ingestion/logging_config.py` — logging setup
 
 ## Inputs
 
@@ -109,7 +109,7 @@ This log is emitted at the end of each job run where any source has `consecutive
 
 ### FastAPI Router
 ```python
-# services/ingestion/routers/health.py
+# src/services/ingestion/routers/health.py
 from fastapi import APIRouter, Depends
 from ..services.health_service import HealthService
 from ..schemas import HealthResponse
@@ -125,7 +125,7 @@ async def health_check(
 
 ### Pydantic Response Models
 ```python
-# services/ingestion/schemas.py (add to existing file)
+# src/services/ingestion/schemas.py (add to existing file)
 from pydantic import BaseModel
 from datetime import datetime
 
@@ -145,7 +145,7 @@ class HealthResponse(BaseModel):
 
 ### Logging Setup
 ```python
-# services/ingestion/logging_config.py
+# src/services/ingestion/logging_config.py
 import logging
 import sys
 from pythonjsonlogger import jsonlogger
@@ -218,13 +218,15 @@ async def trigger_poll(scheduler: IngestionScheduler = Depends(...)) -> dict:
 
 ## Definition of Done
 
-- [ ] Unit tests pass (`pytest services/ingestion/tests/unit/test_health.py`)
-- [ ] `GET /health` integration test passes against a real Postgres instance (uses pytest-anyio or similar)
-- [ ] `ruff check services/ingestion/routers/health.py services/ingestion/services/health_service.py services/ingestion/logging_config.py` reports zero issues
-- [ ] `mypy --strict` reports zero errors on all three files
-- [ ] `HealthResponse` and `SourceStatus` Pydantic models defined with correct `Literal` types
-- [ ] Logging outputs valid JSON (tested by capturing stdout and calling `json.loads()`)
-- [ ] Alert log emitted at ERROR level when `consecutive_zero_count >= 3` (unit tested with mock)
-- [ ] `POST /admin/poll` returns 404 when `ENVIRONMENT=production` (unit tested)
-- [ ] Index on `raw_news.fetched_at` present in Alembic migration
-- [ ] `configure_logging()` called in `main.py` before app creation
+> Contract-aligned build: `/health` and `/ready` are defined in `app.py`; logging uses the shared structlog setup.
+
+- [x] Health/readiness covered by tests (`tests/test_integration.py`)
+- [x] `GET /health` and `/ready` integration test passes against real Postgres + RabbitMQ
+- [x] `ruff check` reports zero issues on `ingestion/app.py`
+- [x] `mypy --strict` reports zero errors
+- [ ] `HealthResponse`/`SourceStatus` Pydantic models — superseded: endpoints return JSON dicts
+- [x] Logging outputs valid JSON (shared structlog; covered by shared `test_logging.py`)
+- [ ] ERROR alert at `consecutive_empty >= 3` — not implemented (counter tracked; alert threshold is a TODO)
+- [ ] `POST /admin/poll` 404 in production — superseded: no admin endpoint (poll runs on startup + schedule)
+- [ ] Index on `fetched_at` — superseded: no Alembic; a `content_hash` index is present
+- [x] Logging configured at startup (`setup_logging` in the FastAPI lifespan)

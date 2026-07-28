@@ -27,26 +27,29 @@ This story depends on S01 (knowledge graph must exist and be seeded before predi
 ## End-to-End Test
 
 1. Start all infra: `docker compose up neo4j rabbitmq postgres`
-2. Run seed: `python infra/neo4j/seed_knowledge_graph.py`
-3. Start the Prediction Service: `docker compose up prediction`
-4. Publish a test `EventDetected` message to the `events` queue:
+2. The canonical graph is seeded automatically by the one-shot `feed-neo4j-seed` container (`infra/neo4j/init/`).
+3. Start the Prediction Service: `docker compose -f infra/docker-compose.yml up -d feed-prediction`
+4. A canonical `EventDetected` (routing key `event.detected`, consumed from `prediction.events`) looks like:
    ```json
    {
-     "event_id": "test-001",
+     "correlation_id": "4cb26473-b48a-46ff-9359-3948f15b9e54",
+     "occurred_at": "2026-01-01T10:05:00Z",
+     "event_id": "dea8a3fd-6dc6-47c4-b2f1-701756932d09",
+     "cluster_id": "3b6a5aa7-c7ef-4591-aab1-e3abd3494699",
      "canonical_summary": "Military attack on oil infrastructure",
-     "event_type": "military_conflict",
-     "actor": "Unknown",
-     "action": "attack",
-     "object": "oil refinery",
-     "entities": ["oil", "war", "attack"],
-     "affected_assets": ["BZ=F", "GC=F"],
-     "first_seen": "2025-01-01T10:00:00Z",
-     "source_count": 3,
+     "event_type": "MILITARY_CONFLICT",
+     "actor": "Unknown", "action": "attack", "object": "oil refinery",
+     "entities": ["oil"],
+     "affected_asset_ids": ["BRENT_OIL", "GOLD"],
+     "first_seen_at": "2026-01-01T10:00:00Z",
+     "last_seen_at": "2026-01-01T10:04:00Z",
      "sources": [],
      "fact_conflicts": [],
-     "correlation_id": "corr-001"
+     "extraction_method": "LOCAL",
+     "llm_metadata": null
    }
    ```
-5. Check Postgres: `SELECT * FROM predictions WHERE correlation_id = 'corr-001'` - expect rows for each asset.
+   Note: canonical `AssetId` values (`BRENT_OIL`, `GOLD`) — never provider symbols like `BZ=F`/`GC=F`.
+5. Check Postgres: `SELECT * FROM prediction.predictions ORDER BY created_at DESC` — expect one row per ready asset/context version with `decision_method = GRAPH_ONLY`.
 6. Check RabbitMQ `predictions` queue: expect `PredictionMade` messages.
 7. Confirm no `PriceRequested` message is published by Prediction; Verification owns that later step.

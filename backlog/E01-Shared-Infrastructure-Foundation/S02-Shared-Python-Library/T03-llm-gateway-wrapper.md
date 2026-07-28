@@ -48,7 +48,8 @@ For M1:
 class LLMSettings(BaseSettings):
     llm_provider: str
     llm_model: str
-    llm_api_key_env: str | None = None
+    llm_api_key: str | None = None
+    llm_base_url: str | None = None
     llm_max_input_tokens: int = 6000
     llm_max_output_tokens: int = 512
     llm_timeout_seconds: float = 30.0
@@ -61,11 +62,13 @@ Required environment examples:
 
 | Provider | Required configuration |
 |---|---|
-| `openai` | `LLM_PROVIDER=openai`, `LLM_MODEL=<model-id>`, `OPENAI_API_KEY=<key>` |
-| `anthropic` | `LLM_PROVIDER=anthropic`, `LLM_MODEL=<model-id>`, `ANTHROPIC_API_KEY=<key>` |
-| `bedrock` | `LLM_PROVIDER=bedrock`, `LLM_MODEL=<inference-profile-or-model-id>`, AWS credentials/profile/region |
+| `openai` | `LLM_PROVIDER=openai`, `LLM_MODEL=<model-id>`, `LLM_API_KEY=<key>` |
+| Kimi / Moonshot (OpenAI-compatible) | `LLM_PROVIDER=openai`, `LLM_MODEL=<kimi-model-id>`, `LLM_BASE_URL=https://api.moonshot.ai/v1`, `LLM_API_KEY=<key>` |
+| `anthropic` | `LLM_PROVIDER=anthropic`, `LLM_MODEL=<model-id>`, `LLM_API_KEY=<key>` |
 
-If `LLM_API_KEY_ENV` is set, the gateway reads the API key from that environment variable. Otherwise, each provider adapter uses its standard key variable.
+`LLM_PROVIDER=openai` selects the OpenAI-compatible wire protocol. Point `LLM_BASE_URL` at any
+compatible endpoint (Kimi/Moonshot, Together, Azure OpenAI, local vLLM); leave it empty to use the
+OpenAI default. `LLM_API_KEY` is the single API key for the configured provider.
 
 ## Provider Adapter Contract
 
@@ -176,7 +179,7 @@ Replaying the same completed request must return the cached response and make ze
 
 1. `from shared.llm.gateway import LLMGateway` imports without error.
 2. Provider selection is driven by `LLM_PROVIDER` and `LLM_MODEL`, not hardcoded service logic.
-3. API key lookup supports provider-specific variables and optional `LLM_API_KEY_ENV`.
+3. The API key is read from the single `LLM_API_KEY` variable, and `LLM_BASE_URL` (when set) targets any OpenAI-compatible endpoint.
 4. Unit tests cover provider selection, missing-key failure, structured-output validation, malformed-output retry, and cache hit with zero provider call.
 5. Integration tests are skipped unless the selected provider key/credentials are present.
 6. Every result includes provider, model, prompt version, context hash, input tokens, output tokens, latency, attempt count, cache status, and response hash.
@@ -192,6 +195,6 @@ Replaying the same completed request must return the cached response and make ze
 - [x] `src/shared/llm/gateway.py` implements the stable gateway interface.
 - [x] At least one provider adapter is implemented for local integration testing.
 - [x] Structured-output validation and malformed-output retry are covered by tests.
-- [ ] Provider usage metadata is persisted/logged without extra LLM calls.
+- [x] Provider usage metadata is persisted/logged without extra LLM calls.
 - [ ] The Cleansing Service can use the gateway through dependency injection.
 - [ ] Prediction-time usage remains disabled for M1.

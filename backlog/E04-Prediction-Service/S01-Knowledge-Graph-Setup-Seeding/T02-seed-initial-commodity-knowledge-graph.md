@@ -1,5 +1,14 @@
 # T02: Seed Initial Commodity Knowledge Graph
 
+> **⚠️ SUPERSEDED — already delivered by E01 with the canonical schema.** The `Event`/`AFFECTS`
+> seed with provider symbols (`GC=F`, `DX-Y.NYB`, `^OMXS30`, `^GSPC`), keyword lists, `base_weight`,
+> and 33 edges below is **not** what ships. The authoritative seed lives in `infra/neo4j/init/`
+> (`02-seed-assets.cypher`, `03-seed-causal-factors.cypher`, `04-seed-causal-edges.cypher`) and
+> creates `(:CausalFactor {id=EventType})-[:CAUSES {direction, weight, confidence, alpha=1.0,
+> beta=1.0}]->(:Asset {id})` with **15 canonical edges over GOLD and BRENT_OIL only** (USD/OMXS30/
+> SP500 are deferred assets; provider symbols belong only in Market Data adapters). MERGE keeps it
+> idempotent. `weight` is magnitude in [0,1]; direction is a separate field.
+
 ## Context
 
 The Prediction Service needs a pre-populated Neo4j knowledge graph to query at startup. This task creates the seed script that loads initial expert-defined causal edges into Neo4j. Without seed data, `get_firing_subgraph` always returns empty results and the Prediction Service produces no predictions. This seed represents domain knowledge that will be refined over time by the Credibility Service's Bayesian updates.
@@ -159,11 +168,14 @@ EDGES = [
 
 ## Definition of Done
 
-- [ ] `python infra/neo4j/seed_knowledge_graph.py` exits 0 against a running Neo4j instance
-- [ ] Edge count is exactly 33 after first run
-- [ ] Edge count is still 33 after second run (idempotency)
-- [ ] All 5 required asset symbols are present: `GC=F`, `BZ=F`, `DX-Y.NYB`, `^OMXS30`, `^GSPC`
-- [ ] All 10 event types are present with correct keywords lists
-- [ ] `infra/neo4j/seed_knowledge_graph.cypher` exists and mirrors the Python seed data
-- [ ] `ruff check infra/neo4j/seed_knowledge_graph.py` exits 0
-- [ ] Script is idempotent (MERGE-based, not CREATE-based)
+> Verified against the delivered canonical seed in `infra/neo4j/init/`; the legacy Python seed,
+> provider-symbol assets, keyword lists, and 33-edge count are superseded.
+
+- [x] The canonical Cypher seed applies cleanly against a running Neo4j (via the one-shot `feed-neo4j-seed` container)
+- [x] At least 15 `CAUSES` edges exist after seeding (canonical scope; the legacy “exactly 33” is superseded)
+- [x] Edge count is stable after re-running (idempotent via MERGE)
+- [x] The canonical POC assets are present: `GOLD`, `BRENT_OIL` (USD/OMXS30/SP500 deferred; no provider symbols on nodes)
+- [x] All 10 non-OTHER `EventType` values are present as `CausalFactor` nodes
+- [x] The seed is Cypher under `infra/neo4j/init/` (no separate Python seed script)
+- [x] Seed validated by `src/shared/tests/test_infrastructure.py::test_neo4j_seed_has_canonical_assets_and_minimum_edges`
+- [x] Seed is idempotent (MERGE-based, not CREATE-based)

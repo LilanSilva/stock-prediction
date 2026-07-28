@@ -109,7 +109,7 @@ def extract_action_signature(title: str, language: str) -> ActionSignature:
 ### File Layout
 
 ```
-services/cleansing/
+src/services/cleansing/
   nlp/
     __init__.py
     action_signature.py   # ActionSignature dataclass, extract_action_signature()
@@ -124,7 +124,7 @@ services/cleansing/
 Load both spaCy models once during service startup (not per-message):
 
 ```python
-# services/cleansing/nlp/models.py
+# src/services/cleansing/nlp/models.py
 import spacy
 
 _models: dict[str, spacy.language.Language] = {}
@@ -155,7 +155,7 @@ If spaCy fails to parse a title (exception or no ROOT token found), store `Actio
 6. Both spaCy models (`en_core_web_sm`, `sv_core_news_sm`) are loaded exactly once at service startup — verified by checking `_models` dict is populated after `load_spacy_models()` and not re-loaded per message.
 7. Each processed article produces exactly one row in `article_action_signatures` with the correct `article_id`.
 8. `ON CONFLICT (article_id) DO NOTHING` prevents duplicate rows on reprocessing.
-9. Unit tests in `services/cleansing/tests/test_action_signature.py` cover: English extraction, Swedish extraction, missing verb handling, and storage mock.
+9. Unit tests in `src/services/cleansing/tests/test_action_signature.py` cover: English extraction, Swedish extraction, missing verb handling, and storage mock.
 
 ## Implementation Notes
 
@@ -169,12 +169,16 @@ If spaCy fails to parse a title (exception or no ROOT token found), store `Actio
 
 ## Definition of Done
 
-- [ ] Unit tests pass (`pytest services/cleansing/tests/test_action_signature.py`)
-- [ ] Code passes `ruff check services/cleansing/nlp/` with zero errors
-- [ ] Code passes `mypy services/cleansing/nlp/action_signature.py` with no type errors
-- [ ] Both spaCy models download and load successfully in the Docker container
-- [ ] `article_action_signatures` table created by migration `002_create_action_signatures.sql`
-- [ ] English and Swedish extraction both produce correct verb lemmas in integration test
-- [ ] NULL action signature on parse failure (no exception raised, warning logged)
-- [ ] `asyncio.get_event_loop().run_in_executor()` used for spaCy call to avoid blocking event loop
-- [ ] Dockerfile updated with spaCy model download commands
+> Verified against the delivered flat-module implementation; legacy `nlp/action_signature.py`,
+> `article_action_signatures`, and migration `002` names are superseded by `cleansing/extraction.py`
+> (+ `cleansing/taxonomy.py`) and the `cleansing.article_actions` table created by `apply_schema`.
+
+- [x] Unit tests pass (`tests/test_extraction.py` + `tests/test_taxonomy.py`)
+- [x] Code passes `ruff check .` with zero errors
+- [x] Code passes `mypy cleansing` with no type errors (`cleansing/extraction.py`)
+- [x] Both spaCy models (`en_core_web_sm`, `sv_core_news_sm`) download and load in the container (`Dockerfile.ml`, live-verified)
+- [x] `cleansing.article_actions` table created by `apply_schema` on startup (replaces migration `002`)
+- [x] English and Swedish extraction both produce verb lemmas / actors — live-verified (Swedish `utbildningsminister`)
+- [x] Parse failure backs off to the deterministic keyword classifier (no exception raised)
+- [x] spaCy runs off the event loop via `asyncio.to_thread` (equivalent to `run_in_executor`)
+- [x] Dockerfile updated with spaCy model download commands (`Dockerfile.ml`)

@@ -44,4 +44,4 @@ Before this story can start:
 4. Verify `events` queue has 2 messages: one event merging A+B, one event for C alone
 5. Validate both messages against `EventDetected` schema using the shared Pydantic model
 6. Confirm `source_count == 2` for the A+B merged event and `source_count == 1` for C
-7. Run unit tests: `pytest services/cleansing/tests/ -v`
+7. Run unit tests: `pytest src/services/cleansing/tests/ -v`

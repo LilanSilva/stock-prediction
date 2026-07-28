@@ -2,7 +2,7 @@
 
 ## Context
 
-This task adds a full audit trail to the Credibility Service (`services/credibility/`). Every time an edge weight or source credibility score is updated (by T01 and T02 respectively), a history row is written to the `credibility_history` Postgres table capturing the before/after state along with 95% Beta distribution confidence interval bounds. The Dashboard uses this history to plot credibility trends with uncertainty bands over time.
+This task adds a full audit trail to the Credibility Service (`src/services/credibility/`). Every time an edge weight or source credibility score is updated (by T01 and T02 respectively), a history row is written to the `credibility_history` Postgres table capturing the before/after state along with 95% Beta distribution confidence interval bounds. The Dashboard uses this history to plot credibility trends with uncertainty bands over time.
 
 ## Background
 
@@ -69,7 +69,7 @@ CREATE INDEX idx_credibility_history_prediction
 
 ## Technical Requirements
 
-1. **New module:** `services/credibility/history.py` — contains the history writing logic, separate from `updater.py`.
+1. **New module:** `src/services/credibility/history.py` — contains the history writing logic, separate from `updater.py`.
 
 2. **History writer function:**
    ```python
@@ -105,7 +105,7 @@ CREATE INDEX idx_credibility_history_prediction
    ```
    scipy>=1.12
    ```
-   in `services/credibility/requirements.txt`.
+   in `src/services/credibility/requirements.txt`.
 
 9. **Postgres migration:** add `credibility_history` table and both indexes to the migration script at `infra/postgres/migrations/`. This migration runs after the `credibility` table migration from T01.
 
@@ -131,9 +131,9 @@ CREATE INDEX idx_credibility_history_prediction
 
 9. The `credibility_history` table is append-only: existing rows are never modified (no UPDATE statements in `history.py`).
 
-10. `pytest services/credibility/tests/test_history.py` passes with >= 90% coverage on `history.py`.
+10. `pytest src/services/credibility/tests/test_history.py` passes with >= 90% coverage on `history.py`.
 
-11. `ruff check services/credibility/` and `mypy services/credibility/` both exit 0.
+11. `ruff check src/services/credibility/` and `mypy src/services/credibility/` both exit 0.
 
 ## Implementation Notes
 
@@ -158,12 +158,12 @@ CREATE INDEX idx_credibility_history_prediction
 
 ## Definition of Done
 
-- [ ] Unit tests pass (`pytest services/credibility/tests/test_history.py`)
-- [ ] `ruff check services/credibility/` exits 0
-- [ ] `mypy services/credibility/` exits 0
+- [ ] Unit tests pass (`pytest src/services/credibility/tests/test_history.py`)
+- [ ] `ruff check src/services/credibility/` exits 0
+- [ ] `mypy src/services/credibility/` exits 0
 - [ ] `write_credibility_history` is tested with: edge entity type, source entity type, prior state (alpha=1, beta=1), mature state (alpha=50, beta=10)
 - [ ] CI computation is tested against known values from `scipy.stats.beta.interval`
 - [ ] Atomic transaction rollback is tested: simulate Postgres failure after `credibility` upsert, assert `credibility_history` row is not present
 - [ ] Postgres migration file exists at `infra/postgres/migrations/` and creates `credibility_history` table with both indexes
-- [ ] `scipy>=1.12` added to `services/credibility/requirements.txt`
+- [ ] `scipy>=1.12` added to `src/services/credibility/requirements.txt`
 - [ ] Integration test: a full `PredictionScored` message produces correct rows in both `credibility` and `credibility_history` tables

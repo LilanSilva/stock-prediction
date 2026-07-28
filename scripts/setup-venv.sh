@@ -37,10 +37,13 @@ if [ ! -x "$venv_python" ]; then
   exit 1
 fi
 
-# 2-4. Upgrade pip, install hash-verified dependencies, install the local package editable.
+# 2-4. Upgrade pip, install hash-verified dependencies, install the local packages editable.
 "$venv_python" -m pip install --upgrade pip
 "$venv_python" -m pip install --require-hashes -r requirements.txt
 "$venv_python" -m pip install -e src/shared --no-deps
+"$venv_python" -m pip install -e src/services/ingestion --no-deps
+"$venv_python" -m pip install -e src/services/cleansing --no-deps
+"$venv_python" -m pip install -e src/services/prediction --no-deps
 
 echo
 echo "Virtual environment ready."

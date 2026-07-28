@@ -1,5 +1,10 @@
 # T03: Prediction Storage and Publishing
 
+> **Delivered:** implemented as `prediction/repository.py` (transactional prediction + contributing
+> edges + outbox), `prediction/outbox.py` (relay to `prediction.made`), and `prediction/db.py`
+> (`prediction` schema). Idempotency key `(asset_id, window_start, ONE_TRADING_DAY, context_version)`.
+> `decision_method=GRAPH_ONLY`, `llm_metadata=null`. Prediction never publishes `PriceRequested`.
+
 ## Current Decision
 
 After the POC-6 `STOP` result, M1 Prediction Service stores and publishes graph-only predictions only. It does not call an LLM and does not publish `PriceRequested`.

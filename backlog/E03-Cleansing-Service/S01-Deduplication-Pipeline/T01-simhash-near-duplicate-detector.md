@@ -2,7 +2,7 @@
 
 ## Context
 
-This task implements the first gate in the Cleansing Service's deduplication pipeline. It lives in `services/cleansing/` and is the very first processing step when an `ArticleIngested` message arrives from the `raw-news` queue. Before spending CPU on spaCy NLP (T02) or GPU on BGE-m3 embedding (S02/T01), we cheaply reject wire-syndication duplicates using SimHash fingerprinting.
+This task implements the first gate in the Cleansing Service's deduplication pipeline. It lives in `src/services/cleansing/` and is the very first processing step when an `ArticleIngested` message arrives from the `raw-news` queue. Before spending CPU on spaCy NLP (T02) or GPU on BGE-m3 embedding (S02/T01), we cheaply reject wire-syndication duplicates using SimHash fingerprinting.
 
 The problem this solves: a single Reuters or AP story is often republished verbatim (or near-verbatim) by dozens of outlets within minutes. Without dedup, each copy would be embedded and potentially merged into the same cluster, inflating `source_count` with fake diversity and corrupting the LLM merge prompt with redundant text.
 
@@ -84,7 +84,7 @@ For scale, limit the 24h window query to at most 10,000 rows (add `LIMIT 10000`)
 ### File Layout
 
 ```
-services/cleansing/
+src/services/cleansing/
   dedup/
     __init__.py
     fingerprint.py       # compute_fingerprint(), is_duplicate(), store_fingerprint()
@@ -112,7 +112,7 @@ The `article_fingerprints` table has a `UNIQUE` constraint on `article_id`. If t
 5. Hamming distance computation is correct: `hamming(fp, fp) == 0`, `hamming(fp, fp ^ 1) == 1`, `hamming(fp, ~fp & 0xFFFFFFFFFFFFFFFF) == 64`.
 6. If Postgres is unavailable, the message is nacked and requeued (not dropped silently).
 7. The `article_fingerprints` table has a unique index on `article_id`; inserting the same `article_id` twice does not raise an unhandled exception.
-8. Unit tests in `services/cleansing/tests/test_fingerprint.py` cover: fingerprint computation, Hamming distance calculation, duplicate detection with mocked Postgres, and the 24h window boundary.
+8. Unit tests in `src/services/cleansing/tests/test_fingerprint.py` cover: fingerprint computation, Hamming distance calculation, duplicate detection with mocked Postgres, and the 24h window boundary.
 
 ## Implementation Notes
 
@@ -121,16 +121,20 @@ The `article_fingerprints` table has a `UNIQUE` constraint on `article_id`. If t
 - **Swedish articles:** SimHash is language-agnostic — it operates on character n-grams or tokens. Default tokenization (split on whitespace) works fine for Swedish. No special handling needed.
 - **Encoding normalization:** The `body` field in `ArticleIngested` is already Unicode-normalized by the Ingestion Service. No re-normalization needed here.
 - **XOR popcount in Python:** `bin(a ^ b).count('1')` is idiomatic Python. For very large batches, `gmpy2.popcount()` is faster but adds a C dependency — avoid unless profiling shows a bottleneck.
-- **Table migration:** Create the table via a SQL migration file in `services/cleansing/db/migrations/001_create_fingerprints.sql`. Run migrations at service startup using a simple `asyncpg.execute()` call before starting the consumer.
+- **Table migration:** Create the table via a SQL migration file in `src/services/cleansing/db/migrations/001_create_fingerprints.sql`. Run migrations at service startup using a simple `asyncpg.execute()` call before starting the consumer.
 
 ## Definition of Done
 
-- [ ] Unit tests pass (`pytest services/cleansing/tests/test_fingerprint.py`)
-- [ ] Code passes `ruff check services/cleansing/` with zero errors
-- [ ] Code passes `mypy services/cleansing/dedup/fingerprint.py` with no type errors
-- [ ] `article_fingerprints` table is created by migration on first service startup
-- [ ] Duplicate articles are silently dropped (ACKed, not requeued) without writing to any table
-- [ ] Non-duplicate articles write exactly one row to `article_fingerprints` and proceed to next step
-- [ ] Idempotent insert (`ON CONFLICT DO NOTHING`) is implemented and tested
-- [ ] 24-hour rolling window is enforced in the duplicate-check query
-- [ ] Service startup log confirms "Deduplication pipeline initialized" with fingerprint table row count
+> Verified against the delivered flat-module implementation; the contract-freeze overrides govern and
+> the legacy `dedup/fingerprint.py` / migration-file paths below are superseded by
+> `cleansing/dedup.py` + startup `apply_schema`.
+
+- [x] Unit tests pass (`tests/test_dedup.py` — SimHash, Hamming, near-duplicate gate)
+- [x] Code passes `ruff check .` with zero errors
+- [x] Code passes `mypy cleansing` with no type errors (`cleansing/dedup.py`)
+- [x] `cleansing.article_fingerprints` table is created by `apply_schema` on first service startup
+- [x] Duplicate articles are silently dropped (ACKed, not requeued) — live-verified `near_duplicate_dropped`
+- [x] Non-duplicate articles write exactly one row to `article_fingerprints` and proceed to next step
+- [x] Idempotent insert (`ON CONFLICT DO NOTHING`) is implemented and tested
+- [x] Rolling dedup window enforced in the duplicate-check query (configurable `CLEANSING_DEDUP_WINDOW_HOURS`, default 48h)
+- [x] Startup log confirms the pipeline is initialized — emitted as structured `cleansing_started` (supersedes the literal string)

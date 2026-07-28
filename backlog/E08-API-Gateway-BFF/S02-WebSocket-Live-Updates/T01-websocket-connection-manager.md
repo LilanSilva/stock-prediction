@@ -45,9 +45,9 @@ If the exchange/routing key pattern has not been established by other services y
 ## Technical Requirements
 
 1. **File locations:**
-   - `services/api-gateway/websocket_manager.py` - `ConnectionManager` class
-   - `services/api-gateway/rabbitmq_subscriber.py` - RabbitMQ consumer coroutine
-   - `services/api-gateway/routers/ws.py` - FastAPI WebSocket route
+   - `src/services/api-gateway/websocket_manager.py` - `ConnectionManager` class
+   - `src/services/api-gateway/rabbitmq_subscriber.py` - RabbitMQ consumer coroutine
+   - `src/services/api-gateway/routers/ws.py` - FastAPI WebSocket route
 
 2. **ConnectionManager class** in `websocket_manager.py`:
    ```python
@@ -91,7 +91,7 @@ If the exchange/routing key pattern has not been established by other services y
      - Acknowledge the message: `await message.ack()`
    - The subscriber coroutine must run as a background `asyncio.Task` started in the FastAPI `lifespan` context manager
 
-5. **Startup/shutdown in lifespan** (`services/api-gateway/main.py`):
+5. **Startup/shutdown in lifespan** (`src/services/api-gateway/main.py`):
    ```python
    @asynccontextmanager
    async def lifespan(app: FastAPI):
@@ -114,7 +114,7 @@ If the exchange/routing key pattern has not been established by other services y
 
 7. **Thread safety:** FastAPI runs in a single-threaded asyncio event loop. `ConnectionManager.active_connections` is a plain list - no locking needed because all operations run in the same event loop. Document this assumption in a code comment.
 
-8. **Dependencies:** Add to `services/api-gateway/requirements.txt`: `aio-pika>=9.0`, `pydantic>=2.0`
+8. **Dependencies:** Add to `src/services/api-gateway/requirements.txt`: `aio-pika>=9.0`, `pydantic>=2.0`
 
 9. **Singleton manager:** The `ConnectionManager` instance must be created at module level in `websocket_manager.py` and imported by both `routers/ws.py` and `rabbitmq_subscriber.py`. Do NOT create separate instances.
 
@@ -131,7 +131,7 @@ If the exchange/routing key pattern has not been established by other services y
 7. A `pydantic.ValidationError` on a malformed message logs the error and does not crash the subscriber task
 8. Shutting down the FastAPI app (SIGTERM) cancels the subscriber task cleanly with no unhandled exceptions in the logs
 9. Zero active WebSocket connections: broadcasting a message produces no errors
-10. All tests in `services/api-gateway/tests/test_websocket.py` pass
+10. All tests in `src/services/api-gateway/tests/test_websocket.py` pass
 
 ## Implementation Notes
 
@@ -152,13 +152,13 @@ If the exchange/routing key pattern has not been established by other services y
 
 ## Definition of Done
 
-- [ ] Unit tests pass (`pytest services/api-gateway/tests/test_websocket.py`)
-- [ ] Code passes `ruff check services/api-gateway/` with zero errors
-- [ ] Code passes `mypy services/api-gateway/ --strict` with zero errors
+- [ ] Unit tests pass (`pytest src/services/api-gateway/tests/test_websocket.py`)
+- [ ] Code passes `ruff check src/services/api-gateway/` with zero errors
+- [ ] Code passes `mypy src/services/api-gateway/ --strict` with zero errors
 - [ ] All 10 acceptance criteria verified
 - [ ] `ConnectionManager` is a module-level singleton (not recreated per request)
 - [ ] `broadcast` iterates over a copy of `active_connections`
 - [ ] RabbitMQ subscriber started in FastAPI `lifespan`, cancelled cleanly on shutdown
 - [ ] `aio_pika.connect_robust` used (not `connect`) for automatic reconnection
 - [ ] Malformed messages are logged and acked without crashing the subscriber
-- [ ] `aio-pika>=9.0` added to `services/api-gateway/requirements.txt`
+- [ ] `aio-pika>=9.0` added to `src/services/api-gateway/requirements.txt`

@@ -13,7 +13,7 @@ The gateway does not perform any business logic or ML inference. Its sole respon
 
 ## Architecture Context
 
-**Service location:** `services/api-gateway/`
+**Service location:** `src/services/api-gateway/`
 
 **Databases read (Postgres with pgvector):**
 - `predictions` table - prediction records written by Prediction Service

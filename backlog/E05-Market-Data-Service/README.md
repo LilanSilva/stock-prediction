@@ -2,7 +2,7 @@
 
 > Contract-freeze status: this epic and its child tasks are governed by the [backlog override matrix](../contract-freeze-overrides.md). Conflicting legacy details are non-authoritative until re-slicing.
 
-> POC-6 finding: Yahoo series are candidate provider reference closes only. Brent identity/calendar and futures-roll policy are unresolved, and Stooq is not a validated fallback. E05 implementation is blocked by P06/T03.
+> POC-6 finding (resolved 2026-07-28): Yahoo series are provider reference closes only. P06/T03 froze the `poc6-yahoo-reference-v1` policy (Yahoo raw daily closes for `GC=F`/`BZ=F`, provider-managed continuous include-all rollover, no validated fallback), which unblocked E05. A 2026-07-28 spike re-confirmed Stooq is unusable (JavaScript anti-bot challenge on the CSV endpoint), so the service is Yahoo-chart only with `fallback=null`. See [T02](S01-Price-Data-Adapters/T02-stooq-fallback-adapter.md).
 
 ## Overview
 
@@ -21,7 +21,7 @@ The service also performs a 90-day historical backfill on startup so Verificatio
 
 ## Architecture Context
 
-**Service:** `services/market-data/`
+**Service:** `src/services/market-data/`
 
 **Queues consumed:**
 - `price-requests` — `PriceRequested` messages from Verification Service

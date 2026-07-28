@@ -2,7 +2,7 @@
 
 ## Context
 
-The Ingestion Service (`services/ingestion/`) needs to run its news-fetching pipeline every hour automatically. This task sets up an **APScheduler** `AsyncIOScheduler` within the FastAPI application's lifespan context manager. The scheduled job runs all five source adapters (GDELT + 4 RSS) in parallel, orchestrates body fetching, and passes results to the storage/publish layer (S02-T02). This is the central orchestration layer of the Ingestion Service.
+The Ingestion Service (`src/services/ingestion/`) needs to run its news-fetching pipeline every hour automatically. This task sets up an **APScheduler** `AsyncIOScheduler` within the FastAPI application's lifespan context manager. The scheduled job runs all five source adapters (GDELT + 4 RSS) in parallel, orchestrates body fetching, and passes results to the storage/publish layer (S02-T02). This is the central orchestration layer of the Ingestion Service.
 
 ## Background
 
@@ -15,9 +15,9 @@ Key design decisions:
 - **Metrics emission**: After each job run, log structured metrics (`articles_fetched_count`, `sources_polled`, `duration_seconds`) at INFO level.
 
 File locations:
-- `services/ingestion/main.py` — FastAPI app + lifespan
-- `services/ingestion/scheduler.py` — job definition and orchestration logic
-- `services/ingestion/db/sources.py` — `last_fetched_at` read/write
+- `src/services/ingestion/main.py` — FastAPI app + lifespan
+- `src/services/ingestion/scheduler.py` — job definition and orchestration logic
+- `src/services/ingestion/db/sources.py` — `last_fetched_at` read/write
 
 ## Inputs
 
@@ -68,7 +68,7 @@ Pre-populated with one row per source on first run (upsert).
 
 ### FastAPI Lifespan Pattern
 ```python
-# services/ingestion/main.py
+# src/services/ingestion/main.py
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from .scheduler import IngestionScheduler
@@ -85,7 +85,7 @@ app = FastAPI(lifespan=lifespan)
 
 ### Scheduler Setup
 ```python
-# services/ingestion/scheduler.py
+# src/services/ingestion/scheduler.py
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
@@ -152,7 +152,7 @@ async def _run_ingestion_job(self) -> None:
 
 ### `ingestion_sources` Repository
 ```python
-# services/ingestion/db/sources.py
+# src/services/ingestion/db/sources.py
 class SourcesRepository:
     async def get_all(self) -> dict[str, SourceState]: ...
     async def update_after_fetch(
@@ -188,13 +188,15 @@ class SourcesRepository:
 
 ## Definition of Done
 
-- [ ] Unit tests pass (`pytest services/ingestion/tests/unit/test_scheduler.py`)
-- [ ] `ruff check services/ingestion/main.py services/ingestion/scheduler.py` reports zero issues
-- [ ] `mypy --strict services/ingestion/main.py services/ingestion/scheduler.py` reports zero errors
-- [ ] `ingestion_sources` table migration exists in `services/ingestion/alembic/versions/`
-- [ ] Job fires immediately on startup (verified in integration test or manual test)
-- [ ] Adapter failure isolation tested (one mock adapter raises; others' results still processed)
-- [ ] `last_fetched_at` updated after job run (integration test queries Postgres)
-- [ ] `consecutive_zero_count` increment/reset logic unit tested
-- [ ] `apscheduler==3.10.4` pinned in `services/ingestion/requirements.txt`
-- [ ] `next_run_time=datetime.now(timezone.utc)` set on the APScheduler job
+> Contract-aligned build: FastAPI app + scheduler in `app.py`, pipeline in `pipeline.py`; schema applied idempotently at startup (no Alembic).
+
+- [x] Unit tests pass (`pytest tests/test_pipeline.py tests/test_pipeline_concurrency.py`)
+- [x] `ruff check` reports zero issues on `ingestion/app.py` and `ingestion/pipeline.py`
+- [x] `mypy --strict` reports zero errors on `ingestion/app.py` and `ingestion/pipeline.py`
+- [ ] `ingestion_sources` table migration — superseded: no `last_fetched_at` table; GDELT uses `timespan`, RSS deduped by canonical URL
+- [x] Job fires immediately on startup (`next_run_time=now`; verified live)
+- [x] Adapter failure isolation tested (a failing source does not abort the others)
+- [ ] `last_fetched_at` updated — superseded: not tracked (see above)
+- [ ] Empty-poll counter unit tested — `consecutive_empty_polls` is implemented in `app._run_poll` but not unit-tested
+- [x] `apscheduler` pinned in the hash-locked `requirements.txt` (3.11.3)
+- [x] `next_run_time=datetime.now(UTC)` set on the APScheduler job

@@ -2,7 +2,7 @@
 
 ## Context
 
-The Ingestion Service (`services/ingestion/`) fetches news from both global (GDELT) and Swedish-language sources. This task builds the RSS feed adapters for the four Swedish news sources: **Dagens Industri** (primary Swedish finance), **Dagens Nyheter**, **Svenska Dagbladet (SvD)**, and **Aftonbladet**. These adapters parse standard RSS 2.0 feeds using the `feedparser` library and return structured `RawArticle` objects. They are consumed by the APScheduler hourly job (S02-T01) alongside the GDELT adapter.
+The Ingestion Service (`src/services/ingestion/`) fetches news from both global (GDELT) and Swedish-language sources. This task builds the RSS feed adapters for the four Swedish news sources: **Dagens Industri** (primary Swedish finance), **Dagens Nyheter**, **Svenska Dagbladet (SvD)**, and **Aftonbladet**. These adapters parse standard RSS 2.0 feeds using the `feedparser` library and return structured `RawArticle` objects. They are consumed by the APScheduler hourly job (S02-T01) alongside the GDELT adapter.
 
 ## Background
 
@@ -18,7 +18,7 @@ Swedish news sites publish RSS feeds in RSS 2.0 format. Key challenges:
 - **Language/Country defaults**: All four sources are Swedish-language (`language="sv"`) from Sweden (`country="SE"`). These are hardcoded per adapter instance, not extracted from the feed (feed-level language declarations are unreliable).
 - **Body**: RSS `description` is a brief summary (50–200 chars typically). Store it as `body` at this stage. Full body fetching is T03's responsibility and will overwrite this field.
 
-File location: `services/ingestion/adapters/rss.py`
+File location: `src/services/ingestion/adapters/rss.py`
 
 ## Inputs
 
@@ -28,7 +28,7 @@ File location: `services/ingestion/adapters/rss.py`
 
 ## Outputs
 
-Each adapter instance's `fetch()` method returns `list[RawArticle]` — the same internal dataclass used by the GDELT adapter (defined in `services/ingestion/models.py`):
+Each adapter instance's `fetch()` method returns `list[RawArticle]` — the same internal dataclass used by the GDELT adapter (defined in `src/services/ingestion/models.py`):
 
 ```python
 @dataclass
@@ -56,7 +56,7 @@ class RawArticle:
 
 ### Class Interface
 ```python
-# services/ingestion/adapters/rss.py
+# src/services/ingestion/adapters/rss.py
 
 RSS_SOURCES: dict[str, str] = {
     "di":          "https://www.di.se/rss",
@@ -120,8 +120,8 @@ def build_all_rss_adapters(http_client: httpx.AsyncClient) -> list[RssAdapter]:
 6. A unit test verifies that HTTP timeout returns `[]` and logs an ERROR.
 7. `published_at` is a timezone-aware `datetime` (not naive) for all returned articles.
 8. `body` field, when present, contains no raw HTML tags (feedparser strips them) and is ≤ 500 characters.
-9. `ruff check services/ingestion/adapters/rss.py` reports zero issues.
-10. `mypy --strict services/ingestion/adapters/rss.py` reports zero errors.
+9. `ruff check src/services/ingestion/adapters/rss.py` reports zero issues.
+10. `mypy --strict src/services/ingestion/adapters/rss.py` reports zero errors.
 
 ## Implementation Notes
 
@@ -134,12 +134,14 @@ def build_all_rss_adapters(http_client: httpx.AsyncClient) -> list[RssAdapter]:
 
 ## Definition of Done
 
-- [ ] Unit tests pass (`pytest services/ingestion/tests/unit/test_rss_adapters.py`)
-- [ ] `ruff check services/ingestion/adapters/rss.py` reports zero issues
-- [ ] `mypy --strict services/ingestion/adapters/rss.py` reports zero errors
-- [ ] All 4 RSS sources are represented in `RSS_SOURCES` dict with correct URLs
-- [ ] `build_all_rss_adapters()` factory function returns 4 adapters
-- [ ] Encoding normalization tested with a fixture containing `�` characters
-- [ ] HTTP error paths (timeout, 4xx, 5xx, HTML-instead-of-RSS) each have a unit test
-- [ ] `published_at` is always timezone-aware (tested explicitly)
-- [ ] `feedparser` called via `asyncio.to_thread` (not blocking the event loop)
+> Contract-aligned build: sources are the `SWEDISH_SOURCES` tuple; adapters are built in `app.py`.
+
+- [x] Unit tests pass (`pytest tests/test_rss_adapter.py`)
+- [x] `ruff check` reports zero issues on `ingestion/adapters/rss.py`
+- [x] `mypy --strict` reports zero errors on `ingestion/adapters/rss.py`
+- [x] All 4 RSS sources are represented (the `SWEDISH_SOURCES` tuple with correct URLs)
+- [ ] `build_all_rss_adapters()` factory — superseded: adapters built from `SWEDISH_SOURCES` in `app.py`
+- [ ] Encoding normalization tested with a replacement-character fixture — normalization is in `normalize.py`; no dedicated fixture test
+- [x] HTTP error path tested (non-2xx raises `AdapterError`); malformed entries are skipped
+- [x] `published_at` is always timezone-aware (tested explicitly)
+- [x] `feedparser` called via `asyncio.to_thread` (not blocking the event loop)

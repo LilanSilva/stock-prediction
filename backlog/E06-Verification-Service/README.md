@@ -17,7 +17,7 @@ This service is the bridge between the forward-looking Prediction Service and th
 
 ## Architecture Context
 
-**Service:** `services/verification/`
+**Service:** `src/services/verification/`
 
 **Consumes from queues:**
 - `predictions` — `PredictionMade` messages from the Prediction Service

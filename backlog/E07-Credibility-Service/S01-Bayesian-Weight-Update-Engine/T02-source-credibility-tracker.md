@@ -2,7 +2,7 @@
 
 ## Context
 
-This task extends the Credibility Service (`services/credibility/`) to track the credibility of individual news sources (domains like `di.se`, `svd.se`) independently from the causal graph edge weights updated in T01. The same `PredictionScored` message that drives edge updates also drives source credibility updates. Source scores are stored in Postgres and are consumed by the Dashboard's credibility trends chart and by future Prediction Service enhancements that weight source evidence.
+This task extends the Credibility Service (`src/services/credibility/`) to track the credibility of individual news sources (domains like `di.se`, `svd.se`) independently from the causal graph edge weights updated in T01. The same `PredictionScored` message that drives edge updates also drives source credibility updates. Source scores are stored in Postgres and are consumed by the Dashboard's credibility trends chart and by future Prediction Service enhancements that weight source evidence.
 
 ## Background
 
@@ -69,9 +69,9 @@ For a source row, `entity_id = 'di.se'` and `entity_type = 'source'`.
 
 ## Technical Requirements
 
-1. **Integration point:** add source update logic to `services/credibility/updater.py` alongside the edge update function. Both are called from the same `handle_prediction_scored` async function in `main.py`. The message is consumed once; both edge and source updates happen within the same message processing lifecycle.
+1. **Integration point:** add source update logic to `src/services/credibility/updater.py` alongside the edge update function. Both are called from the same `handle_prediction_scored` async function in `main.py`. The message is consumed once; both edge and source updates happen within the same message processing lifecycle.
 
-2. **Source credit function** (in `services/credibility/updater.py`):
+2. **Source credit function** (in `src/services/credibility/updater.py`):
    ```python
    def compute_source_credits(
        sources: list[str]
@@ -138,9 +138,9 @@ For a source row, `entity_id = 'di.se'` and `entity_type = 'source'`.
 
 8. `entity_type = 'source'` for all rows written by this task; `entity_type = 'edge'` rows (from T01) are unaffected.
 
-9. `pytest services/credibility/tests/test_source_credibility.py` passes.
+9. `pytest src/services/credibility/tests/test_source_credibility.py` passes.
 
-10. `ruff check services/credibility/` and `mypy services/credibility/` both exit 0 (including the new source update code).
+10. `ruff check src/services/credibility/` and `mypy src/services/credibility/` both exit 0 (including the new source update code).
 
 ## Implementation Notes
 
@@ -153,9 +153,9 @@ For a source row, `entity_id = 'di.se'` and `entity_type = 'source'`.
 
 ## Definition of Done
 
-- [ ] Unit tests pass (`pytest services/credibility/tests/test_source_credibility.py`)
-- [ ] `ruff check services/credibility/` exits 0
-- [ ] `mypy services/credibility/` exits 0
+- [ ] Unit tests pass (`pytest src/services/credibility/tests/test_source_credibility.py`)
+- [ ] `ruff check src/services/credibility/` exits 0
+- [ ] `mypy src/services/credibility/` exits 0
 - [ ] `compute_source_credits` is tested with: two sources, one source, empty list
 - [ ] `update_source_credibility` is tested with: first-time source (new row), returning source (existing row), is_correct=True, is_correct=False
 - [ ] Integration with T01: a single `PredictionScored` message triggers both edge and source updates in the correct order

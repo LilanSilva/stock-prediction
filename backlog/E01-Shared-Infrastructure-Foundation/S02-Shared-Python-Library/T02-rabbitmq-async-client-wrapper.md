@@ -234,6 +234,6 @@ class RabbitMQSettings(BaseSettings):
 - [x] `src/shared/pyproject.toml` includes `aio-pika>=9.4,<10`
 - [x] Unit tests (mocked) pass for publish, consume, ack, nack, dead-letter, retry logic
 - [x] Integration test passes against live RabbitMQ (marked `@pytest.mark.integration`)
-- [ ] Published messages are persistent (delivery_mode=2)
+- [x] Published messages are persistent (delivery_mode=2)
 - [x] `mypy src/shared/messaging/ --strict` returns 0 errors
 - [x] `ruff check src/shared/messaging/` returns 0 violations

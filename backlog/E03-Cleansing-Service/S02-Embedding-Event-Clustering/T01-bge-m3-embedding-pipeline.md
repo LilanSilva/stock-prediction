@@ -65,7 +65,7 @@ CREATE INDEX IF NOT EXISTS idx_embeddings_hnsw
 ### Model Loading
 
 ```python
-# services/cleansing/embedding/model.py
+# src/services/cleansing/embedding/model.py
 from sentence_transformers import SentenceTransformer
 import numpy as np
 
@@ -127,7 +127,7 @@ async def store_embedding(conn: asyncpg.Connection, article_id: str, embedding: 
 ### File Layout
 
 ```
-services/cleansing/
+src/services/cleansing/
   embedding/
     __init__.py
     model.py         # load_embedding_model(), get_model()
@@ -160,7 +160,7 @@ BGE-m3 loaded in memory: ~900 MB (float32). The container must have at least 1.5
 6. `store_embedding()` writes one row to `article_embeddings`; re-inserting the same `article_id` does not raise an exception.
 7. The HNSW index exists on `article_embeddings.embedding` after migration runs.
 8. `embed_article()` does not block the asyncio event loop (uses `run_in_executor`).
-9. Unit tests in `services/cleansing/tests/test_embedding.py` cover: vector length, normalization, storage mock, and idempotent insert.
+9. Unit tests in `src/services/cleansing/tests/test_embedding.py` cover: vector length, normalization, storage mock, and idempotent insert.
 
 ## Implementation Notes
 
@@ -174,13 +174,17 @@ BGE-m3 loaded in memory: ~900 MB (float32). The container must have at least 1.5
 
 ## Definition of Done
 
-- [ ] Unit tests pass (`pytest services/cleansing/tests/test_embedding.py`)
-- [ ] Code passes `ruff check services/cleansing/embedding/` with zero errors
-- [ ] Code passes `mypy services/cleansing/embedding/model.py services/cleansing/embedding/embed.py` with no type errors
-- [ ] pgvector extension enabled in Postgres via migration `003_enable_pgvector.sql`
-- [ ] `article_embeddings` table with HNSW index created via migration `004_create_embeddings.sql`
-- [ ] Model loaded once at startup; health-check returns 200 only after model is ready
-- [ ] `normalize_embeddings=True` used in all `model.encode()` calls
-- [ ] `run_in_executor` used to avoid blocking event loop
-- [ ] Docker image pre-downloads model weights (no runtime HuggingFace fetch)
-- [ ] `docker-compose.yml` sets `mem_limit: 2g` for the cleansing service
+> Verified against the delivered flat-module implementation; legacy `embedding/model.py`,
+> `embedding/embed.py`, and migration `003`/`004` names are superseded by `cleansing/embedding.py`
+> and the `vector(1024)` columns created by `apply_schema`.
+
+- [x] Unit tests pass (`tests/test_embedding.py`)
+- [x] Code passes `ruff check .` with zero errors
+- [x] Code passes `mypy cleansing` with no type errors (`cleansing/embedding.py`)
+- [x] pgvector extension enabled by the Postgres image + `apply_schema` (replaces migration `003`)
+- [x] `cleansing.article_embeddings` `vector(1024)` table created by `apply_schema` — ANN index deferred (seq-scan cosine is acceptable at POC scale)
+- [x] Model loaded once at startup; `/ready` returns 200 only after the embedder reports ready
+- [x] `normalize_embeddings=True` used in all `encode()` calls (`BgeM3Embedder`)
+- [x] `asyncio.to_thread` used to keep encoding off the event loop
+- [x] Docker image pre-downloads BGE-m3 weights (`Dockerfile.ml`, no runtime HuggingFace fetch)
+- [x] `docker-compose.yml` sets a memory reservation/limit for the cleansing service (`mem_reservation: 2g`, `mem_limit: 4g`)

@@ -26,7 +26,7 @@ Together they form the data-access layer consumed by S02's price request handler
 
 1. Start a Python REPL or run the adapter smoke-test script:
    ```bash
-   cd services/market-data
+   cd src/services/market-data
    python -m pytest tests/test_adapters.py -v
    ```
 2. Verify `get_ohlc('GC=F', date.today())` returns a dict with non-null `close`.

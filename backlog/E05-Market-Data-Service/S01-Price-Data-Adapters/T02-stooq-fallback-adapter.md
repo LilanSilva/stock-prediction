@@ -2,9 +2,11 @@
 
 > **POC-6 replacement scope (2026-07-13):** This is now a validation spike, not an implementation commitment. The live canary returned non-CSV responses for `^gold` and `^oil`. Prove stable programmatic access and equivalent instrument, currency, session, adjustment, and rollover semantics for both assets before implementing or enabling fallback. Until then the registry fallback is `null`, and all transparent-fallback requirements below are non-authoritative.
 
+> **Spike continuation (2026-07-28) — FAIL, fallback stays `null`:** Re-ran the live Stooq CSV probe against the same endpoint (`https://stooq.com/q/d/l/?s=<symbol>&d1=...&i=d`) across multiple candidate symbol conventions — GOLD (`^gold`, `gc.f`, `xauusd`) and BRENT_OIL (`^oil`, `cb.f`, `lco`, `cl.f`). Every candidate returned **HTTP 200 with an HTML JavaScript anti-bot challenge** (`<!DOCTYPE html>… noindex,nofollow …(async()=>{…TextEncoder…}`, 796 bytes), not CSV. Retrying with a realistic browser `User-Agent` produced the same challenge. This is worse than the original finding: the endpoint no longer serves CSV to any plain programmatic client (including `pandas-datareader`'s Stooq reader, which issues the same GET), so it is an **access-layer failure**, not a symbol-mapping problem — and semantic equivalence cannot even be assessed because no data is returned. **Decision:** Stooq is not a viable programmatic fallback; the frozen registry policy `fallback: null` stands. E05 proceeds **yfinance / Yahoo-chart only**. Revisit only with a JS-capable fetch (headless browser — heavy/fragile/ToS risk) or a different keyed provider, neither of which is POC scope.
+
 ## Context
 
-The Market Data Service uses yfinance as its primary price source (T01). When yfinance raises `AdapterUnavailableError` after 3 retries, the service must transparently fall back to **Stooq** via `pandas-datareader`. This task implements that fallback adapter at `services/market-data/adapters/stooq_adapter.py`. It exposes the same `get_ohlc(symbol, date)` interface as the yfinance adapter, so the caller (S02-T01) needs no special-case logic beyond catching the primary adapter's error.
+The Market Data Service uses yfinance as its primary price source (T01). When yfinance raises `AdapterUnavailableError` after 3 retries, the service must transparently fall back to **Stooq** via `pandas-datareader`. This task implements that fallback adapter at `src/services/market-data/adapters/stooq_adapter.py`. It exposes the same `get_ohlc(symbol, date)` interface as the yfinance adapter, so the caller (S02-T01) needs no special-case logic beyond catching the primary adapter's error.
 
 ## Background
 
@@ -35,14 +37,14 @@ Log which adapter was used on every successful fetch — this is a hard requirem
 
 Returns the same `OHLCResult` Pydantic model as the yfinance adapter (defined in `src/shared/schemas/prices.py`), with `source == 'stooq'`.
 
-Raises `AdapterUnavailableError` (from `services/market-data/exceptions.py`) if Stooq also fails after 3 retries or returns no data.
+Raises `AdapterUnavailableError` (from `src/services/market-data/exceptions.py`) if Stooq also fails after 3 retries or returns no data.
 
 ## Technical Requirements
 
 ### File locations
-- `services/market-data/adapters/stooq_adapter.py`
-- `services/market-data/adapters/symbol_map.py` — centralised symbol mapping dict
-- `services/market-data/tests/test_stooq_adapter.py`
+- `src/services/market-data/adapters/stooq_adapter.py`
+- `src/services/market-data/adapters/symbol_map.py` — centralised symbol mapping dict
+- `src/services/market-data/tests/test_stooq_adapter.py`
 
 ### Libraries
 - `pandas-datareader>=0.10.0` — `DataReader(..., 'stooq', ...)`
@@ -117,20 +119,20 @@ The warning should be emitted by the **caller** (the orchestrator function in S0
 - **Missing volume:** Stooq sometimes returns `NaN` for `volume` on index/commodity symbols. Cast to `int` with a default of `0` if NaN: `int(row.get('Volume', 0) or 0)`.
 - **Rate limiting:** Stooq does not publish rate limits but will block repeated rapid requests. Add `asyncio.sleep(0.5)` between retries (inside the `wait_exponential` config is fine; the `min=2` already handles this).
 - **Swedish tickers (.PL):** Stooq hosts cross-listed Polish copies of Swedish equities. Data quality is generally good but volume may differ from the Stockholm exchange. This is acceptable for close-price verification.
-- **Do not** import the Stooq adapter inside the yfinance adapter — keep adapters independent. The orchestration/fallback logic lives in `services/market-data/price_fetcher.py` (implemented in S02-T01).
+- **Do not** import the Stooq adapter inside the yfinance adapter — keep adapters independent. The orchestration/fallback logic lives in `src/services/market-data/price_fetcher.py` (implemented in S02-T01).
 - **Symbol map maintenance:** When new assets are added to the prediction universe, `YFINANCE_TO_STOOQ` in `symbol_map.py` is the single place to update. Document this in a comment.
 - Test with real network calls disabled by default (`@pytest.mark.vcr` or `responses` library mocking). Only integration tests tagged `@pytest.mark.integration` should make real HTTP calls.
 
 ## Definition of Done
 
-- [ ] `services/market-data/adapters/stooq_adapter.py` exists with `async def get_ohlc(symbol, date) -> OHLCResult`
-- [ ] `services/market-data/adapters/symbol_map.py` exists with `YFINANCE_TO_STOOQ` dict and `to_stooq_symbol()` function
+- [ ] `src/services/market-data/adapters/stooq_adapter.py` exists with `async def get_ohlc(symbol, date) -> OHLCResult`
+- [ ] `src/services/market-data/adapters/symbol_map.py` exists with `YFINANCE_TO_STOOQ` dict and `to_stooq_symbol()` function
 - [ ] Symbol mapping covers: `GC=F`, `BZ=F`, `DX-Y.NYB`, `SPY`, `OMXS30=F`
 - [ ] Heuristic handles `.ST` suffix and unmapped US tickers
 - [ ] `source` field in returned `OHLCResult` is always `'stooq'`
 - [ ] Retry logic uses `tenacity` with 3 attempts and exponential back-off
 - [ ] Weekend/holiday gap handling returns last available trading day
 - [ ] Unit tests in `tests/test_stooq_adapter.py` cover: happy path, symbol mapping, retry exhaustion, weekend date, NaN volume handling
-- [ ] `ruff check services/market-data/adapters/stooq_adapter.py` passes
-- [ ] `mypy services/market-data/adapters/stooq_adapter.py` passes
-- [ ] `pytest services/market-data/tests/test_stooq_adapter.py -v` all tests green
+- [ ] `ruff check src/services/market-data/adapters/stooq_adapter.py` passes
+- [ ] `mypy src/services/market-data/adapters/stooq_adapter.py` passes
+- [ ] `pytest src/services/market-data/tests/test_stooq_adapter.py -v` all tests green

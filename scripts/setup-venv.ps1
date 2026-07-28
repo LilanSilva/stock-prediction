@@ -45,10 +45,13 @@ if (-not (Test-Path $venvPython)) {
     throw "Expected interpreter not found at $venvPython"
 }
 
-# 2-4. Upgrade pip, install hash-verified dependencies, install the local package editable.
+# 2-4. Upgrade pip, install hash-verified dependencies, install the local packages editable.
 & $venvPython -m pip install --upgrade pip
 & $venvPython -m pip install --require-hashes -r requirements.txt
 & $venvPython -m pip install -e src\shared --no-deps
+& $venvPython -m pip install -e src\services\ingestion --no-deps
+& $venvPython -m pip install -e src\services\cleansing --no-deps
+& $venvPython -m pip install -e src\services\prediction --no-deps
 
 Write-Host ""
 Write-Host "Virtual environment ready."

@@ -40,4 +40,4 @@ Before this story can start, the following must exist:
 5. Verify the second message was acknowledged (not requeued) without being written to `embeddings` or triggering an LLM call
 6. Publish an article with a clear subject-verb-object title (e.g., "Iran launches missile strike on Saudi oil facilities")
 7. Query Postgres `article_action_signatures` table and confirm `actor=Iran`, `action=launch`, `object=strike` (or similar normalized form)
-8. Run unit tests: `pytest services/cleansing/tests/test_dedup.py services/cleansing/tests/test_action_signature.py -v`
+8. Run unit tests: `pytest src/services/cleansing/tests/test_dedup.py src/services/cleansing/tests/test_action_signature.py -v`

@@ -32,7 +32,7 @@ These adapters are pure data-retrieval components. They return structured Python
 
 ## How to Test End-to-End
 
-1. Run `pytest services/ingestion/tests/unit/` — all adapter unit tests pass with mocked HTTP responses.
-2. Run `pytest services/ingestion/tests/integration/ -m live` (requires network) — each adapter returns at least 1 article from its live source.
+1. Run `pytest src/services/ingestion/tests/unit/` — all adapter unit tests pass with mocked HTTP responses.
+2. Run `pytest src/services/ingestion/tests/integration/ -m live` (requires network) — each adapter returns at least 1 article from its live source.
 3. Manually invoke `GdeltAdapter().fetch()` in a Python shell and verify returned objects have non-empty `title`, `url`, `language`, and `country` fields.
 4. Manually invoke `ArticleBodyFetcher().fetch_body(url)` with a known DI article URL and verify returned text is UTF-8, ≤ 2000 chars, and contains no HTML tags.

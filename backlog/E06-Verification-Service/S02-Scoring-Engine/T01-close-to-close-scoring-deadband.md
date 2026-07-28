@@ -2,7 +2,7 @@
 
 ## Context
 
-This task implements the core scoring algorithm inside the Verification Service (`services/verification/`). It is called by the window-close APScheduler job (built in S01/T01) after confirming that a `PriceObservation` row exists for the prediction. The result — actual return, actual direction, is_correct, magnitude accuracy — is written back to the `outcomes` Postgres table. The publisher (S02/T02) then reads these columns to build the outbound message.
+This task implements the core scoring algorithm inside the Verification Service (`src/services/verification/`). It is called by the window-close APScheduler job (built in S01/T01) after confirming that a `PriceObservation` row exists for the prediction. The result — actual return, actual direction, is_correct, magnitude accuracy — is written back to the `outcomes` Postgres table. The publisher (S02/T02) then reads these columns to build the outbound message.
 
 ## Background
 
@@ -68,7 +68,7 @@ No queue consumption in this task — it is invoked as a function by the schedul
 
 ### 1. Module location
 
-Create `services/verification/app/scoring.py`.
+Create `src/services/verification/app/scoring.py`.
 
 ### 2. ScoringResult dataclass
 
@@ -197,13 +197,13 @@ No new dependencies beyond what S01 already requires. Uses:
 
 ## Definition of Done
 
-- [ ] `services/verification/app/scoring.py` exists and is fully type-annotated
+- [ ] `src/services/verification/app/scoring.py` exists and is fully type-annotated
 - [ ] `DEADBAND_THRESHOLD` constant defined at module level
 - [ ] `classify_magnitude()` function implemented and unit tested
 - [ ] `ScoringResult` dataclass defined with all fields
 - [ ] `score_prediction()` async function implemented
 - [ ] `outcomes` DDL includes `magnitude_correct` column
 - [ ] `tests/test_scoring.py` exists with tests for all 9 acceptance criteria
-- [ ] `ruff check services/verification/app/scoring.py` exits 0
-- [ ] `mypy services/verification/app/scoring.py` exits 0
+- [ ] `ruff check src/services/verification/app/scoring.py` exits 0
+- [ ] `mypy src/services/verification/app/scoring.py` exits 0
 - [ ] Scheduler `on_window_close` calls `score_prediction` and passes result to publisher stub

@@ -52,6 +52,24 @@ Minimum `ingestion.outbox` fields: message ID, aggregate ID, routing key, serial
 
 The source registry records terms, attribution, permitted retention, and whether body extraction is allowed. Store the minimum article text required by the POC and apply the documented retention period. Do not add a source until these fields are recorded.
 
+### 6.1 Retention and cleanup
+
+The service enforces **time-based retention** to keep table growth bounded while preserving the
+de-duplication guarantee. Because RSS and GDELT only surface *recent* items (RSS lists the last few
+days; GDELT uses a bounded `timespan`), an article older than any feed's lookback window can never be
+re-ingested, so it is safe to delete.
+
+- A scheduled cleanup job runs on a fixed interval (default **daily**, `retention_interval_seconds`).
+- `ingestion.articles` rows older than the retention window are deleted. The default window is
+  **30 days** (`article_retention_days`), chosen to comfortably exceed the longest feed lookback plus
+  a safety margin. The retention window must always be larger than the longest configured source
+  lookback; otherwise a still-listed article could be re-ingested.
+- `ingestion.outbox` rows with `delivery_status = 'DELIVERED'` older than `outbox_retention_days`
+  (default **7 days**) are deleted; pending rows are never pruned.
+- Cleanup is **decoupled** from downstream services: Cleansing consumes the `cleansing.articles`
+  queue (not the table), so deletion is driven purely by row age, never by whether a consumer read it.
+- Retention can be disabled with `retention_enabled=false`; all windows are environment-tunable.
+
 ## 7. Failure and recovery
 
 - A failed source does not prevent other sources from completing.

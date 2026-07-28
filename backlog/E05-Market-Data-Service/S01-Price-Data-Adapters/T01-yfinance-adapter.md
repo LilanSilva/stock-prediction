@@ -4,7 +4,7 @@
 
 ## Context
 
-The Market Data Service fetches real OHLC price data for assets that the Prediction Service has generated predictions on. This task implements the **primary price-data adapter** using the `yfinance` library. The adapter is a pure data-access module (`services/market-data/adapters/yfinance_adapter.py`) that the price-request handler (S02-T01) will call. It is the first point of contact with external market data and must be robust: retrying on transient failures and gracefully handling non-trading days.
+The Market Data Service fetches real OHLC price data for assets that the Prediction Service has generated predictions on. This task implements the **primary price-data adapter** using the `yfinance` library. The adapter is a pure data-access module (`src/services/market-data/adapters/yfinance_adapter.py`) that the price-request handler (S02-T01) will call. It is the first point of contact with external market data and must be robust: retrying on transient failures and gracefully handling non-trading days.
 
 ## Background
 
@@ -37,16 +37,16 @@ class OHLCResult(BaseModel):
     source: Literal["yfinance", "stooq"]
 ```
 
-Raises `AdapterUnavailableError` (custom exception in `services/market-data/exceptions.py`) after exhausting retries.
+Raises `AdapterUnavailableError` (custom exception in `src/services/market-data/exceptions.py`) after exhausting retries.
 
 ## Technical Requirements
 
 ### File locations
-- `services/market-data/adapters/__init__.py`
-- `services/market-data/adapters/yfinance_adapter.py`
-- `services/market-data/exceptions.py`
+- `src/services/market-data/adapters/__init__.py`
+- `src/services/market-data/adapters/yfinance_adapter.py`
+- `src/services/market-data/exceptions.py`
 - `src/shared/schemas/prices.py` (add `OHLCResult` if not present)
-- `services/market-data/tests/test_yfinance_adapter.py`
+- `src/services/market-data/tests/test_yfinance_adapter.py`
 
 ### Libraries
 - `yfinance>=0.2.40` — primary data source
@@ -126,12 +126,25 @@ async def get_ohlc(symbol: str, date: datetime.date) -> OHLCResult:
 
 ## Definition of Done
 
-- [ ] `services/market-data/adapters/yfinance_adapter.py` exists with `async def get_ohlc(symbol, date) -> OHLCResult`
-- [ ] `src/shared/schemas/prices.py` contains `OHLCResult` Pydantic model
-- [ ] `services/market-data/exceptions.py` contains `AdapterUnavailableError`
-- [ ] Retry logic uses `tenacity` with 3 attempts and exponential back-off
-- [ ] Weekend/holiday gap handling returns last available trading day
-- [ ] Unit tests in `tests/test_yfinance_adapter.py` cover: happy path, retry exhaustion, weekend date, Swedish `.ST` ticker
-- [ ] `ruff check services/market-data/adapters/yfinance_adapter.py` passes with no errors
-- [ ] `mypy services/market-data/adapters/yfinance_adapter.py` passes with no errors
-- [ ] `pytest services/market-data/tests/test_yfinance_adapter.py -v` all tests green
+> The original checklist below predates the contract freeze and P06/T03. It is retained for history;
+> superseded lines are marked and the authoritative outcome is the **As-built** checklist that follows.
+
+- [~] `src/services/market-data/adapters/yfinance_adapter.py` exists with `async def get_ohlc(symbol, date) -> OHLCResult` — *superseded: built as `adapters/yahoo_chart.py` with `get_close`/`fetch_observations` returning `CloseObservation`*
+- [~] `src/shared/schemas/prices.py` contains `OHLCResult` Pydantic model — *superseded: uses the canonical `shared.schemas.messages.CloseObservation`*
+- [x] `src/services/market-data/exceptions.py` contains `AdapterUnavailableError`
+- [~] Retry logic uses `tenacity` with 3 attempts and exponential back-off — *superseded: transient vs terminal errors are typed; bounded backoff is owned by the handler/scheduler, not the adapter*
+- [~] Weekend/holiday gap handling returns last available trading day — *superseded: sessions absent from the provider series are non-sessions; the handler resolves baseline/settlement and stays pending until published*
+- [x] Unit tests in `tests/test_yahoo_chart_adapter.py` cover: happy path, missing session, wrong currency/exchange, non-positive/null close filtering, provider error, transient HTTP error
+- [x] `ruff check` passes with no errors on `market_data/adapters/yahoo_chart.py`
+- [x] `mypy --strict` passes with no errors on `market_data/adapters/yahoo_chart.py`
+- [x] `pytest` all tests green for the adapter suite
+
+### As-built (implemented 2026-07-28)
+
+- [x] `market_data/adapters/yahoo_chart.py` implements `YahooChartAdapter` over the **Yahoo Finance chart-JSON endpoint via async httpx** (the P06/T03-validated path, not the `yfinance` library)
+- [x] Accepts a canonical `AssetId`; resolves provider symbol/exchange/timezone/currency from the executable registry `shared.reference` (provider symbols never leave the adapter)
+- [x] Validates provider `meta` (currency, exchange, timezone) against the registry; wrong values are terminal (`InvalidObservationError`)
+- [x] Fetches raw provider daily closes, applies the frozen `PROVIDER_MANAGED_CONTINUOUS_INCLUDE_ALL_V1` rollover, and returns immutable `CloseObservation` values (`PROVIDER_DAILY_CLOSE`, never an official settlement)
+- [x] Preserves provider bar time, fetch time, instrument/currency, price kind, adjustment flag, and registry version
+- [x] Missing session raises `PriceNotYetAvailableError`; transport failure raises `AdapterUnavailableError`
+- [~] Stooq fallback (T02) — *not built: 2026-07-28 spike confirmed the CSV endpoint is behind a JavaScript anti-bot challenge; registry `fallback=null`*

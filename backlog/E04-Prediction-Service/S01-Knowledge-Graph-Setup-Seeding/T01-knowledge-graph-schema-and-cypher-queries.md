@@ -1,8 +1,21 @@
 # T01: Knowledge Graph Schema & Cypher Queries
 
+> **⚠️ SUPERSEDED SCHEMA — read this first.** The `Event`/`AFFECTS`/`symbol='GC=F'`/`keywords`/
+> `base_weight`/multi-hop model described below conflicts with the frozen contract (canonical asset
+> IDs only; provider symbols such as `GC=F` live **only** in Market Data adapters) and with the
+> graph that E01 already seeded. The **authoritative** schema (see `infra/neo4j/init/`) is:
+>
+> `(:CausalFactor {id})-[:CAUSES {direction, weight, confidence, alpha, beta, last_updated}]->(:Asset {id})`
+>
+> where `CausalFactor.id` is a canonical `EventType` and `Asset.id` is a canonical `AssetId`
+> (`GOLD`, `BRENT_OIL`). Graph access is **delivered in the shared library** as `shared.graph`
+> (`CausalGraphClient.get_firing_edges` / `update_edge_weight`, `FiringEdge`), not a
+> prediction-local `GraphMatcher`. M1 is single-hop (the seed has no Asset→Asset edges). Keyword
+> fuzzy-matching and `base_weight` are not used.
+
 ## Context
 
-The Prediction Service (located at `services/prediction/`) relies on a Neo4j knowledge graph to find causal edges that "fire" when a given event type and set of entities are observed. This task defines the graph schema, creates the necessary indexes, and implements the three Cypher query functions that the Prediction Engine calls at runtime. This is a foundational task: nothing in S02 can be built or tested without this in place.
+The Prediction Service (located at `src/services/prediction/`) relies on a Neo4j knowledge graph to find causal edges that "fire" when a given event type and set of entities are observed. This task defines the graph schema, creates the necessary indexes, and implements the three Cypher query functions that the Prediction Engine calls at runtime. This is a foundational task: nothing in S02 can be built or tested without this in place.
 
 ## Background
 
@@ -32,13 +45,13 @@ The graph driver uses the `neo4j` Python async driver (`neo4j>=5.0`, `pip instal
 
 ## Outputs
 
-- Python module at `services/prediction/graph/neo4j_client.py` implementing `GraphMatcher` class
+- Python module at `src/services/prediction/graph/neo4j_client.py` implementing `GraphMatcher` class
 - Cypher schema/index setup script at `infra/neo4j/schema.cypher`
-- Unit tests at `services/prediction/tests/test_neo4j_client.py`
+- Unit tests at `src/services/prediction/tests/test_neo4j_client.py`
 
 ## Technical Requirements
 
-### File: `services/prediction/graph/neo4j_client.py`
+### File: `src/services/prediction/graph/neo4j_client.py`
 
 ```
 from neo4j import AsyncGraphDatabase, AsyncDriver
@@ -70,7 +83,7 @@ Implement `GraphMatcher` class with:
 
 ### Pydantic model: `FiringEdge`
 
-Defined in `services/prediction/graph/models.py`:
+Defined in `src/services/prediction/graph/models.py`:
 
 ```python
 from pydantic import BaseModel
@@ -121,8 +134,8 @@ CREATE INDEX asset_class IF NOT EXISTS
 4. `get_firing_subgraph` returns multi-hop edges (hop=2) when an intermediate asset has outbound AFFECTS edges (e.g. `strait_closure -> OIL -> USD -> GOLD` chain).
 5. `update_edge_weight('military_conflict', 'GC=F', 'UP', 5, 2)` updates `current_weight` to `5/7 ≈ 0.714` and sets `last_updated`.
 6. `infra/neo4j/schema.cypher` applies without errors on a fresh Neo4j 5.x instance.
-7. All tests in `services/prediction/tests/test_neo4j_client.py` pass (use a real Neo4j test container or mock the driver).
-8. `ruff check services/prediction/graph/` and `mypy services/prediction/graph/` both exit 0.
+7. All tests in `src/services/prediction/tests/test_neo4j_client.py` pass (use a real Neo4j test container or mock the driver).
+8. `ruff check src/services/prediction/graph/` and `mypy src/services/prediction/graph/` both exit 0.
 
 ## Implementation Notes
 
@@ -145,11 +158,14 @@ CREATE INDEX asset_class IF NOT EXISTS
 
 ## Definition of Done
 
-- [ ] Unit tests pass (`pytest services/prediction/tests/test_neo4j_client.py`)
-- [ ] `ruff check services/prediction/` exits 0
-- [ ] `mypy services/prediction/graph/` exits 0
-- [ ] `infra/neo4j/schema.cypher` successfully applies on a fresh Neo4j 5.x instance
-- [ ] `GraphMatcher.get_firing_subgraph` returns correct multi-hop edges with `hop=2` and `via_asset` populated
-- [ ] `GraphMatcher.update_edge_weight` correctly computes `current_weight = alpha / (alpha + beta)`
-- [ ] All environment variables documented in task are read from env, not hardcoded
-- [ ] `services/prediction/graph/__init__.py` exports `GraphMatcher` and `FiringEdge`
+> Verified against the delivered canonical implementation (`shared.graph`); the legacy
+> `prediction/graph/neo4j_client.py` / `Event`/`AFFECTS` / multi-hop items are superseded.
+
+- [x] Unit tests pass (`src/shared/tests/test_graph_client.py`, mocked driver)
+- [x] `ruff check` passes for `shared/graph` and the prediction service
+- [x] `mypy --strict` passes for `shared/graph` (and the prediction service)
+- [x] Canonical constraints/indexes applied by `infra/neo4j/init/01-constraints-indexes.cypher` on a fresh Neo4j 5.x instance (replaces `infra/neo4j/schema.cypher`)
+- [x] ~~multi-hop `hop=2`/`via_asset`~~ superseded: the seed is single-hop `CausalFactor->Asset`; M1 implements single-hop firing
+- [x] `CausalGraphClient.update_edge_weight` persists `alpha`/`beta` (Beta mean `alpha/(alpha+beta)` is exposed as `FiringEdge.reliability`)
+- [x] All connection settings read from `NEO4J_*` env via `Neo4jSettings`, never hardcoded
+- [x] `shared/graph/__init__.py` exports `CausalGraphClient` and `FiringEdge` (replaces `GraphMatcher`)

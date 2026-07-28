@@ -2,7 +2,7 @@
 
 ## Context
 
-This task implements the core feedback loop of the entire prediction system. The Credibility Service (`services/credibility/`) consumes `PredictionScored` messages from the `scored-predictions` RabbitMQ queue and updates the causal graph edge weights in Neo4j using a Beta-Bernoulli Bayesian model with proportional credit assignment. Updated edge weights are used by the Prediction Service on the next inference cycle, making the system self-improving over time.
+This task implements the core feedback loop of the entire prediction system. The Credibility Service (`src/services/credibility/`) consumes `PredictionScored` messages from the `scored-predictions` RabbitMQ queue and updates the causal graph edge weights in Neo4j using a Beta-Bernoulli Bayesian model with proportional credit assignment. Updated edge weights are used by the Prediction Service on the next inference cycle, making the system self-improving over time.
 
 ## Background
 
@@ -73,13 +73,13 @@ Each edge in Neo4j must have:
 
 ## Technical Requirements
 
-1. **Service entrypoint:** `services/credibility/main.py` — starts an `asyncio` event loop, connects to RabbitMQ using `aio-pika`, and begins consuming the `scored-predictions` queue.
+1. **Service entrypoint:** `src/services/credibility/main.py` — starts an `asyncio` event loop, connects to RabbitMQ using `aio-pika`, and begins consuming the `scored-predictions` queue.
 
 2. **Queue consumption:** use `aio-pika` with `manual_ack=True` on a durable queue named `scored-predictions`. Only `ack` the message after all Neo4j and Postgres writes succeed. On failure, `nack` with `requeue=True`.
 
 3. **Message parsing:** deserialise the message body as `PredictionScored` from `shared.schemas`. Raise `pydantic.ValidationError` on malformed messages — log the error, `ack` the message (do not requeue poison pills), and continue.
 
-4. **Credit calculation function** (in `services/credibility/updater.py`):
+4. **Credit calculation function** (in `src/services/credibility/updater.py`):
    ```python
    def compute_proportional_credits(
        edges: list[ContributingEdge]
@@ -114,7 +114,7 @@ Each edge in Neo4j must have:
 
 9. **Logging:** use `structlog` (from shared library). Log `prediction_id`, number of edges updated, and wall-clock duration per message at INFO level. Log individual edge updates at DEBUG level.
 
-10. **Dependency file:** `services/credibility/requirements.txt` must include:
+10. **Dependency file:** `src/services/credibility/requirements.txt` must include:
     - `aio-pika>=9.0`
     - `neo4j>=5.0`
     - `asyncpg>=0.29`
@@ -141,9 +141,9 @@ Each edge in Neo4j must have:
 
 8. `alpha` and `beta` values in Neo4j and Postgres are always >= 1.0.
 
-9. `pytest services/credibility/tests/test_updater.py` passes with all unit tests for `compute_proportional_credits` and the update logic.
+9. `pytest src/services/credibility/tests/test_updater.py` passes with all unit tests for `compute_proportional_credits` and the update logic.
 
-10. `ruff check services/credibility/` and `mypy services/credibility/` both exit 0.
+10. `ruff check src/services/credibility/` and `mypy src/services/credibility/` both exit 0.
 
 ## Implementation Notes
 
@@ -156,12 +156,12 @@ Each edge in Neo4j must have:
 
 ## Definition of Done
 
-- [ ] Unit tests pass (`pytest services/credibility/tests/`)
-- [ ] `ruff check services/credibility/` exits 0
-- [ ] `mypy services/credibility/` exits 0
+- [ ] Unit tests pass (`pytest src/services/credibility/tests/`)
+- [ ] `ruff check src/services/credibility/` exits 0
+- [ ] `mypy src/services/credibility/` exits 0
 - [ ] `compute_proportional_credits` is tested with: normal case, single edge, zero-sum weights, empty list
 - [ ] Neo4j update is tested with a mock driver asserting the correct Cypher parameters
 - [ ] Postgres upsert is tested with an in-memory or mock session
 - [ ] Message ack/nack behaviour is tested for success, Neo4j failure, and malformed message cases
-- [ ] `services/credibility/requirements.txt` lists all dependencies with minimum version pins
-- [ ] `services/credibility/Dockerfile` exists and builds successfully
+- [ ] `src/services/credibility/requirements.txt` lists all dependencies with minimum version pins
+- [ ] `src/services/credibility/Dockerfile` exists and builds successfully

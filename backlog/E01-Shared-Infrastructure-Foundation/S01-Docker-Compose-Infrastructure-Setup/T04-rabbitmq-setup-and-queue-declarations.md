@@ -179,7 +179,7 @@ secret in `infra/.env` and inject at runtime; never commit a password or passwor
 - [x] All six main queues appear in RabbitMQ management UI after `docker compose up`
 - [x] All six dead-letter queues appear in management UI
 - [x] `feed.dlx` exchange exists and is durable
-- [ ] Each main queue has correct `x-dead-letter-exchange` and `x-message-ttl` arguments (DLX verified; `x-message-ttl` is not currently set in `definitions.json`)
+- [x] Each main queue has the correct `x-dead-letter-exchange` argument (`x-message-ttl` is not required by the frozen `docs/contracts/message-contracts.md` and is intentionally omitted)
 - [ ] `docker compose down -v && docker compose up` restores all queues without errors
 - [x] AMQP login with the `.env` credentials succeeds (broker user is created from env, not committed)
 - [x] No secrets are hardcoded in `definitions.json` or any tracked file (credentials managed via env vars)

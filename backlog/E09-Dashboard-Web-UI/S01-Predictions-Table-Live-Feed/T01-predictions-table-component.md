@@ -6,7 +6,7 @@ This task builds the main predictions table in the React dashboard (`dashboard/`
 
 ## Background
 
-The API Gateway (service 7, `services/api-gateway/`) exposes:
+The API Gateway (service 7, `src/services/api-gateway/`) exposes:
 - `GET /predictions` - paginated list of predictions with optional filter params
 - `WS /ws/predictions` - WebSocket that pushes `PredictionMade` events whenever the Prediction Service publishes to the `predictions` RabbitMQ queue
 

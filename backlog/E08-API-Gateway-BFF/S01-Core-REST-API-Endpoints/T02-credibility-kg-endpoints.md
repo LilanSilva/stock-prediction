@@ -95,8 +95,8 @@ The `/graph/assets/{symbol}` endpoint is the only one that reads from **Neo4j** 
 
 ## Technical Requirements
 
-1. **Router file:** `services/api-gateway/routers/credibility.py` for credibility endpoints; `services/api-gateway/routers/graph.py` for graph endpoints
-2. **Postgres access:** Same async connection pool as T01. Inject via `Depends(get_db)` FastAPI dependency defined in `services/api-gateway/dependencies.py`
+1. **Router file:** `src/services/api-gateway/routers/credibility.py` for credibility endpoints; `src/services/api-gateway/routers/graph.py` for graph endpoints
+2. **Postgres access:** Same async connection pool as T01. Inject via `Depends(get_db)` FastAPI dependency defined in `src/services/api-gateway/dependencies.py`
 3. **Neo4j access:** Use the `neo4j` Python async driver (`neo4j>=5.0`). Inject async session via `Depends(get_neo4j_session)` FastAPI dependency. Connection params from env vars: `NEO4J_URI` (e.g., `bolt://neo4j:7687`), `NEO4J_USER`, `NEO4J_PASSWORD`
 4. **Cypher query for graph endpoint:**
    ```cypher
@@ -107,7 +107,7 @@ The `/graph/assets/{symbol}` endpoint is the only one that reads from **Neo4j** 
    After fetching Neo4j results, query Postgres for matching `edge_id` values to enrich with `alpha`, `beta`, `credibility`.
 5. **min_credibility filter:** `WHERE credibility >= $1` in the edges query. Default: no filter (return all).
 6. **edge_id URL encoding:** `edge_id` values like `war->gold` contain `>` which is valid in path segments but must be documented. Test with URL-encoded form `war-%3Egold` as well.
-7. **Response schemas:** Define in `services/api-gateway/schemas/credibility.py`. Use Pydantic v2 `model_config = ConfigDict(from_attributes=True)`.
+7. **Response schemas:** Define in `src/services/api-gateway/schemas/credibility.py`. Use Pydantic v2 `model_config = ConfigDict(from_attributes=True)`.
 8. **Sorting:** `/credibility/edges` sorts by `credibility DESC`. `/credibility/sources` sorts by `credibility DESC`. `/credibility/history/{edge_id}` sorts by `recorded_at ASC`.
 9. **Missing Postgres row for Neo4j edge:** If a Neo4j edge has no matching row in `credibility_edges`, return `alpha=1.0`, `beta=1.0`, `credibility=0.5` (uninformed prior defaults).
 10. **Logging:** Log Neo4j query latency as structured field `neo4j_query_ms`.
@@ -124,7 +124,7 @@ The `/graph/assets/{symbol}` endpoint is the only one that reads from **Neo4j** 
 8. `GET /graph/assets/GOLD` returns `credibility=0.5` for any edge not found in `credibility_edges` Postgres table
 9. `GET /graph/assets/UNKNOWN_SYMBOL` returns `{"symbol": "UNKNOWN_SYMBOL", "edges": []}` (not 404)
 10. Neo4j connection failure causes a `503 Service Unavailable` response, not an unhandled 500
-11. All tests in `services/api-gateway/tests/test_credibility.py` pass
+11. All tests in `src/services/api-gateway/tests/test_credibility.py` pass
 
 ## Implementation Notes
 
@@ -137,11 +137,11 @@ The `/graph/assets/{symbol}` endpoint is the only one that reads from **Neo4j** 
 
 ## Definition of Done
 
-- [ ] Unit tests pass (`pytest services/api-gateway/tests/test_credibility.py`)
-- [ ] Code passes `ruff check services/api-gateway/` with zero errors
-- [ ] Code passes `mypy services/api-gateway/ --strict` with zero errors
+- [ ] Unit tests pass (`pytest src/services/api-gateway/tests/test_credibility.py`)
+- [ ] Code passes `ruff check src/services/api-gateway/` with zero errors
+- [ ] Code passes `mypy src/services/api-gateway/ --strict` with zero errors
 - [ ] All 11 acceptance criteria verified
 - [ ] Neo4j driver initialized once at startup, not per-request
 - [ ] Batch Postgres lookup used in graph endpoint (no N+1 queries)
 - [ ] Neo4j errors return HTTP 503, not HTTP 500
-- [ ] Response schemas in `services/api-gateway/schemas/credibility.py`
+- [ ] Response schemas in `src/services/api-gateway/schemas/credibility.py`

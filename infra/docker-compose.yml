@@ -120,6 +120,144 @@ services:
     networks:
       - feed-net
 
+  feed-ingestion:
+    build:
+      context: ..
+      dockerfile: src/services/ingestion/Dockerfile
+    image: feed-analyzer/ingestion:0.1
+    container_name: feed-ingestion
+    depends_on:
+      feed-postgres:
+        condition: service_healthy
+      feed-rabbitmq:
+        condition: service_healthy
+    environment:
+      # Container-network connection strings (override the host-side values in .env). The service
+      # reaches Postgres/RabbitMQ by their compose service names, not localhost.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-feed_user}:${POSTGRES_PASSWORD:?set in .env}@feed-postgres:5432/${POSTGRES_DB:-feed}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-feed_user}:${RABBITMQ_DEFAULT_PASS:?set in .env}@feed-rabbitmq:5672/
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      POLL_INTERVAL_SECONDS: ${INGESTION_POLL_INTERVAL_SECONDS:-3600}
+      # Keep local GDELT volume small so the startup poll stays quick (bodies are fetched serially).
+      GDELT_MAX_RECORDS: ${GDELT_MAX_RECORDS:-25}
+    ports:
+      - "8001:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    networks:
+      - feed-net
+
+  feed-cleansing:
+    build:
+      context: ..
+      dockerfile: src/services/cleansing/Dockerfile.ml
+    image: feed-analyzer/cleansing:0.1-ml
+    container_name: feed-cleansing
+    depends_on:
+      feed-postgres:
+        condition: service_healthy
+      feed-rabbitmq:
+        condition: service_healthy
+    environment:
+      # Container-network connection strings (override the host-side values in .env). The service
+      # reaches Postgres/RabbitMQ by their compose service names, not localhost.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-feed_user}:${POSTGRES_PASSWORD:?set in .env}@feed-postgres:5432/${POSTGRES_DB:-feed}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-feed_user}:${RABBITMQ_DEFAULT_PASS:?set in .env}@feed-rabbitmq:5672/
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # Full-spec ML backends (baked into Dockerfile.ml): BGE-m3 embeddings + spaCy extraction.
+      CLEANSING_EMBEDDING_BACKEND: ${CLEANSING_EMBEDDING_BACKEND:-bge-m3}
+      CLEANSING_NLP_BACKEND: ${CLEANSING_NLP_BACKEND:-spacy}
+      # Event-time cluster-close tuning; a cluster closes after this quiet gap with no new members.
+      CLEANSING_QUIET_PERIOD_MINUTES: ${CLEANSING_QUIET_PERIOD_MINUTES:-30}
+      # LLM-assisted merge is optional; when unset the service runs local-only.
+      LLM_PROVIDER: ${LLM_PROVIDER:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+    ports:
+      - "8002:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      # Loading BGE-m3 (~2 GB) into memory at startup takes time; allow a generous grace period.
+      start_period: 240s
+    # BGE-m3 (torch) is memory-resident; reserve enough RAM and cap it so a runaway cannot starve the host.
+    mem_reservation: 2g
+    mem_limit: 4g
+    networks:
+      - feed-net
+
+  feed-prediction:
+    build:
+      context: ..
+      dockerfile: src/services/prediction/Dockerfile
+    image: feed-analyzer/prediction:0.1
+    container_name: feed-prediction
+    depends_on:
+      feed-postgres:
+        condition: service_healthy
+      feed-rabbitmq:
+        condition: service_healthy
+      feed-neo4j:
+        condition: service_healthy
+      feed-neo4j-seed:
+        condition: service_completed_successfully
+    environment:
+      # Container-network connection strings (override the host-side values in .env). The service
+      # reaches Postgres/RabbitMQ/Neo4j by their compose service names, not localhost.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-feed_user}:${POSTGRES_PASSWORD:?set in .env}@feed-postgres:5432/${POSTGRES_DB:-feed}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-feed_user}:${RABBITMQ_DEFAULT_PASS:?set in .env}@feed-rabbitmq:5672/
+      NEO4J_URI: bolt://feed-neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:?set in .env}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8003:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    networks:
+      - feed-net
+
+  feed-market-data:
+    build:
+      context: ..
+      dockerfile: src/services/market-data/Dockerfile
+    image: feed-analyzer/market-data:0.1
+    container_name: feed-market-data
+    depends_on:
+      feed-postgres:
+        condition: service_healthy
+      feed-rabbitmq:
+        condition: service_healthy
+    environment:
+      # Container-network connection strings (override the host-side values in .env). The service
+      # reaches Postgres/RabbitMQ by their compose service names, not localhost.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-feed_user}:${POSTGRES_PASSWORD:?set in .env}@feed-postgres:5432/${POSTGRES_DB:-feed}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-feed_user}:${RABBITMQ_DEFAULT_PASS:?set in .env}@feed-rabbitmq:5672/
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # How often to re-drive pending requests whose settlement session has not yet completed.
+      SETTLEMENT_POLL_INTERVAL_SECONDS: ${MARKET_DATA_SETTLEMENT_POLL_INTERVAL_SECONDS:-900}
+    ports:
+      - "8004:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    networks:
+      - feed-net
+
 volumes:
   feed-postgres-data:
   feed-neo4j-data:

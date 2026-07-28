@@ -2,7 +2,7 @@
 
 ## Context
 
-The Ingestion Service (`services/ingestion/`) collects article metadata from GDELT (T01) and RSS feeds (T02), but both sources provide only summaries or no body text at all. This task builds the `ArticleBodyFetcher` component, which takes a list of article URLs, fetches the full HTML page for each, extracts the main article text using `BeautifulSoup`, normalizes it to UTF-8, and truncates to 2000 characters. The enriched body is then stored in Postgres and included in the `ArticleIngested` RabbitMQ message. The body fetcher is called by the hourly scheduler (S02-T01) after deduplication — only new articles (not yet in the `raw_news` table) have their bodies fetched.
+The Ingestion Service (`src/services/ingestion/`) collects article metadata from GDELT (T01) and RSS feeds (T02), but both sources provide only summaries or no body text at all. This task builds the `ArticleBodyFetcher` component, which takes a list of article URLs, fetches the full HTML page for each, extracts the main article text using `BeautifulSoup`, normalizes it to UTF-8, and truncates to 2000 characters. The enriched body is then stored in Postgres and included in the `ArticleIngested` RabbitMQ message. The body fetcher is called by the hourly scheduler (S02-T01) after deduplication — only new articles (not yet in the `raw_news` table) have their bodies fetched.
 
 ## Background
 
@@ -14,7 +14,7 @@ Full-body text dramatically improves Cleansing Service quality (BGE-m3 embedding
 - **Text extraction heuristics**: `BeautifulSoup` alone is noisy. Use a priority order of CSS selectors known to contain article bodies on Swedish news sites, falling back to `<article>` tag, then `<main>`, then full `<body>` text with `<nav>`, `<footer>`, `<header>`, `<aside>`, `<script>`, `<style>` removed.
 - **Paywall detection**: If extracted text is < 150 characters, treat as paywall/failure and return the original RSS summary (passed in as `fallback_body`).
 
-File location: `services/ingestion/adapters/body_fetcher.py`
+File location: `src/services/ingestion/adapters/body_fetcher.py`
 
 ## Inputs
 
@@ -42,7 +42,7 @@ Returns `list[RawArticle]` — same list with `body` and `raw_html` fields popul
 
 ### Class Interface
 ```python
-# services/ingestion/adapters/body_fetcher.py
+# src/services/ingestion/adapters/body_fetcher.py
 
 class ArticleBodyFetcher:
     def __init__(
@@ -125,8 +125,8 @@ User-Agent: Mozilla/5.0 (compatible; FeedAnalyzer/1.0; +https://github.com/your-
 7. When two articles in the input share the same URL, the HTTP fetch is performed exactly once (verified by mock call count).
 8. No more than `BODY_FETCH_CONCURRENCY` HTTP requests are in-flight simultaneously (verified with semaphore count tracking in tests).
 9. An `httpx.TimeoutException` for one article does not prevent other articles from being processed.
-10. `ruff check services/ingestion/adapters/body_fetcher.py` reports zero issues.
-11. `mypy --strict services/ingestion/adapters/body_fetcher.py` reports zero errors.
+10. `ruff check src/services/ingestion/adapters/body_fetcher.py` reports zero issues.
+11. `mypy --strict src/services/ingestion/adapters/body_fetcher.py` reports zero errors.
 
 ## Implementation Notes
 
@@ -139,13 +139,15 @@ User-Agent: Mozilla/5.0 (compatible; FeedAnalyzer/1.0; +https://github.com/your-
 
 ## Definition of Done
 
-- [ ] Unit tests pass (`pytest services/ingestion/tests/unit/test_body_fetcher.py`)
-- [ ] `ruff check services/ingestion/adapters/body_fetcher.py` reports zero issues
-- [ ] `mypy --strict services/ingestion/adapters/body_fetcher.py` reports zero errors
-- [ ] Paywall/403 fallback behavior tested with mocked HTTP responses
-- [ ] URL deduplication tested (mock verifies single HTTP call for duplicate URLs)
-- [ ] Concurrency limit tested (semaphore not exceeded)
-- [ ] `body` always ≤ 2000 chars and valid UTF-8 (unit test asserts both)
-- [ ] `raw_html` truncated at 50,000 chars (unit test with oversized HTML)
-- [ ] `dataclasses.replace` used — input list is not mutated
-- [ ] `lxml` present in `services/ingestion/requirements.txt`
+> Contract-aligned build: fetcher is `ingestion/fetcher.py`; de-duplication is at storage (canonical URL); raw HTML is never stored or published (functional doc sec 2/5).
+
+- [x] Unit tests pass (`pytest tests/test_fetcher.py`)
+- [x] `ruff check` reports zero issues on `ingestion/fetcher.py`
+- [x] `mypy --strict` reports zero errors on `ingestion/fetcher.py`
+- [x] Error/paywall responses raise; the pipeline falls back to the feed summary (tested)
+- [ ] Fetcher-level URL dedup — superseded: enforced at storage via the `canonical_url` unique constraint
+- [x] Concurrency limit tested (semaphore not exceeded) — `tests/test_pipeline_concurrency.py`
+- [x] Body normalized and truncated to <= 2000 chars, UTF-8 safe (`tests/test_normalize.py`)
+- [ ] `raw_html` truncated at 50,000 chars — superseded: raw HTML is never stored/published
+- [ ] `dataclasses.replace` used — superseded: immutable Pydantic models are used
+- [ ] `lxml` in requirements — superseded: not used (feedparser + httpx)

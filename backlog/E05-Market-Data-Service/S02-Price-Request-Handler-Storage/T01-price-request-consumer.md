@@ -2,7 +2,7 @@
 
 ## Context
 
-The Market Data Service must respond to `PriceRequested` messages published by the Verification Service. Each message says: "I need the closing price for asset X when window Y closes." This task implements the **RabbitMQ consumer** that receives those messages, uses **APScheduler** to trigger the fetch at the right moment, calls the adapter layer (S01), and publishes the result as a `PriceObserved` message to the `prices` queue. It is the central orchestration module of the Market Data Service, at `services/market-data/consumer.py`.
+The Market Data Service must respond to `PriceRequested` messages published by the Verification Service. Each message says: "I need the closing price for asset X when window Y closes." This task implements the **RabbitMQ consumer** that receives those messages, uses **APScheduler** to trigger the fetch at the right moment, calls the adapter layer (S01), and publishes the result as a `PriceObserved` message to the `prices` queue. It is the central orchestration module of the Market Data Service, at `src/services/market-data/consumer.py`.
 
 ## Background
 
@@ -68,10 +68,10 @@ class PriceObserved(BaseModel):
 ## Technical Requirements
 
 ### File locations
-- `services/market-data/consumer.py` — main consumer class
-- `services/market-data/price_fetcher.py` — fetch orchestration (adapter selection + fallback)
-- `services/market-data/main.py` — service entry point, starts consumer + scheduler + backfill
-- `services/market-data/tests/test_consumer.py`
+- `src/services/market-data/consumer.py` — main consumer class
+- `src/services/market-data/price_fetcher.py` — fetch orchestration (adapter selection + fallback)
+- `src/services/market-data/main.py` — service entry point, starts consumer + scheduler + backfill
+- `src/services/market-data/tests/test_consumer.py`
 
 ### Libraries
 - `aio-pika>=9.0` — async RabbitMQ client
@@ -153,7 +153,7 @@ scheduler = AsyncIOScheduler(
 6. When yfinance raises `AdapterUnavailableError`, the consumer logs `yfinance_fallback_activated` at WARNING level and calls the Stooq adapter.
 7. When both adapters raise `AdapterUnavailableError`, the consumer logs at ERROR level and does not publish a `PriceObserved` message (no partial/empty messages on the queue).
 8. A duplicate `PriceRequested` with the same `request_id` replaces the existing APScheduler job (`replace_existing=True`) without raising an error.
-9. `pytest services/market-data/tests/test_consumer.py -v` passes with all adapters and RabbitMQ mocked.
+9. `pytest src/services/market-data/tests/test_consumer.py -v` passes with all adapters and RabbitMQ mocked.
 10. No mypy or ruff errors.
 
 ## Implementation Notes
@@ -167,14 +167,26 @@ scheduler = AsyncIOScheduler(
 
 ## Definition of Done
 
-- [ ] `services/market-data/consumer.py` implements `PriceRequestConsumer` with `start()` and `_on_message()` methods
-- [ ] `services/market-data/price_fetcher.py` implements `PriceFetcher` with yfinance→Stooq fallback
-- [ ] `services/market-data/main.py` starts scheduler, backfill, and consumer in the correct order
-- [ ] RabbitMQ messages acked immediately on receipt, not after fetch
-- [ ] APScheduler uses `DateTrigger` with `misfire_grace_time=3600`
-- [ ] `PriceObserved` published to `prices` queue with all required fields
-- [ ] `yfinance_fallback_activated` WARNING log emitted on fallback
-- [ ] Both adapters failing results in ERROR log, no queue message published
-- [ ] Unit tests mock adapters, RabbitMQ, and APScheduler; all tests pass
-- [ ] `ruff check services/market-data/` passes
-- [ ] `mypy services/market-data/` passes
+> The original checklist below predates the contract freeze (single-close, `prices` queue, Stooq
+> fallback, ack-on-receipt). It is retained for history; superseded lines are marked and the
+> authoritative outcome is the **As-built** checklist that follows.
+
+- [~] `src/services/market-data/consumer.py` implements `PriceRequestConsumer` with `start()` and `_on_message()` methods — *superseded: consumer wired in `market_data/app.py` via the shared `RabbitMQClient.consume`*
+- [~] `src/services/market-data/price_fetcher.py` implements `PriceFetcher` with yfinance→Stooq fallback — *superseded: `market_data/handler.py` `PriceRequestProcessor`; Yahoo-chart only, no Stooq (`fallback=null`)*
+- [~] `src/services/market-data/main.py` starts scheduler, backfill, and consumer in the correct order — *superseded: FastAPI lifespan in `app.py` starts scheduler + consumer; no backfill (see S02-T02)*
+- [~] RabbitMQ messages acked immediately on receipt, not after fetch — *superseded: contract requires durability first — the request is persisted before ack, then processed*
+- [~] APScheduler uses `DateTrigger` with `misfire_grace_time=3600` — *superseded: an interval job re-drives all open requests and reconciles the outbox (coalesce, max_instances=1)*
+- [~] `PriceObserved` published to `prices` queue with all required fields — *superseded: exactly one `PriceObserved` published to `feed.events` (routing key `price.observed`) via the transactional outbox*
+- [~] `yfinance_fallback_activated` WARNING log emitted on fallback — *superseded: no fallback exists*
+- [~] Both adapters failing results in ERROR log, no queue message published — *superseded: transient failure defers with bounded backoff (stays pending); terminal data errors dead-letter the message*
+- [x] Unit tests cover pending vs. completed transitions with fakes; live integration tests cover the RabbitMQ round-trip and `/health`+`/ready`
+- [x] `ruff check` passes on `market_data`
+- [x] `mypy --strict` passes on `market_data`
+
+### As-built (implemented 2026-07-28)
+
+- [x] `market_data/app.py` consumes `market-data.price-requests` via the shared `RabbitMQClient`; the request is persisted (PENDING) **before** the message is acknowledged
+- [x] `market_data/handler.py` `PriceRequestProcessor` resolves baseline + settlement sessions without look-ahead and fetches both approved reference closes
+- [x] Settlement work that is not yet complete/published stays pending with a bounded next attempt; an APScheduler interval job re-drives open requests and reconciles the outbox
+- [x] Exactly one `PriceObserved` (both `CloseObservation`s) is published per request through the outbox; duplicate delivery creates no second schedule or publication
+- [x] Terminal provider-data errors raise `MessagePoisonError` so the delivery dead-letters; the service never computes prediction correctness

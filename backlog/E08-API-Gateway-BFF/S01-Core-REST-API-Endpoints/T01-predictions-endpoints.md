@@ -72,14 +72,14 @@ The endpoints must join `predictions` with `prediction_outcomes` so the Dashboar
 
 ## Technical Requirements
 
-1. **Framework:** FastAPI `APIRouter` mounted at prefix `/predictions` in `services/api-gateway/routers/predictions.py`
+1. **Framework:** FastAPI `APIRouter` mounted at prefix `/predictions` in `src/services/api-gateway/routers/predictions.py`
 2. **Database access:** Use `asyncpg` directly or `SQLAlchemy 2.x` async engine with connection pool size 10. Connection string from env var `DATABASE_URL` (e.g., `postgresql+asyncpg://user:pass@postgres:5432/feedanalyzer`).
 3. **ORM vs raw SQL:** Prefer raw SQL with `asyncpg` for performance. Use parameterized queries only - no f-string interpolation of user inputs.
 4. **Pagination:** `limit` must be capped at 200. Return HTTP 400 if `limit < 1` or `offset < 0`.
 5. **Date filter:** `from_date` and `to_date` are `date` strings (YYYY-MM-DD). Filter on `predictions.created_at::date`.
 6. **Status derivation:** If no matching `prediction_outcomes` row exists AND `window_close_at > NOW()`, status = `PENDING`. If no outcome AND `window_close_at <= NOW()`, status = `OVERDUE`. If outcome exists, status = `SCORED`.
 7. **stats endpoint ordering:** Route `/predictions/stats` must be registered BEFORE `/predictions/{id}` in the router to avoid FastAPI matching `stats` as a path parameter.
-8. **Response models:** Define Pydantic response models in `services/api-gateway/schemas/predictions.py`. Do not reuse the `src/shared/` message schemas directly as response models - shape them for the API consumer.
+8. **Response models:** Define Pydantic response models in `src/services/api-gateway/schemas/predictions.py`. Do not reuse the `src/shared/` message schemas directly as response models - shape them for the API consumer.
 9. **Error handling:** Return `HTTP 404` with `{"detail": "Prediction {id} not found"}` for unknown IDs. Return `HTTP 422` automatically via FastAPI for invalid query params.
 10. **Logging:** Use `structlog` (already in shared requirements) to log each request with `prediction_id` or filters as structured fields.
 
@@ -98,7 +98,7 @@ The endpoints must join `predictions` with `prediction_outcomes` so the Dashboar
 11. `accuracy_rate` in stats equals `correct / (correct + wrong)` and is 0 when both are 0
 12. All endpoints respond within 200 ms on a local Docker setup with 1000 seeded rows
 13. `GET /predictions?limit=201` returns HTTP 400
-14. All tests in `services/api-gateway/tests/test_predictions.py` pass
+14. All tests in `src/services/api-gateway/tests/test_predictions.py` pass
 
 ## Implementation Notes
 
@@ -111,9 +111,9 @@ The endpoints must join `predictions` with `prediction_outcomes` so the Dashboar
 
 ## Definition of Done
 
-- [ ] Unit tests pass (`pytest services/api-gateway/tests/test_predictions.py`)
-- [ ] Code passes `ruff check services/api-gateway/` with zero errors
-- [ ] Code passes `mypy services/api-gateway/ --strict` with zero errors
+- [ ] Unit tests pass (`pytest src/services/api-gateway/tests/test_predictions.py`)
+- [ ] Code passes `ruff check src/services/api-gateway/` with zero errors
+- [ ] Code passes `mypy src/services/api-gateway/ --strict` with zero errors
 - [ ] All 14 acceptance criteria verified manually or via automated tests
 - [ ] No raw f-string SQL interpolation - all queries use parameterized `$1`, `$2` placeholders
 - [ ] Response schemas documented with FastAPI's OpenAPI auto-generation (viewable at `/docs`)

@@ -2,7 +2,7 @@
 
 ## Context
 
-The Market Data Service must persist every fetched OHLC price to Postgres so that the Verification Service can look up historical closes, and so that the system has price data available immediately on first startup. This task implements the **`prices` Postgres table schema**, the **upsert (insert-or-update) logic** via SQLAlchemy, the **90-day historical backfill** that runs at service startup, and the **1-hour in-memory price cache** that prevents redundant API calls for prices already fetched in the current hour. This module is `services/market-data/price_store.py`.
+The Market Data Service must persist every fetched OHLC price to Postgres so that the Verification Service can look up historical closes, and so that the system has price data available immediately on first startup. This task implements the **`prices` Postgres table schema**, the **upsert (insert-or-update) logic** via SQLAlchemy, the **90-day historical backfill** that runs at service startup, and the **1-hour in-memory price cache** that prevents redundant API calls for prices already fetched in the current hour. This module is `src/services/market-data/price_store.py`.
 
 ## Background
 
@@ -62,9 +62,9 @@ CREATE INDEX IF NOT EXISTS idx_prices_symbol_date
 ## Technical Requirements
 
 ### File locations
-- `services/market-data/price_store.py`
-- `services/market-data/migrations/001_create_prices_table.sql` (or Alembic migration)
-- `services/market-data/tests/test_price_store.py`
+- `src/services/market-data/price_store.py`
+- `src/services/market-data/migrations/001_create_prices_table.sql` (or Alembic migration)
+- `src/services/market-data/tests/test_price_store.py`
 
 ### Libraries
 - `sqlalchemy>=2.0` with async engine (`create_async_engine`)
@@ -219,15 +219,27 @@ This returns the most recent available row on or before `target_date`, handling 
 
 ## Definition of Done
 
-- [ ] `services/market-data/price_store.py` implements `PriceStore` with `save_price`, `get_price`, and `run_backfill`
-- [ ] `services/market-data/migrations/001_create_prices_table.sql` (or equivalent Alembic migration) creates the `prices` table with correct schema and unique constraint
-- [ ] `save_price` uses PostgreSQL `INSERT ... ON CONFLICT DO UPDATE` (upsert)
-- [ ] `get_price` checks in-memory cache before querying DB
-- [ ] Cache entries expire after `PRICE_CACHE_TTL_SECONDS` (default 3600)
-- [ ] `run_backfill` runs as a background task via `asyncio.create_task` in `main.py`
-- [ ] Backfill fetches 90 days for `GC=F`, `BZ=F`, `OMXS30=F` by default
-- [ ] `backfill_started` and `backfill_complete` log entries emitted with correct fields
-- [ ] Unit tests cover: upsert idempotency, cache hit/miss/expiry, backfill skip-on-existing, weekend date DB query
-- [ ] `ruff check services/market-data/price_store.py` passes
-- [ ] `mypy services/market-data/price_store.py` passes
-- [ ] `pytest services/market-data/tests/test_price_store.py -v` all tests green
+> The original checklist below predates the contract freeze (SQLAlchemy `prices` table, upsert-on-update,
+> 90-day backfill, 1-hour cache). It is retained for history; superseded lines are marked and the
+> authoritative outcome is the **As-built** checklist that follows.
+
+- [~] `src/services/market-data/price_store.py` implements `PriceStore` with `save_price`, `get_price`, and `run_backfill` — *superseded: split into `market_data/db.py` (schema DDL) and `market_data/storage.py` (`PriceRequestRepository` + `OutboxPublisher`)*
+- [~] `src/services/market-data/migrations/001_create_prices_table.sql` (or equivalent Alembic migration) creates the `prices` table with correct schema and unique constraint — *superseded: `db.py` applies the `market_data` schema idempotently at startup (per-service DDL ownership); tables are `price_requests`, `close_observations`, `outbox` — not a single `prices` table*
+- [~] `save_price` uses PostgreSQL `INSERT ... ON CONFLICT DO UPDATE` (upsert) — *superseded: observations are immutable — `ON CONFLICT (asset_id, session, registry_version) DO NOTHING`, never updated*
+- [~] `get_price` checks in-memory cache before querying DB — *superseded: no cache; Verification requests exactly the sessions it needs*
+- [~] Cache entries expire after `PRICE_CACHE_TTL_SECONDS` (default 3600) — *superseded: no cache*
+- [~] `run_backfill` runs as a background task via `asyncio.create_task` in `main.py` — *superseded: no 90-day backfill; instead pending and publish-pending work is rehydrated on startup*
+- [~] Backfill fetches 90 days for `GC=F`, `BZ=F`, `OMXS30=F` by default — *superseded: no backfill; OMXS30 is a deferred asset*
+- [~] `backfill_started` and `backfill_complete` log entries emitted with correct fields — *superseded: no backfill; startup logs rehydration/outbox reconciliation instead*
+- [x] Unit tests cover storage helpers (content hash, `build_price_observed`); live integration tests cover request idempotency, immutable dual-close persistence, and outbox delivery
+- [x] `ruff check` passes on `market_data/db.py` and `market_data/storage.py`
+- [x] `mypy --strict` passes on `market_data/db.py` and `market_data/storage.py`
+- [x] `pytest` all tests green for the storage suite
+
+### As-built (implemented 2026-07-28)
+
+- [x] `market_data/db.py` applies the `market_data` schema idempotently: `price_requests`, `close_observations`, `outbox` (asyncpg, not SQLAlchemy)
+- [x] `market_data/storage.py` `PriceRequestRepository` registers requests idempotently on `request_id` and persists immutable observations keyed on `(asset_id, session, registry_version)` with a content hash
+- [x] `complete_request` stores both closes and enqueues exactly one `PriceObserved` outbox row atomically (idempotent via a unique `aggregate_id = request_id`)
+- [x] `OutboxPublisher` relays pending `PriceObserved` rows to `feed.events` and reconciles rows left pending after a crash/restart
+- [x] Both close observations record price kind, source, provider symbol, provider bar time, fetch time, adjustment flag, and registry version

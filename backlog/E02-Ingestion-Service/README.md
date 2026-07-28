@@ -24,7 +24,7 @@ Downstream, the Cleansing Service consumes `raw-news` and performs deduplication
 ## Architecture Context
 
 ### Service Location
-`services/ingestion/`
+`src/services/ingestion/`
 
 ### Queues
 | Queue      | Role     | Message Schema   |
@@ -34,7 +34,13 @@ Downstream, the Cleansing Service consumes `raw-news` and performs deduplication
 ### Database
 | Engine   | Table      | Purpose                                      |
 |----------|------------|----------------------------------------------|
-| Postgres | `raw_news` | Persist raw articles, URL-dedup anchor, source tracking |
+| Postgres | `ingestion.articles` | Persist raw articles, canonical-URL dedup anchor, source tracking |
+| Postgres | `ingestion.outbox`   | Transactional outbox for `ArticleIngested` publication |
+
+Time-based retention keeps growth bounded: a daily job deletes `ingestion.articles` rows older than
+`article_retention_days` (default 30) and `DELIVERED` `ingestion.outbox` rows older than
+`outbox_retention_days` (default 7). Safe because feeds only surface recent items, so an aged article
+can never be re-ingested. See the ingestion functional document sec 6.1.
 
 ### Message Schema: `ArticleIngested`
 Defined in `src/shared/` package. Fields:

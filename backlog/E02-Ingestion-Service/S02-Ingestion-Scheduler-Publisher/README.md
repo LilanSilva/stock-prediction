@@ -8,7 +8,7 @@ This story wires the source adapters (S01) into a running service. It builds thr
 2. **Raw article storage & deduplication** (T02) — inserts new articles into the `raw_news` Postgres table (URL-unique) and publishes `ArticleIngested` messages to the `raw-news` RabbitMQ queue.
 3. **Health & monitoring endpoint** (T03) — FastAPI `GET /health` endpoint with per-source status, last poll time, and consecutive-zero-article alerting.
 
-All three tasks combine to produce the complete, runnable `services/ingestion/` Docker service.
+All three tasks combine to produce the complete, runnable `src/services/ingestion/` Docker service.
 
 ---
 
@@ -37,7 +37,7 @@ All three tasks combine to produce the complete, runnable `services/ingestion/` 
 ## How to Test End-to-End
 
 1. Start infra: `docker compose -f infra/docker-compose.yml up postgres rabbitmq -d`
-2. Apply DB migration: `alembic upgrade head` inside `services/ingestion/`
+2. Apply DB migration: `alembic upgrade head` inside `src/services/ingestion/`
 3. Start the service: `docker compose up ingestion`
 4. Call `GET http://localhost:8001/health` — expect HTTP 200 with JSON body containing `status`, `sources`, and `last_poll_at`.
 5. Trigger a manual poll: `POST http://localhost:8001/admin/poll` (dev-only endpoint) or wait up to 1 hour for the scheduler.

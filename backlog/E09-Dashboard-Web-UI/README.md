@@ -29,7 +29,7 @@ dashboard/          ← React + Recharts + React Flow (this epic)
  │  HTTP REST
  │  WebSocket
  ▼
-services/api-gateway/   ← FastAPI BFF (E08)
+src/services/api-gateway/   ← FastAPI BFF (E08)
  │
  ├── reads: Predictions DB (Postgres) → GET /predictions, /predictions/stats
  ├── reads: Outcomes DB (Postgres)    → scoring data joined to predictions

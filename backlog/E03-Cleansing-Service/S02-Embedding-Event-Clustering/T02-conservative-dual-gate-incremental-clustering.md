@@ -222,7 +222,7 @@ async def maybe_mark_cluster_ready(conn: asyncpg.Connection, cluster_id: uuid.UU
 ### File Layout
 
 ```
-services/cleansing/
+src/services/cleansing/
   clustering/
     __init__.py
     cluster.py      # assign_to_cluster(), create_cluster(), update_cluster_centroid()
@@ -262,7 +262,7 @@ async def timeout_old_clusters(conn_pool: asyncpg.Pool) -> None:
 7. `are_actions_compatible("launch", "fire")` returns `True` (both are WordNet verb synonyms for projectile discharge).
 8. `are_actions_compatible("launch", "close")` returns `False`.
 9. `are_actions_compatible(None, "close")` returns `True` (missing action — Gate 2 skipped).
-10. Unit tests in `services/cleansing/tests/test_clustering.py` cover all three merge/no-merge scenarios and the ready-condition logic.
+10. Unit tests in `src/services/cleansing/tests/test_clustering.py` cover all three merge/no-merge scenarios and the ready-condition logic.
 
 ## Implementation Notes
 
@@ -276,13 +276,17 @@ async def timeout_old_clusters(conn_pool: asyncpg.Pool) -> None:
 
 ## Definition of Done
 
-- [ ] Unit tests pass (`pytest services/cleansing/tests/test_clustering.py`)
-- [ ] Code passes `ruff check services/cleansing/clustering/` with zero errors
-- [ ] Code passes `mypy services/cleansing/clustering/` with no type errors
-- [ ] `event_clusters` and `cluster_articles` tables created via migrations 005 and 006
-- [ ] Both gates enforced: similarity < 0.80 prevents merge; incompatible action verb prevents merge
-- [ ] Cluster centroid is re-normalized after each update
-- [ ] Background timeout task marks 30-min-old open clusters as ready
-- [ ] NLTK WordNet downloaded in Dockerfile
-- [ ] `assign_to_cluster()` runs inside a Postgres transaction
-- [ ] Integration test confirms clusters correctly form with sample English + Swedish articles
+> Verified against the delivered flat-module implementation; legacy migration `005`/`006` names and
+> the NLTK WordNet synonym gate are superseded — Gate 2 uses canonical taxonomy mapping
+> (`cleansing/taxonomy.py`), and clustering lives in `cleansing/clustering.py` + `cleansing/repository.py`.
+
+- [x] Unit tests pass (`tests/test_clustering.py`)
+- [x] Code passes `ruff check .` with zero errors
+- [x] Code passes `mypy cleansing` with no type errors (`cleansing/clustering.py`)
+- [x] `cleansing.event_clusters` and `cleansing.cluster_articles` tables created by `apply_schema` (replaces migrations `005`/`006`)
+- [x] Both gates enforced: cosine < 0.80 prevents merge; incompatible canonical event type prevents merge (OTHER never merges)
+- [x] Cluster centroid maintained as a running mean under a row lock; similarity compared via cosine
+- [x] Event-time close sweep marks quiet/lifetime-due clusters ready (time-based; article count never closes — per overrides)
+- [x] ~~NLTK WordNet~~ superseded: Swedish/English actions mapped to the canonical taxonomy locally instead
+- [x] Cluster assignment runs inside a Postgres transaction (`add_article_to_cluster`, `FOR UPDATE`)
+- [x] EN + SV clusters form correctly — live-verified end-to-end (integration tests + replay run)

@@ -90,13 +90,13 @@ Top-level `status` is `"ok"` only if ALL services are `"ok"`. Otherwise `"degrad
 
 ## Technical Requirements
 
-1. **Router files:** `services/api-gateway/routers/events.py`, `services/api-gateway/routers/prices.py`, `services/api-gateway/routers/health.py`
+1. **Router files:** `src/services/api-gateway/routers/events.py`, `src/services/api-gateway/routers/prices.py`, `src/services/api-gateway/routers/health.py`
 2. **JSONB array filter for asset:** Use Postgres operator `@>` to filter events where `affected_assets` contains the given asset string: `WHERE affected_assets @> $1::jsonb` where `$1 = json.dumps([asset])`.
 3. **Health checks:** Use `httpx.AsyncClient` with a timeout of `2.0` seconds per service. Run all six health checks concurrently with `asyncio.gather(*checks, return_exceptions=True)`. A timeout or connection error sets that service's status to `"degraded"` with an `error` field.
 4. **Health check HTTP client:** Create a single `httpx.AsyncClient` instance at application startup (in the FastAPI `lifespan`) and store on `app.state.http_client`. Close it on shutdown. Do NOT create a new client per request.
 5. **Prices ordering:** Return price rows sorted by `observed_at ASC`.
 6. **Events detail - source articles:** The `events.sources` JSONB column contains article IDs. For the detail endpoint, look up each article ID in the `articles` table and return the article metadata (url, title, source, published_at). Use `WHERE article_id = ANY($1::uuid[])` for the batch lookup.
-7. **Response schemas:** Define in `services/api-gateway/schemas/events.py` and `services/api-gateway/schemas/health.py`.
+7. **Response schemas:** Define in `src/services/api-gateway/schemas/events.py` and `src/services/api-gateway/schemas/health.py`.
 8. **Health endpoint caching:** Cache the health response for 10 seconds to prevent hammering downstream services if the Dashboard polls frequently. Use a simple in-memory dict `{"cached_at": datetime, "result": dict}` on `app.state`. No Redis required.
 9. **prices/{symbol} with no data:** Return `{"symbol": "GOLD", "items": []}` (not 404).
 10. **events/{id} not found:** Return HTTP 404 with `{"detail": "Event {id} not found"}`.
@@ -116,7 +116,7 @@ Top-level `status` is `"ok"` only if ALL services are `"ok"`. Otherwise `"degrad
 11. `GET /health` includes per-service `latency_ms` for healthy services and `error` string for unreachable ones
 12. Health checks for all six services run concurrently (not sequentially)
 13. Health endpoint returns a cached response within 10 seconds of the last real check (no duplicate requests to backends within the cache window)
-14. All tests in `services/api-gateway/tests/test_events.py` and `services/api-gateway/tests/test_health.py` pass
+14. All tests in `src/services/api-gateway/tests/test_events.py` and `src/services/api-gateway/tests/test_health.py` pass
 
 ## Implementation Notes
 
@@ -129,9 +129,9 @@ Top-level `status` is `"ok"` only if ALL services are `"ok"`. Otherwise `"degrad
 
 ## Definition of Done
 
-- [ ] Unit tests pass (`pytest services/api-gateway/tests/test_events.py services/api-gateway/tests/test_health.py`)
-- [ ] Code passes `ruff check services/api-gateway/` with zero errors
-- [ ] Code passes `mypy services/api-gateway/ --strict` with zero errors
+- [ ] Unit tests pass (`pytest src/services/api-gateway/tests/test_events.py src/services/api-gateway/tests/test_health.py`)
+- [ ] Code passes `ruff check src/services/api-gateway/` with zero errors
+- [ ] Code passes `mypy src/services/api-gateway/ --strict` with zero errors
 - [ ] All 14 acceptance criteria verified
 - [ ] Health checks are concurrent via `asyncio.gather`
 - [ ] Health response cached for 10 seconds (verified by test asserting only one outbound HTTP call within cache window)

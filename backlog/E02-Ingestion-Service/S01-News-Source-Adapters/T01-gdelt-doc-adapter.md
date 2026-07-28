@@ -4,7 +4,7 @@
 
 ## Context
 
-The Ingestion Service (`services/ingestion/`) is the first stage of the news-driven prediction pipeline. It fetches raw news articles from multiple sources, stores them, and publishes them to the `raw-news` RabbitMQ queue for the Cleansing Service to process. This task implements the adapter for **GDELT DOC 2.0** — the primary English-language source covering financial and geopolitical news globally. The adapter is a standalone, reusable component called by the APScheduler hourly job (built in S02-T01).
+The Ingestion Service (`src/services/ingestion/`) is the first stage of the news-driven prediction pipeline. It fetches raw news articles from multiple sources, stores them, and publishes them to the `raw-news` RabbitMQ queue for the Cleansing Service to process. This task implements the adapter for **GDELT DOC 2.0** — the primary English-language source covering financial and geopolitical news globally. The adapter is a standalone, reusable component called by the APScheduler hourly job (built in S02-T01).
 
 ## Background
 
@@ -17,7 +17,7 @@ Key design decisions:
 - **No article body**: GDELT only provides metadata + URL. Full body fetching is handled by T03.
 - **Last-seen deduplication anchor**: The adapter accepts a `since` datetime parameter so the scheduler (S02-T01) can pass `last_fetched_at` from Postgres to avoid refetching old articles.
 
-File location: `services/ingestion/adapters/gdelt.py`
+File location: `src/services/ingestion/adapters/gdelt.py`
 
 ## Inputs
 
@@ -27,7 +27,7 @@ File location: `services/ingestion/adapters/gdelt.py`
 
 ## Outputs
 
-Returns `list[RawArticle]` — a list of internal dataclass instances (defined in `services/ingestion/models.py`).
+Returns `list[RawArticle]` — a list of internal dataclass instances (defined in `src/services/ingestion/models.py`).
 
 ```python
 @dataclass
@@ -87,7 +87,7 @@ GET https://api.gdeltproject.org/api/v2/doc/doc
 
 ### Class Interface
 ```python
-# services/ingestion/adapters/gdelt.py
+# src/services/ingestion/adapters/gdelt.py
 class GdeltAdapter:
     def __init__(self, http_client: httpx.AsyncClient) -> None: ...
     async def fetch(self, since: datetime | None = None) -> list[RawArticle]: ...
@@ -119,11 +119,13 @@ The `http_client` is injected for testability (allows mocking in unit tests).
 
 ## Definition of Done
 
-- [ ] Unit tests pass (`pytest services/ingestion/tests/unit/test_gdelt_adapter.py`)
-- [ ] `ruff check services/ingestion/adapters/gdelt.py` reports zero issues
-- [ ] `mypy --strict services/ingestion/adapters/gdelt.py` reports zero errors
-- [ ] `GdeltAdapter` class is importable from `services.ingestion.adapters.gdelt`
-- [ ] All GDELT response fields map correctly to `RawArticle` fields per the mapping table above
-- [ ] HTTP error handling (timeout, 4xx, 5xx, 429) verified by unit tests with mocked responses
-- [ ] Rate-limit sleep is enforced (tested by mocking `asyncio.sleep` and asserting call count)
-- [ ] `RawArticle` dataclass is defined in `services/ingestion/models.py` with all fields typed
+> Contract-aligned build: adapter path is `ingestion.adapters.gdelt`; tests live in `tests/`.
+
+- [x] Unit tests pass (`pytest tests/test_gdelt_adapter.py`)
+- [x] `ruff check` reports zero issues on `ingestion/adapters/gdelt.py`
+- [x] `mypy --strict` reports zero errors on `ingestion/adapters/gdelt.py`
+- [x] `GdeltAdapter` class is importable from `ingestion.adapters.gdelt`
+- [x] All GDELT response fields map correctly to `RawArticle` (country/language names -> ISO2/ISO639)
+- [x] HTTP error handling (timeout, 4xx/5xx, 429, invalid JSON) verified by unit tests with mocked responses
+- [x] Rate-limit retry enforced (429 test mocks `asyncio.sleep` and asserts one retry)
+- [x] `RawArticle` model is defined in `ingestion/models.py` with all fields typed

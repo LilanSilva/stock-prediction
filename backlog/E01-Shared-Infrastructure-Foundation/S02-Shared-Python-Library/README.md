@@ -25,7 +25,7 @@ For M1, only the Cleansing Service is allowed to call the shared LLM gateway. Pr
 ## Dependencies
 
 - S01 (Docker Compose & Infrastructure Setup) must be complete so that RabbitMQ and Postgres are available for integration tests.
-- A provider-specific API key must be set for T03 integration tests, for example `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or the configured provider's equivalent.
+- A single API key (`LLM_API_KEY`) for the configured provider must be set for T03 integration tests.
 - Python 3.12 must be installed on the developer machine.
 
 ## LLM Configuration
@@ -34,12 +34,10 @@ The shared LLM gateway must not hardcode one provider or one model. Runtime conf
 
 | Variable | Purpose |
 |---|---|
-| `LLM_PROVIDER` | Provider adapter, for example `openai`, `anthropic`, `bedrock`, or another approved adapter |
+| `LLM_PROVIDER` | Wire protocol/adapter; `openai` selects the OpenAI-compatible adapter (covers Kimi/Moonshot, Together, Azure OpenAI, local vLLM) |
 | `LLM_MODEL` | Provider-specific model ID |
-| `LLM_API_KEY_ENV` | Optional name of the environment variable that contains the API key |
-| `OPENAI_API_KEY` | API key when `LLM_PROVIDER=openai` |
-| `ANTHROPIC_API_KEY` | API key when `LLM_PROVIDER=anthropic` |
-| `AWS_REGION`, `AWS_PROFILE` | AWS credentials/config when `LLM_PROVIDER=bedrock` |
+| `LLM_BASE_URL` | OpenAI-compatible endpoint URL; empty uses the provider default (`api.openai.com`) |
+| `LLM_API_KEY` | The single API key for the configured provider |
 | `LLM_MAX_INPUT_TOKENS` | Maximum compact input budget |
 | `LLM_MAX_OUTPUT_TOKENS` | Low output cap for structured responses |
 | `LLM_TIMEOUT_SECONDS` | Per-call timeout |
@@ -88,6 +86,6 @@ src/shared/
    All services reuse this single root `.venv`; do not create a per-service environment. See the
    repository `README.md` (*Development environment*) for details.
 2. Ensure S01 infrastructure is running: `docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build`
-3. Set provider variables in `infra/.env`, for example `LLM_PROVIDER=openai`, `LLM_MODEL=<model-id>`, and `OPENAI_API_KEY=<key>`.
+3. Set provider variables in `infra/.env`, for example `LLM_PROVIDER=openai`, `LLM_MODEL=<model-id>`, `LLM_BASE_URL=<endpoint-or-empty>`, and `LLM_API_KEY=<key>`.
 4. Run all tests: `cd src/shared && python -m pytest`
 5. Run linting and type checks: `python -m ruff check . && python -m mypy shared tests`

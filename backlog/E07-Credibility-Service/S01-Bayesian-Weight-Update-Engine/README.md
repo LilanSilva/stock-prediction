@@ -51,4 +51,4 @@ Before this story can start the following must exist:
 3. Query Neo4j: `MATCH ()-[r {edge_id: 'war->gold'}]-() RETURN r.alpha, r.beta, r.credibility_score` — alpha should have increased by ~0.7 relative to its prior value.
 4. Query Postgres `credibility` table: both `di.se` and `svd.se` rows should show alpha incremented by 0.5 (equal split across 2 sources).
 5. Query Postgres `credibility_history`: two new rows for edges and two for sources, all with `prediction_id = 'test-pred-001'` and valid `ci_lower` / `ci_upper` values.
-6. Run unit tests: `pytest services/credibility/tests/ -v`.
+6. Run unit tests: `pytest src/services/credibility/tests/ -v`.

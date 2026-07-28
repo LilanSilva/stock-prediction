@@ -21,7 +21,7 @@ The service addresses a fundamental problem in news aggregation: the same event 
 
 ## Architecture Context
 
-**Service:** `services/cleansing/`
+**Service:** `src/services/cleansing/`
 
 **Consumes queue:** `raw-news`
 - Message: `ArticleIngested` `{article_id, source, url, title, body, published_at, language, country, raw_html, correlation_id}`

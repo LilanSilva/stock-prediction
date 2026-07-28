@@ -18,7 +18,7 @@ Before this story can be started the following must exist:
 
 - Postgres schema migrations must have run and the tables `predictions`, `prediction_outcomes`, `events`, `articles`, `prices`, `credibility_edges`, `credibility_sources`, `credibility_edge_history` must exist
 - The `src/shared/` package must expose Pydantic schemas: `PredictionMade`, `PredictionScored`, `EventDetected`, `PriceObserved`
-- `services/api-gateway/` directory must exist with a `Dockerfile` and `requirements.txt`
+- `src/services/api-gateway/` directory must exist with a `Dockerfile` and `requirements.txt`
 - Environment variables `DATABASE_URL`, `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`, and per-service health URLs must be injectable via `.env` / Docker Compose
 - The six backend services must expose `GET /health` endpoints
 
@@ -26,7 +26,7 @@ Before this story can be started the following must exist:
 
 1. `docker compose up --build` from `infra/`
 2. Seed Postgres with fixture data using `pytest` fixtures or a seed SQL script
-3. Run `pytest services/api-gateway/tests/ -v` - all unit and integration tests must pass
+3. Run `pytest src/services/api-gateway/tests/ -v` - all unit and integration tests must pass
 4. Open a browser or use `curl`/`httpie` to hit `http://localhost:8080/predictions` and confirm a paginated JSON response
 5. Check filters: `GET /predictions?asset=GOLD&status=SCORED&limit=5` must return at most 5 scored gold predictions
 6. Check `/health` - stop one backend service container and confirm the health endpoint reports it as `degraded`

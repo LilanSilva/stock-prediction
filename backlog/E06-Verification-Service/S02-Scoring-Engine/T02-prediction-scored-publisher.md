@@ -33,7 +33,7 @@ This is the final task in the Verification Service pipeline. After scoring compl
 
 ### 1. Module location
 
-Create `services/verification/app/publisher.py`.
+Create `src/services/verification/app/publisher.py`.
 
 ### 2. PredictionScored schema
 
@@ -118,7 +118,7 @@ await session.commit()
 
 ### 7. Accuracy metric
 
-Create `services/verification/app/metrics.py`:
+Create `src/services/verification/app/metrics.py`:
 
 ```python
 from prometheus_client import Gauge
@@ -218,7 +218,7 @@ class PredictionScored(BaseModel):
 
 ### 11. Config class
 
-Create `services/verification/app/config.py` using `pydantic-settings`:
+Create `src/services/verification/app/config.py` using `pydantic-settings`:
 ```python
 from pydantic_settings import BaseSettings
 
@@ -262,14 +262,14 @@ Add `pydantic-settings>=2.2` to `requirements.txt`.
 
 ## Definition of Done
 
-- [ ] `services/verification/app/publisher.py` exists and is fully type-annotated
-- [ ] `services/verification/app/metrics.py` exists with `update_accuracy_metric` and `ACCURACY_GAUGE`
-- [ ] `services/verification/app/config.py` exists with all required settings
+- [ ] `src/services/verification/app/publisher.py` exists and is fully type-annotated
+- [ ] `src/services/verification/app/metrics.py` exists with `update_accuracy_metric` and `ACCURACY_GAUGE`
+- [ ] `src/services/verification/app/config.py` exists with all required settings
 - [ ] `src/shared/schemas/messages.py` exports `PredictionScored` with all required fields
 - [ ] `GET /metrics` endpoint is mounted and returns Prometheus-format text
 - [ ] `tests/test_publisher.py` tests message shape, DB update, and accuracy metric
 - [ ] `prediction_accuracy_rate` metric is emitted as both Prometheus gauge and structured log
-- [ ] `ruff check services/verification/` exits 0
-- [ ] `mypy services/verification/` exits 0
+- [ ] `ruff check src/services/verification/` exits 0
+- [ ] `mypy src/services/verification/` exits 0
 - [ ] Full end-to-end flow (PredictionMade → window close → score → PredictionScored in queue) verified in Docker Compose
 - [ ] `pydantic-settings>=2.2` added to `requirements.txt`

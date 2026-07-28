@@ -17,7 +17,7 @@ This is a single-task story because the connection manager, RabbitMQ subscriber,
 Before this story can be started:
 
 - S01 (Core REST API Endpoints) must be complete - the app startup lifecycle (`lifespan`) must already be wired
-- RabbitMQ must be running and accessible. The `aio-pika` library must be in `services/api-gateway/requirements.txt`
+- RabbitMQ must be running and accessible. The `aio-pika` library must be in `src/services/api-gateway/requirements.txt`
 - The `src/shared/` package must export `PredictionMade` and `PredictionScored` Pydantic schemas
 - The `src/shared/` package must provide a `RabbitMQClient` wrapper or the gateway must implement its own `aio-pika` connection
 - RabbitMQ connection string must be injectable via env var `RABBITMQ_URL` (e.g., `amqp://guest:guest@rabbitmq:5672/`)
@@ -33,4 +33,4 @@ Before this story can be started:
 7. Confirm the WebSocket client receives a JSON message with `type: "score"` within 500 ms
 8. Close the WebSocket client connection and confirm no errors appear in the gateway logs
 9. Open two WebSocket clients simultaneously and confirm both receive the broadcast
-10. Run `pytest services/api-gateway/tests/test_websocket.py -v`
+10. Run `pytest src/services/api-gateway/tests/test_websocket.py -v`
