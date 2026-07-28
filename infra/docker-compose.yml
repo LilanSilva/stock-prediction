@@ -258,6 +258,34 @@ services:
     networks:
       - feed-net
 
+  feed-verification:
+    build:
+      context: ..
+      dockerfile: src/services/verification/Dockerfile
+    image: feed-analyzer/verification:0.1
+    container_name: feed-verification
+    depends_on:
+      feed-postgres:
+        condition: service_healthy
+      feed-rabbitmq:
+        condition: service_healthy
+    environment:
+      # Container-network connection strings (override the host-side values in .env). The service
+      # reaches Postgres/RabbitMQ by their compose service names, not localhost.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-feed_user}:${POSTGRES_PASSWORD:?set in .env}@feed-postgres:5432/${POSTGRES_DB:-feed}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-feed_user}:${RABBITMQ_DEFAULT_PASS:?set in .env}@feed-rabbitmq:5672/
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8006:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    networks:
+      - feed-net
+
 volumes:
   feed-postgres-data:
   feed-neo4j-data:
