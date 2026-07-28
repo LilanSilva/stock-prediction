@@ -28,8 +28,15 @@ class OpenAIProvider:
 
     name = "openai"
 
-    def __init__(self, api_key: str, *, transport_retries: int = 2) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        *,
+        base_url: str | None = None,
+        transport_retries: int = 2,
+    ) -> None:
         self._api_key = api_key
+        self._base_url = base_url
         self._transport_retries = transport_retries
 
     async def complete_structured(
@@ -50,6 +57,7 @@ class OpenAIProvider:
 
         client = AsyncOpenAI(
             api_key=self._api_key,
+            base_url=self._base_url,
             timeout=timeout_seconds,
             max_retries=self._transport_retries,
         )
@@ -98,6 +106,7 @@ def build_provider(settings: LLMSettings) -> LLMProvider:
     if settings.provider.lower() == "openai":
         return OpenAIProvider(
             settings.require_api_key(),
+            base_url=settings.resolve_base_url(),
             transport_retries=settings.transport_retries,
         )
     raise LLMConfigurationError(

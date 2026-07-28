@@ -78,6 +78,11 @@ class RabbitMQClient:
             await self._connection.close()
             self._connection = None
 
+    @property
+    def is_connected(self) -> bool:
+        """True when a live broker connection is established (for readiness checks)."""
+        return self._connection is not None and not self._connection.is_closed
+
     def _require_pool(self) -> Pool[AbstractRobustChannel]:
         if self._channel_pool is None:
             raise RabbitMQConnectionError("client is not connected; call connect() first")

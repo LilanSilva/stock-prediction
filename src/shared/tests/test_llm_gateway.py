@@ -132,20 +132,26 @@ async def test_oversized_input_rejected_before_call() -> None:
 
 
 def test_missing_provider_key_fails_readiness(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    settings = LLMSettings(provider="openai", model="test-model")
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    settings = LLMSettings(provider="openai", model="test-model", api_key=None)
     with pytest.raises(LLMConfigurationError, match="API key"):
         build_provider(settings)
 
 
-def test_api_key_override_is_resolved(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("MY_LLM_KEY", "secret")
-    settings = LLMSettings(
-        provider="openai",
-        model="test-model",
-        api_key_env="MY_LLM_KEY",
-    )
+def test_api_key_is_resolved_from_settings() -> None:
+    settings = LLMSettings(provider="openai", model="test-model", api_key="secret")
     assert settings.require_api_key() == "secret"
+
+
+def test_base_url_defaults_to_none_and_is_configurable() -> None:
+    assert LLMSettings(provider="openai", model="m", api_key="k").resolve_base_url() is None
+    kimi = LLMSettings(
+        provider="openai",
+        model="kimi-k2-0711-preview",
+        api_key="k",
+        base_url="https://api.moonshot.ai/v1",
+    )
+    assert kimi.resolve_base_url() == "https://api.moonshot.ai/v1"
 
 
 async def test_invalid_output_schema_is_rejected_before_call() -> None:
@@ -184,10 +190,12 @@ async def test_json_schema_enum_is_enforced() -> None:
 
 @pytest.mark.integration
 async def test_openai_structured_response_live() -> None:
-    if not os.environ.get("OPENAI_API_KEY") or not os.environ.get("LLM_MODEL"):
-        pytest.skip("OPENAI_API_KEY and LLM_MODEL are required for the live provider test")
+    if not all(os.environ.get(var) for var in ("LLM_API_KEY", "LLM_MODEL", "LLM_PROVIDER")):
+        pytest.skip("LLM_API_KEY, LLM_MODEL, and LLM_PROVIDER are required for the live test")
 
-    settings = LLMSettings(provider="openai")
+    # Read the full provider/model/base_url/key configuration from the environment (infra/.env),
+    # never hardcode the provider here.
+    settings = LLMSettings()
     provider = build_provider(settings)
     gateway = LLMGateway(settings, {provider.name: provider})
     result = await gateway.complete_structured(
@@ -207,4 +215,4 @@ async def test_openai_structured_response_live() -> None:
         cache_key="integration-smoke-v1",
     )
     assert result.status == "SUCCESS"
-    assert result.provider == "openai"
+    assert result.provider == provider.name

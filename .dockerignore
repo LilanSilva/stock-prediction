@@ -1,0 +1,18 @@
+# Keep the Docker build context small and reproducible.
+.venv/
+**/__pycache__/
+**/*.pyc
+.git/
+.github/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+**/*.egg-info/
+build/
+dist/
+docs/
+backlog/
+POC/
+infra/.env
+**/.env
+node_modules/

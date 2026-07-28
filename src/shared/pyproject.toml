@@ -22,6 +22,9 @@ llm = [
     "openai>=1.30,<2",
     "anthropic>=0.30,<1",
 ]
+graph = [
+    "neo4j>=5,<6",
+]
 dev = [
     "pytest>=8",
     "pytest-asyncio>=0.23",
@@ -58,4 +61,10 @@ plugins = ["pydantic.mypy"]
 # type check; ignore their missing stubs rather than forcing every consumer to install them.
 [[tool.mypy.overrides]]
 module = ["openai", "openai.*", "anthropic", "anthropic.*"]
+ignore_missing_imports = true
+
+# The Neo4j driver (the `graph` extra) is optional in the same way: only Prediction and Credibility
+# install it, so its stubs are ignored for the base strict check.
+[[tool.mypy.overrides]]
+module = ["neo4j", "neo4j.*"]
 ignore_missing_imports = true

@@ -1,7 +1,5 @@
 """LLM gateway configuration (provider-configurable by environment)."""
 
-import os
-
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -13,7 +11,8 @@ class LLMSettings(BaseSettings):
 
     provider: str = ""
     model: str = ""
-    api_key_env: str | None = None
+    api_key: str | None = None
+    base_url: str | None = None
     max_input_tokens: int = Field(default=6000, gt=0)
     max_output_tokens: int = Field(default=512, gt=0)
     timeout_seconds: float = Field(default=30.0, gt=0)
@@ -29,21 +28,22 @@ class LLMSettings(BaseSettings):
             raise LLMConfigurationError("LLM_MODEL is not configured")
 
     def resolve_api_key(self) -> str | None:
-        """Resolve the API key from LLM_API_KEY_ENV if set, else the provider's default variable."""
-        if self.api_key_env:
-            return os.environ.get(self.api_key_env)
-        default_var = {
-            "openai": "OPENAI_API_KEY",
-            "anthropic": "ANTHROPIC_API_KEY",
-        }.get(self.provider.lower())
-        # bedrock uses AWS credentials/profile rather than a single API key variable.
-        return os.environ.get(default_var) if default_var else None
+        """Return the single configured API key (LLM_API_KEY), or None when unset/empty."""
+        return self.api_key or None
+
+    def resolve_base_url(self) -> str | None:
+        """Return the configured base URL (LLM_BASE_URL) or None to use the provider default.
+
+        Set this for any OpenAI-compatible provider that is not api.openai.com (e.g. Kimi/Moonshot,
+        Together, Azure OpenAI, a local vLLM server).
+        """
+        return self.base_url or None
 
     def require_api_key(self) -> str:
         """Return the configured provider key or fail readiness without exposing its name/value."""
         api_key = self.resolve_api_key()
         if not api_key:
             raise LLMConfigurationError(
-                f"API key is not configured for LLM_PROVIDER={self.provider!r}"
+                f"API key is not configured for LLM_PROVIDER={self.provider!r} (set LLM_API_KEY)"
             )
         return api_key
