@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "feed-analyzer-market-data"
+version = "0.1.0"
+description = "Feed Analyzer Market Data Service: dual-session price request handler, Yahoo-chart reference-close adapter, transactional outbox publisher, and persistent settlement scheduler."
+requires-python = ">=3.12"
+# The shared library (feed-analyzer-shared) is installed editable into the same root .venv and is
+# intentionally NOT listed here so pip does not try to resolve it from PyPI.
+dependencies = [
+    "httpx>=0.27,<1",
+    "apscheduler>=3.10,<4",
+    "asyncpg>=0.29,<1",
+    "uvicorn>=0.30,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.5",
+    "mypy>=1.10",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["market_data*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "integration: tests that require live infrastructure or network access",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_ignores = true
+plugins = ["pydantic.mypy"]
+# Resolve the sibling editable `shared` package's types from source.
+mypy_path = "../../shared"
+
+[[tool.mypy.overrides]]
+module = ["apscheduler.*", "asyncpg"]
+ignore_missing_imports = true
