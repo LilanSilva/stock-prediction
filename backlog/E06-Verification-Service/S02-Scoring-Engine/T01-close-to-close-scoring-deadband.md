@@ -197,13 +197,18 @@ No new dependencies beyond what S01 already requires. Uses:
 
 ## Definition of Done
 
-- [ ] `src/services/verification/app/scoring.py` exists and is fully type-annotated
-- [ ] `DEADBAND_THRESHOLD` constant defined at module level
-- [ ] `classify_magnitude()` function implemented and unit tested
-- [ ] `ScoringResult` dataclass defined with all fields
-- [ ] `score_prediction()` async function implemented
-- [ ] `outcomes` DDL includes `magnitude_correct` column
-- [ ] `tests/test_scoring.py` exists with tests for all 9 acceptance criteria
-- [ ] `ruff check src/services/verification/app/scoring.py` exits 0
-- [ ] `mypy src/services/verification/app/scoring.py` exits 0
-- [ ] Scheduler `on_window_close` calls `score_prediction` and passes result to publisher stub
+> Verified against the delivered implementation. Superseded legacy items: `app/scoring.py`
+> path/SQLAlchemy, single `open`/`close` OHLCV row, and magnitude buckets 0.5%/2%. The authoritative
+> rules (verification functional doc sec 4) are: `actual_return=(settlement-baseline)/baseline` from
+> the two closes in one `PriceObserved`; ±0.3% deadband→NEUTRAL; magnitude <1% SMALL / 1-3% MEDIUM /
+> ≥3% LARGE; `is_correct` = predicted==actual; `score` 1.0/0.0.
+
+- [x] `verification/scoring.py` exists and is fully type-annotated (pure function)
+- [x] Deadband and magnitude thresholds are configurable constants (`VerificationSettings`), not inlined
+- [x] Magnitude bucketing implemented and unit tested (SMALL/MEDIUM/LARGE)
+- [x] `ScoreOutcome` dataclass defined with all fields
+- [x] Scoring computes return/direction/magnitude/is_correct/score deterministically
+- [x] Score persisted to `verification.scores` (immutable, unique per prediction_id)
+- [x] `tests/test_scoring.py` covers deadband, direction, magnitude buckets, and correctness edges
+- [x] `ruff check` and `mypy --strict` pass
+- [x] The price consumer scores on `PriceObserved` and outboxes `PredictionScored` — verified live (integration test)

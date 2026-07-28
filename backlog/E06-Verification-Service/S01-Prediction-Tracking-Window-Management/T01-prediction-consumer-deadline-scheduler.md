@@ -267,13 +267,20 @@ prometheus-client>=0.20
 
 ## Definition of Done
 
-- [ ] Unit tests pass (`pytest src/services/verification/tests/`)
-- [ ] `ruff check src/services/verification/` exits 0
-- [ ] `mypy src/services/verification/` exits 0
-- [ ] `outcomes` table DDL migration file exists at `infra/postgres/init/03_verification.sql`
-- [ ] `price_observations` table DDL migration exists in the same file
-- [ ] `src/services/verification/requirements.txt` is complete and pinned to minor versions
-- [ ] Service starts cleanly in Docker Compose (`docker-compose up verification`)
-- [ ] A manually published `PredictionMade` message results in a visible `PENDING` row in Postgres
-- [ ] A scheduler job fires after the configured window and publishes `PriceRequested` when no price exists
-- [ ] No synchronous blocking calls inside async functions
+> Verified against the delivered flat-module implementation (`src/services/verification/verification/`,
+> asyncpg — not SQLAlchemy). Superseded legacy items: the `predictions`/`price-requests` queue names
+> (canonical `verification.predictions` / `price.requested`), single-close `outcomes`/`window_close_at+24h`,
+> and per-prediction APScheduler deadline jobs. Per the functional doc the dual-session `PriceRequested`
+> is published immediately on `PredictionMade` (Market Data holds it until settlement completes), so no
+> per-prediction timers exist — only an outbox relay sweep. Sessions resolve via `shared.calendar`
+> (baseline = last completed session at `decision_at`, settlement = next session; no look-ahead).
+
+- [x] Unit tests pass (`tests/test_pipeline.py`, `tests/test_scoring.py`)
+- [x] `ruff check` and `mypy --strict` pass for the verification service
+- [x] `verification` schema (evaluations, price_observations, scores, outbox_events) created by `apply_schema` on startup
+- [x] Dependencies declared in `pyproject.toml` (asyncpg/apscheduler/uvicorn; fastapi/aio-pika via shared)
+- [x] Service starts cleanly in Docker Compose (`feed-verification`, live-verified)
+- [x] A consumed `PredictionMade` creates a `PENDING` evaluation row — live-verified (8 evaluations)
+- [x] Each new prediction publishes exactly one dual-session `PriceRequested` via the outbox — live-verified
+- [x] Duplicate `PredictionMade` is idempotent (unique prediction_id/request_id; no second request)
+- [x] No synchronous blocking calls inside async functions
