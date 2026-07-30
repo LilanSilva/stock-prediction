@@ -20,7 +20,7 @@ from fastapi.responses import JSONResponse
 from shared.logging import setup_logging
 from shared.messaging.client import RabbitMQClient
 
-from ingestion.adapters.gdelt import GdeltAdapter
+from ingestion.adapters.freenewsapi import FreeNewsApiAdapter
 from ingestion.adapters.rss import SWEDISH_SOURCES, RssAdapter
 from ingestion.config import IngestionSettings
 from ingestion.db import apply_schema, create_pool
@@ -94,17 +94,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     http = httpx.AsyncClient(timeout=settings.feed_fetch_timeout_seconds)
     # Each source is wrapped in its own circuit breaker so a flaky source fails fast in isolation.
     raw_adapters: list[SourceAdapter] = [RssAdapter(source, http) for source in SWEDISH_SOURCES]
-    if settings.gdelt_enabled:
+    # FreeNewsApi is only added when a key is configured; without one the four RSS feeds still run.
+    if settings.freenewsapi_key:
         raw_adapters.append(
-            GdeltAdapter(
+            FreeNewsApiAdapter(
                 http,
-                base_url=settings.gdelt_base_url,
-                query=settings.gdelt_query,
-                max_records=settings.gdelt_max_records,
-                timespan=settings.gdelt_timespan,
-                retry_wait_seconds=settings.gdelt_retry_wait_seconds,
+                api_key=settings.freenewsapi_key,
+                base_url=settings.freenewsapi_base_url,
+                keywords=settings.freenewsapi_keywords,
+                language=settings.freenewsapi_language,
+                page_size=settings.freenewsapi_page_size,
             )
         )
+    else:
+        logger.warning("freenewsapi_disabled_no_key")
     adapters = wrap_with_breakers(
         raw_adapters,
         failure_threshold=settings.circuit_failure_threshold,

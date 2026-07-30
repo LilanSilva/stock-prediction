@@ -32,15 +32,16 @@ class IngestionSettings(BaseSettings):
     outbox_retention_days: int = Field(default=7, ge=1)
     retention_interval_seconds: int = Field(default=86400, gt=0)
 
-    # GDELT (global English news). Optional per POC-6; failures trip its own circuit breaker.
-    gdelt_enabled: bool = True
-    gdelt_base_url: str = "https://api.gdeltproject.org/api/v2/doc/doc"
-    gdelt_query: str = (
-        '(oil OR gold OR OPEC OR "crude oil" OR sanctions OR inflation OR "central bank") '
-        "sourcelang:english"
+    # FreeNewsApi.io (keyed global news search; POC-8). Replaced GDELT, which returned 0 records
+    # under an undocumented HTTP 429 IP rate-limit. Failures trip this source's own circuit breaker.
+    # The API key is a secret injected via FREENEWSAPI_KEY (never committed); an empty key disables
+    # the source so the four RSS feeds still run.
+    freenewsapi_key: str = Field(default="", validation_alias="FREENEWSAPI_KEY")
+    freenewsapi_base_url: str = "https://api.freenewsapi.io/v1"
+    freenewsapi_keywords: tuple[str, ...] = ("oil", "gold", "OPEC", "sanctions", "inflation")
+    freenewsapi_language: str = "en"
+    freenewsapi_page_size: int = Field(
+        default=5, gt=0, le=100, validation_alias="FREENEWSAPI_PAGE_SIZE"
     )
-    gdelt_max_records: int = Field(default=250, gt=0)
-    gdelt_timespan: str = "24h"
-    gdelt_retry_wait_seconds: float = Field(default=30.0, ge=0)
 
     log_level: str = "INFO"

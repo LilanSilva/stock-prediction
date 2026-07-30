@@ -138,8 +138,10 @@ services:
       RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-feed_user}:${RABBITMQ_DEFAULT_PASS:?set in .env}@feed-rabbitmq:5672/
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       POLL_INTERVAL_SECONDS: ${INGESTION_POLL_INTERVAL_SECONDS:-3600}
-      # Keep local GDELT volume small so the startup poll stays quick (bodies are fetched serially).
-      GDELT_MAX_RECORDS: ${GDELT_MAX_RECORDS:-25}
+      # FreeNewsApi.io key (POC-8, replaces GDELT). Empty disables the source; RSS feeds still run.
+      FREENEWSAPI_KEY: ${FREENEWSAPI_KEY:-}
+      # Articles fetched per keyword search per poll (kept small so bodies fetch quickly).
+      FREENEWSAPI_PAGE_SIZE: ${FREENEWSAPI_PAGE_SIZE:-5}
     ports:
       - "8001:8000"
     healthcheck:

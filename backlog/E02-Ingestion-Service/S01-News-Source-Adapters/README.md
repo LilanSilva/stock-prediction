@@ -1,5 +1,13 @@
 # S01: News Source Adapters
 
+> **POC-8 migration (2026-07-30):** the GDELT adapter (T01) is retired and replaced by a
+> `FreeNewsApiAdapter` (FreeNewsApi.io) — GDELT returned 0 records under `HTTP 429` IP rate-limiting.
+> The new keyed source authenticates via `x-api-key`, searches finance keywords newest-first
+> (`in_title` + `order_by=recent`), and pulls **full article bodies** via `/details`. The **four
+> Swedish RSS adapters (T02) and the body fetcher (T03) are unchanged.** T01 below is superseded —
+> kept for history. See the [epic README](../README.md) banner and
+> [POC-8](../../POC/poc-8-freenewsapi-source.md).
+
 ## Overview
 
 This story builds the three adapter-layer components that retrieve raw article data from external sources:

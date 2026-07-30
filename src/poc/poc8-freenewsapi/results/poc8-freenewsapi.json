@@ -1,0 +1,108 @@
+{
+  "poc": "poc-8-freenewsapi-source",
+  "base_url": "https://api.freenewsapi.io/v1",
+  "keywords": [
+    "oil",
+    "gold",
+    "OPEC",
+    "sanctions",
+    "inflation"
+  ],
+  "overall_pass": true,
+  "gates": [
+    {
+      "gate": "G1_authenticated_fetch",
+      "passed": true,
+      "detail": {
+        "http_status": 200,
+        "rate_headers": {
+          "X-RateLimit-Limit-Day": "5000",
+          "X-RateLimit-Remaining-Day": "4992",
+          "X-RateLimit-Reset-Day": "2026-07-31T22:36:04.000Z"
+        }
+      }
+    },
+    {
+      "gate": "G2_keyword_search",
+      "passed": true,
+      "detail": {
+        "oil": {
+          "http_status": 200,
+          "returned": 10
+        },
+        "gold": {
+          "http_status": 200,
+          "returned": 10
+        },
+        "OPEC": {
+          "http_status": 200,
+          "returned": 10
+        },
+        "sanctions": {
+          "http_status": 200,
+          "returned": 10
+        },
+        "inflation": {
+          "http_status": 200,
+          "returned": 10
+        }
+      }
+    },
+    {
+      "gate": "G3_contract_mapping",
+      "passed": true,
+      "detail": {
+        "list_item_fields": [
+          "published_at",
+          "publisher",
+          "title",
+          "uuid"
+        ],
+        "detail_fields": [
+          "authors",
+          "body",
+          "countries",
+          "incipit",
+          "languages",
+          "original_url",
+          "published_at",
+          "publisher",
+          "thumbnail",
+          "title",
+          "topics",
+          "uuid"
+        ],
+        "required_present": true,
+        "body_length": 726
+      }
+    },
+    {
+      "gate": "G4_paced_rate_limit",
+      "passed": true,
+      "detail": {
+        "paced_statuses": [
+          200,
+          200,
+          200,
+          200,
+          200
+        ],
+        "daily_limit": "5000",
+        "daily_remaining": "4980"
+      }
+    },
+    {
+      "gate": "G5_burst_rate_limit",
+      "passed": true,
+      "detail": {
+        "burst": 10,
+        "status_counts": {
+          "200": 10
+        },
+        "throttled_429": 0,
+        "retry_after": null
+      }
+    }
+  ],
+  "generated_at": "2026-07-30T22:42:55.666620+00:00"
+}

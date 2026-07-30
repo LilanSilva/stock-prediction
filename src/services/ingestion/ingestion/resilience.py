@@ -3,7 +3,7 @@
 Each source gets its own `CircuitBreaker` instance so a flaky source cannot trip the breaker of a
 healthy one. `ResilientAdapter` wraps any `SourceAdapter.fetch()` with the breaker: after repeated
 failures the circuit opens and calls fail fast for a cooldown, then a single half-open probe decides
-whether to close again. This is the mechanism the (optional) GDELT source will rely on for its
+whether to close again. This is the mechanism the (optional) FreeNewsApi source relies on for its
 429/transport behavior; it applies uniformly to every source.
 """
 

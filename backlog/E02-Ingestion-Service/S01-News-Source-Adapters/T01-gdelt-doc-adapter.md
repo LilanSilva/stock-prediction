@@ -1,5 +1,12 @@
 # T01: GDELT DOC 2.0 Adapter
 
+> **POC-8 retirement (2026-07-30) — this adapter is superseded and removed.** GDELT returned 0
+> records in practice: its API rate-limits this host's IP with `HTTP 429` (retry-then-skip). It was
+> replaced by `FreeNewsApiAdapter` (FreeNewsApi.io) — see [POC-8](../../POC/poc-8-freenewsapi-source.md).
+> The replacement is keyed (`x-api-key`, `FREENEWSAPI_KEY`), searches `in_title` newest-first, pulls
+> full bodies via `/details`, and paces under 2 req/sec against a 5,000/day budget. The `gdelt.py`
+> adapter and its tests are deleted; everything below is retained for history and is non-authoritative.
+
 > **POC-6 replacement requirements (2026-07-13):** GDELT is optional, not the primary availability dependency. Honor `Retry-After`; use bounded exponential backoff with jitter; cache successful query pages; maintain a per-host rate limiter; open a circuit after repeated HTTP 429, invalid-JSON, or transport failures; and let RSS processing complete independently. Remove the fixed `asyncio.sleep(5)` rule and any acceptance criterion requiring GDELT success in every polling cycle.
 
 ## Context

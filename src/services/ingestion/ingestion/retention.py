@@ -1,7 +1,8 @@
 """Time-based retention cleanup for the ingestion schema.
 
-`ingestion.articles` is the de-duplication anchor, but RSS/GDELT only ever surface *recent* items,
-so an article older than any feed's lookback window can never be re-ingested and is safe to delete.
+`ingestion.articles` is the de-duplication anchor, but the RSS/news sources only ever surface
+*recent* items, so an article older than any feed's lookback window can never be re-ingested and is
+safe to delete.
 Delivered outbox rows are safe to prune once they have been delivered. This keeps table growth
 bounded while preserving the de-duplication guarantee for the (short) feed window.
 """
