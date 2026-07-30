@@ -1,0 +1,146 @@
+{
+  "poc": "poc-7-biquote-price-source",
+  "base_url": "https://biquote.io/api",
+  "candidate_symbols": {
+    "GOLD": "XAUUSD",
+    "BRENT_OIL": "UKOIL"
+  },
+  "historical_window": {
+    "from": "2026-07-24T00:00:00Z",
+    "to": "2026-07-28T23:59:59Z"
+  },
+  "overall_pass": true,
+  "gates": [
+    {
+      "gate": "G1_symbols_have_data",
+      "passed": true,
+      "detail": {
+        "GOLD": {
+          "symbol": "XAUUSD",
+          "http_status": 200,
+          "bar_count": 4,
+          "has_positive_close": true,
+          "sample_close": 4103.166
+        },
+        "BRENT_OIL": {
+          "symbol": "UKOIL",
+          "http_status": 200,
+          "bar_count": 4,
+          "has_positive_close": true,
+          "sample_close": 86.8895
+        }
+      }
+    },
+    {
+      "gate": "G2_date_range",
+      "passed": true,
+      "detail": {
+        "GOLD": {
+          "symbol": "XAUUSD",
+          "http_status": 200,
+          "bar_count": 4,
+          "openTimes": [
+            "2026-07-28T00:00:00Z",
+            "2026-07-27T00:00:00Z",
+            "2026-07-26T00:00:00Z",
+            "2026-07-24T00:00:00Z"
+          ],
+          "all_within_window": true
+        },
+        "BRENT_OIL": {
+          "symbol": "UKOIL",
+          "http_status": 200,
+          "bar_count": 2,
+          "openTimes": [
+            "2026-07-28T00:00:00Z",
+            "2026-07-24T00:00:00Z"
+          ],
+          "all_within_window": true
+        }
+      }
+    },
+    {
+      "gate": "G3_final_close_flag",
+      "passed": true,
+      "detail": {
+        "GOLD": {
+          "symbol": "XAUUSD",
+          "http_status": 200,
+          "isOpen_present_on_all_bars": true,
+          "newest_bar_isOpen": true,
+          "closed_bar_count": 3
+        },
+        "BRENT_OIL": {
+          "symbol": "UKOIL",
+          "http_status": 200,
+          "isOpen_present_on_all_bars": true,
+          "newest_bar_isOpen": true,
+          "closed_bar_count": 3
+        }
+      }
+    },
+    {
+      "gate": "G4_timestamp_convention",
+      "passed": true,
+      "detail": {
+        "GOLD": {
+          "symbol": "XAUUSD",
+          "http_status": 200,
+          "convention": {
+            "example": "2026-07-30T00:00:00Z",
+            "hour": 0,
+            "minute": 0,
+            "tz": "UTC",
+            "is_utc_midnight": true
+          }
+        },
+        "BRENT_OIL": {
+          "symbol": "UKOIL",
+          "http_status": 200,
+          "convention": {
+            "example": "2026-07-30T00:00:00Z",
+            "hour": 0,
+            "minute": 0,
+            "tz": "UTC",
+            "is_utc_midnight": true
+          }
+        }
+      }
+    },
+    {
+      "gate": "G5_response_shape",
+      "passed": true,
+      "detail": {
+        "http_status": 200,
+        "top_level_keys": [
+          "bars",
+          "interval",
+          "symbol"
+        ],
+        "bar_keys": [
+          "close",
+          "high",
+          "isOpen",
+          "low",
+          "open",
+          "openTime",
+          "tickVolume",
+          "volume"
+        ],
+        "has_yahoo_style_meta": false
+      }
+    },
+    {
+      "gate": "G6_rate_limit",
+      "passed": true,
+      "detail": {
+        "burst": 60,
+        "status_counts": {
+          "200": 60
+        },
+        "throttled_429": 0
+      }
+    }
+  ],
+  "generated_at": "2026-07-30T20:57:54.761797+00:00"
+}

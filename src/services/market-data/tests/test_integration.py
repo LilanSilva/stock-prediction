@@ -43,11 +43,11 @@ def _observation(session: date, close: str) -> CloseObservation:
         close=Decimal(close),
         provider_bar_time=datetime.combine(session, datetime.min.time(), tzinfo=UTC),
         fetched_at=datetime.now(UTC),
-        source="Yahoo Finance chart",
-        provider_symbol="GC=F",
+        source="biquote.io",
+        provider_symbol="XAUUSD",
         price_kind=PriceKind.PROVIDER_DAILY_CLOSE,
         is_adjusted=False,
-        registry_version="poc6-yahoo-reference-v1",
+        registry_version="biquote-reference-v1",
     )
 
 
@@ -73,7 +73,7 @@ async def _cleanup(pool: asyncpg.Pool, request_id: uuid.UUID) -> None:
     await pool.execute(
         "DELETE FROM market_data.close_observations "
         "WHERE registry_version = $1 AND session = ANY($2::date[])",
-        "poc6-yahoo-reference-v1",
+        "biquote-reference-v1",
         [date(2026, 7, 10), date(2026, 7, 13)],
     )
 
@@ -145,7 +145,7 @@ async def test_both_closes_are_persisted_immutably() -> None:
             WHERE registry_version = $1 AND session = ANY($2::date[])
             ORDER BY session
             """,
-            "poc6-yahoo-reference-v1",
+            "biquote-reference-v1",
             [date(2026, 7, 10), date(2026, 7, 13)],
         )
         assert len(rows) == 2

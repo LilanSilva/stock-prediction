@@ -1,5 +1,7 @@
 # T02: Price Storage & Historical Backfill
 
+> **POC-7 provider note (2026-07-30):** the `source` values (`'yfinance'`/`'stooq'`) and yfinance bulk-download references below are superseded — observations are now stored with `source='biquote.io'`, `provider_symbol` `XAUUSD`/`UKOIL`, and `registry_version='biquote-reference-v1'`. The storage/outbox design in this task's As-built section is unchanged by the provider swap. See [POC-7](../../POC/poc-7-biquote-price-source.md).
+
 ## Context
 
 The Market Data Service must persist every fetched OHLC price to Postgres so that the Verification Service can look up historical closes, and so that the system has price data available immediately on first startup. This task implements the **`prices` Postgres table schema**, the **upsert (insert-or-update) logic** via SQLAlchemy, the **90-day historical backfill** that runs at service startup, and the **1-hour in-memory price cache** that prevents redundant API calls for prices already fetched in the current hour. This module is `src/services/market-data/price_store.py`.

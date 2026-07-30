@@ -1,4 +1,4 @@
-"""Shared market-session calendar (frozen `poc6-yahoo-reference-v1` policy).
+"""Shared market-session calendar (reference-price policy `biquote-reference-v1`).
 
 Used by Verification (baseline/settlement resolution) and Market Data (session completion).
 """

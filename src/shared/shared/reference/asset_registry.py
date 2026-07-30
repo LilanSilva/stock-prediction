@@ -1,15 +1,17 @@
 """Executable asset reference registry (source of truth for provider mappings).
 
-Mirrors the P06/T03 frozen policy `poc6-yahoo-reference-v1`
-(src/poc/poc6/results/reference-price-policy.json) as typed, versioned constants so every service
-resolves a canonical `AssetId` to its approved provider reference series identically.
+Reflects the POC-7 provider migration to biquote.io (`biquote-reference-v1`;
+src/poc/poc7-biquote-market-data/) as typed, versioned constants so every service resolves a
+canonical `AssetId` to its approved provider reference series identically. This replaces the earlier
+`poc6-yahoo-reference-v1` (Yahoo Finance chart `GC=F`/`BZ=F`), which was retired because the Yahoo
+endpoint rate-limits this host's IP (HTTP 429). See backlog/POC/poc-7-biquote-price-source.md.
 
-Business logic uses canonical `AssetId`. Provider symbols such as `GC=F`/`BZ=F` live only here and
-inside market-data adapters; they never cross a service boundary as a business identity.
+Business logic uses canonical `AssetId`. Provider symbols such as `XAUUSD`/`UKOIL` live only here
+and inside market-data adapters; they never cross a service boundary as a business identity.
 
-Frozen-policy invariants preserved from P06/T03:
-  - Yahoo daily bars are PROVIDER_DAILY_CLOSE, never labelled official exchange settlements.
-  - Continuous futures use PROVIDER_MANAGED_CONTINUOUS_INCLUDE_ALL_V1 (include every positive raw
+Policy invariants (carried over from P06/T03, provider swapped):
+  - biquote daily bars are PROVIDER_DAILY_CLOSE, never labelled official exchange settlements.
+  - Continuous series use PROVIDER_MANAGED_CONTINUOUS_INCLUDE_ALL_V1 (include every positive raw
     close; no adjustment or outcome-based exclusion).
   - No validated fallback exists for the POC: `fallback` is None for both assets.
 """
@@ -24,13 +26,16 @@ from pydantic import BaseModel, ConfigDict, Field
 from shared.reference.exceptions import UnknownAssetError
 from shared.schemas.messages import AssetId, PriceKind
 
-REGISTRY_VERSION = "poc6-yahoo-reference-v1"
+REGISTRY_VERSION = "biquote-reference-v1"
 
 # The continuous-futures rollover policy pre-declared by P06/T03. Declared before any outcome is
 # evaluated, so an observation may be validated against it without look-ahead.
 ROLLOVER_INCLUDE_ALL = "PROVIDER_MANAGED_CONTINUOUS_INCLUDE_ALL_V1"
 
-# Session-completion wall-clock in the provider timezone (17:00 America/New_York per the policy).
+# Session-completion wall-clock for the market calendar (17:00 America/New_York). This governs the
+# baseline/settlement session math in shared.calendar and is independent of the price provider: it
+# stays America/New_York even though biquote stamps its daily bars at UTC midnight (the adapter maps
+# a biquote bar's calendar date directly to the session date).
 SESSION_COMPLETION_HOUR = 17
 SESSION_COMPLETION_MINUTE = 0
 
@@ -62,10 +67,10 @@ _REGISTRY: Mapping[AssetId, AssetReferenceSeries] = MappingProxyType(
     {
         AssetId.GOLD: AssetReferenceSeries(
             asset_id=AssetId.GOLD,
-            provider="Yahoo Finance chart",
-            provider_symbol="GC=F",
-            economic_identity="COMEX Gold futures continuous reference",
-            expected_exchange="CMX",
+            provider="biquote.io",
+            provider_symbol="XAUUSD",
+            economic_identity="Spot Gold vs US Dollar (XAU/USD) reference",
+            expected_exchange="COMEX",
             timezone="America/New_York",
             currency="USD",
             price_kind=PriceKind.PROVIDER_DAILY_CLOSE,
@@ -76,12 +81,10 @@ _REGISTRY: Mapping[AssetId, AssetReferenceSeries] = MappingProxyType(
         ),
         AssetId.BRENT_OIL: AssetReferenceSeries(
             asset_id=AssetId.BRENT_OIL,
-            provider="Yahoo Finance chart",
-            provider_symbol="BZ=F",
-            economic_identity=(
-                "NYMEX Brent Crude Oil Last Day Financial futures continuous reference"
-            ),
-            expected_exchange="NYM",
+            provider="biquote.io",
+            provider_symbol="UKOIL",
+            economic_identity="Crude Oil Brent (UKOIL) continuous reference",
+            expected_exchange="NYMEX",
             timezone="America/New_York",
             currency="USD",
             price_kind=PriceKind.PROVIDER_DAILY_CLOSE,

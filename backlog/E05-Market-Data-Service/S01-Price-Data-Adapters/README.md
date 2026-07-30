@@ -1,5 +1,7 @@
 # S01 - Price Data Adapters
 
+> **POC-7 provider migration (2026-07-30): superseded.** Both adapters described below (yfinance/Yahoo primary + Stooq fallback) are retired. Yahoo rate-limited this host's IP (`HTTP 429`), so the sole implemented adapter is now `BiquoteAdapter` (`src/services/market-data/market_data/adapters/biquote.py`) against **biquote.io** under policy `biquote-reference-v1` (`GOLD`→`XAUUSD`, `BRENT_OIL`→`UKOIL`). There is no fallback adapter (`fallback=null`). biquote's JSON has no `meta` block (no metadata validation), stamps daily bars at UTC midnight (session = bar date), and flags the unsettled day with `isOpen=true` (excluded). See the epic README banner and [backlog/POC/poc-7-biquote-price-source.md](../../POC/poc-7-biquote-price-source.md). The T01/T02 task docs below are retained for history and are non-authoritative where they conflict.
+
 ## Overview
 
 This story builds the two price-data adapters that provide OHLC data to the Market Data Service. Both adapters expose the same interface — `get_ohlc(symbol: str, date: date) -> OHLCResult` — so the rest of the service can swap between them transparently.

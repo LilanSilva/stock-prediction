@@ -246,7 +246,7 @@ services:
       RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-feed_user}:${RABBITMQ_DEFAULT_PASS:?set in .env}@feed-rabbitmq:5672/
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       # How often to re-drive pending requests whose settlement session has not yet completed.
-      SETTLEMENT_POLL_INTERVAL_SECONDS: ${MARKET_DATA_SETTLEMENT_POLL_INTERVAL_SECONDS:-900}
+      SETTLEMENT_POLL_INTERVAL_SECONDS: ${MARKET_DATA_SETTLEMENT_POLL_INTERVAL_SECONDS:-3600}
     ports:
       - "8004:8000"
     healthcheck:

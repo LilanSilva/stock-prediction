@@ -25,7 +25,7 @@ from verification.exceptions import PriceValidationError
 from verification.models import EvaluationRecord
 from verification.pipeline import VerificationPipeline
 
-_REGISTRY = "poc6-yahoo-reference-v1"
+_REGISTRY = "biquote-reference-v1"
 _DECISION_AT = datetime(2026, 7, 27, 22, 46, tzinfo=UTC)  # Monday after the 17:00 NY close
 
 
@@ -84,8 +84,8 @@ def _close(session: date, close: str) -> CloseObservation:
         session=session,
         close=Decimal(close),
         fetched_at=datetime.now(UTC),
-        source="Yahoo Finance chart",
-        provider_symbol="GC=F",
+        source="biquote.io",
+        provider_symbol="XAUUSD",
         price_kind=PriceKind.PROVIDER_DAILY_CLOSE,
         is_adjusted=False,
         registry_version=_REGISTRY,

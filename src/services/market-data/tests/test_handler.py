@@ -27,11 +27,11 @@ def _observation(session: date, close: str) -> CloseObservation:
         close=Decimal(close),
         provider_bar_time=datetime.combine(session, datetime.min.time(), tzinfo=UTC),
         fetched_at=datetime.now(UTC),
-        source="Yahoo Finance chart",
-        provider_symbol="GC=F",
+        source="biquote.io",
+        provider_symbol="XAUUSD",
         price_kind=PriceKind.PROVIDER_DAILY_CLOSE,
         is_adjusted=False,
-        registry_version="poc6-yahoo-reference-v1",
+        registry_version="biquote-reference-v1",
     )
 
 

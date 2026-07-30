@@ -7,7 +7,7 @@ never touch the graph (Ingestion, Cleansing) carry no Neo4j dependency.
 The canonical schema (seeded in infra/neo4j/init) is:
     (:CausalFactor {id})-[:CAUSES {direction, weight, confidence, alpha, beta}]->(:Asset {id})
 where CausalFactor.id is a canonical EventType and Asset.id is a canonical AssetId. Provider symbols
-(GC=F, BZ=F) never appear on graph nodes; they live only inside Market Data adapters.
+(e.g. XAUUSD, UKOIL) never appear on graph nodes; they live only inside Market Data adapters.
 """
 
 from __future__ import annotations

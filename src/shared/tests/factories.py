@@ -129,11 +129,11 @@ def _close(session: date, close: str) -> CloseObservation:
         close=Decimal(close),
         provider_bar_time=_NOW,
         fetched_at=_NOW,
-        source="yahoo",
-        provider_symbol="GC=F",
+        source="biquote.io",
+        provider_symbol="XAUUSD",
         price_kind=PriceKind.PROVIDER_DAILY_CLOSE,
         is_adjusted=False,
-        registry_version="v1",
+        registry_version="biquote-reference-v1",
     )
 
 

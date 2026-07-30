@@ -1,4 +1,4 @@
-"""Shared market-session calendar for the frozen `poc6-yahoo-reference-v1` policy.
+"""Shared market-session calendar for the reference-price policy (`biquote-reference-v1`).
 
 The session semantics MUST be identical across Verification (which resolves baseline/settlement
 session dates without look-ahead) and Market Data (which decides when a session is complete before

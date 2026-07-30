@@ -1,5 +1,7 @@
 # T01: yfinance Adapter
 
+> **POC-7 retirement (2026-07-30) — this adapter is superseded and NOT built.** The Yahoo/yfinance path was retired because the live Yahoo chart endpoint rate-limits this host's IP (`HTTP 429`). Per [POC-7](../../POC/poc-7-biquote-price-source.md) the implemented adapter is `BiquoteAdapter` (`src/services/market-data/market_data/adapters/biquote.py`) against **biquote.io** (`GOLD`→`XAUUSD`, `BRENT_OIL`→`UKOIL`) under policy `biquote-reference-v1`. The frozen invariants below still hold (raw provider daily closes, `PROVIDER_DAILY_CLOSE`, include-all rollover, never an official settlement) but the provider, library (`httpx`, not `yfinance`), and symbols changed. All `yfinance`/`GC=F`/`BZ=F`/`auto_adjust` details below are **superseded** — retained for history, non-authoritative.
+
 > **POC-6 replacement requirements (2026-07-13):** `GC=F` and `BZ=F` returned daily data, but this adapter is not approved until P06/T03 freezes the series policy. Fetch raw provider daily closes (`auto_adjust=False`), preserve provider exchange/timezone, bar timestamp, fetch time, instrument, currency, and registry version, and apply the pre-declared rollover policy. `BZ=F` metadata currently conflicts with the intended ICE-Europe calendar. Never label Yahoo data an official settlement. Conflicting automatic-approval and `auto_adjust=True` details below are non-authoritative.
 
 ## Context

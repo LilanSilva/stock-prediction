@@ -1,5 +1,7 @@
 # S02 - Price Request Handler & Storage
 
+> **POC-7 provider note (2026-07-30):** all `yfinance → Stooq fallback` wording below is superseded. The implemented fetch path is the single `BiquoteAdapter` (biquote.io; `GOLD`→`XAUUSD`, `BRENT_OIL`→`UKOIL`) under policy `biquote-reference-v1`, with no fallback. The handler/storage/outbox design in the As-built checklists is unchanged by the provider swap — only the adapter behind it changed. See the [epic README](../README.md) banner and [POC-7](../../POC/poc-7-biquote-price-source.md).
+
 ## Overview
 
 This story wires the Market Data Service into the RabbitMQ pipeline and provides persistence. It builds on the adapters from S01 to:

@@ -20,7 +20,7 @@ import structlog
 from shared.reference import resolve
 from shared.schemas.messages import CloseObservation
 
-from market_data.adapters.yahoo_chart import YahooChartAdapter
+from market_data.adapters.biquote import BiquoteAdapter
 from market_data.exceptions import PriceNotYetAvailableError
 from market_data.sessions import is_session_complete
 from market_data.storage import (
@@ -48,7 +48,7 @@ class PriceRequestProcessor:
     def __init__(
         self,
         repository: PriceRequestRepository,
-        adapter: YahooChartAdapter,
+        adapter: BiquoteAdapter,
         *,
         retry_backoff_base_seconds: float = 2.0,
         retry_backoff_max_seconds: float = 8.0,

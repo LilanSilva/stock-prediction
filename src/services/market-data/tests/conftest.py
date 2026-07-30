@@ -2,38 +2,20 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 import httpx
 import pytest
 
-
-def _ts(year: int, month: int, day: int) -> int:
-    """Unix seconds for a Yahoo daily bar stamped 21:00 UTC (17:00 America/New_York, EDT)."""
-    return int(datetime(year, month, day, 21, 0, tzinfo=UTC).timestamp())
-
-
-# Minimal valid Yahoo chart JSON for GOLD (GC=F / CMX / USD / America/New_York) with three sessions.
-GOLD_CHART: dict[str, object] = {
-    "chart": {
-        "error": None,
-        "result": [
-            {
-                "meta": {
-                    "currency": "USD",
-                    "exchangeName": "CMX",
-                    "exchangeTimezoneName": "America/New_York",
-                    "instrumentType": "FUTURE",
-                },
-                "timestamp": [_ts(2026, 7, 9), _ts(2026, 7, 10), _ts(2026, 7, 13)],
-                "indicators": {
-                    "quote": [
-                        {"close": [3300.5, 3315.0, 3290.25]},
-                    ]
-                },
-            }
-        ],
-    }
+# Minimal valid biquote OHLC JSON for GOLD (XAUUSD) with three settled daily sessions. biquote
+# stamps each daily bar at UTC midnight and flags the still-forming day with isOpen=true; these
+# fixtures are all settled bars (isOpen=false), so the session date is the openTime calendar date.
+GOLD_OHLC: dict[str, object] = {
+    "symbol": "XAUUSD",
+    "interval": "1d",
+    "bars": [
+        {"openTime": "2026-07-09T00:00:00Z", "close": 3300.5, "isOpen": False},
+        {"openTime": "2026-07-10T00:00:00Z", "close": 3315.0, "isOpen": False},
+        {"openTime": "2026-07-13T00:00:00Z", "close": 3290.25, "isOpen": False},
+    ],
 }
 
 
@@ -44,5 +26,5 @@ def make_client(handler: object) -> httpx.AsyncClient:
 
 
 @pytest.fixture
-def gold_chart() -> dict[str, object]:
-    return GOLD_CHART
+def gold_ohlc() -> dict[str, object]:
+    return GOLD_OHLC

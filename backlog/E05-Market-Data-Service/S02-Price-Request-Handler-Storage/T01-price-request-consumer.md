@@ -1,5 +1,7 @@
 # T01: Price Request Consumer
 
+> **POC-7 provider note (2026-07-30):** the `yfinance primary / Stooq fallback` fetch snippets below are superseded — the implemented path is a single `BiquoteAdapter` (biquote.io, no fallback) under policy `biquote-reference-v1`. Also note the contract-frozen consumer semantics captured in this task's As-built section (persist-before-ack, dual-session `PriceObserved` via outbox) are unchanged by the provider swap. See [POC-7](../../POC/poc-7-biquote-price-source.md).
+
 ## Context
 
 The Market Data Service must respond to `PriceRequested` messages published by the Verification Service. Each message says: "I need the closing price for asset X when window Y closes." This task implements the **RabbitMQ consumer** that receives those messages, uses **APScheduler** to trigger the fetch at the right moment, calls the adapter layer (S01), and publishes the result as a `PriceObserved` message to the `prices` queue. It is the central orchestration module of the Market Data Service, at `src/services/market-data/consumer.py`.

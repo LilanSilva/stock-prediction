@@ -32,7 +32,7 @@ from shared.messaging.exceptions import MessagePoisonError
 from shared.reference import supported_assets
 from shared.schemas.messages import PriceRequested
 
-from market_data.adapters.yahoo_chart import YahooChartAdapter
+from market_data.adapters.biquote import BiquoteAdapter
 from market_data.config import MarketDataSettings
 from market_data.db import apply_schema, create_pool
 from market_data.exceptions import InvalidObservationError
@@ -133,9 +133,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await rabbit.connect()
 
     http = httpx.AsyncClient(timeout=settings.provider_timeout_seconds)
-    adapter = YahooChartAdapter(
+    adapter = BiquoteAdapter(
         http,
-        base_url=settings.yahoo_chart_base_url,
+        base_url=settings.biquote_base_url,
         fetch_window_days=settings.fetch_window_days,
     )
     repository = PriceRequestRepository(pool)

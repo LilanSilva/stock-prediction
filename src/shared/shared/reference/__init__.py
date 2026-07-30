@@ -1,7 +1,7 @@
 """Shared reference data: the executable asset registry.
 
 The registry is the single source of truth mapping canonical `AssetId` values to their approved,
-versioned provider reference series (frozen policy `poc6-yahoo-reference-v1`).
+versioned provider reference series (policy `biquote-reference-v1`, POC-7).
 """
 
 from __future__ import annotations
