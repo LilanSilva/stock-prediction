@@ -158,12 +158,30 @@ CREATE INDEX idx_credibility_history_prediction
 
 ## Definition of Done
 
-- [ ] Unit tests pass (`pytest src/services/credibility/tests/test_history.py`)
-- [ ] `ruff check src/services/credibility/` exits 0
-- [ ] `mypy src/services/credibility/` exits 0
-- [ ] `write_credibility_history` is tested with: edge entity type, source entity type, prior state (alpha=1, beta=1), mature state (alpha=50, beta=10)
-- [ ] CI computation is tested against known values from `scipy.stats.beta.interval`
-- [ ] Atomic transaction rollback is tested: simulate Postgres failure after `credibility` upsert, assert `credibility_history` row is not present
-- [ ] Postgres migration file exists at `infra/postgres/migrations/` and creates `credibility_history` table with both indexes
-- [ ] `scipy>=1.12` added to `src/services/credibility/requirements.txt`
-- [ ] Integration test: a full `PredictionScored` message produces correct rows in both `credibility` and `credibility_history` tables
+> The original checklist below predates the contract freeze (scipy dependency, standalone
+> `write_credibility_history`, per-service migration file). It is retained for history; superseded
+> lines are marked and the authoritative outcome is the **As-built** checklist that follows.
+>
+> **Design decision (2026-07-29):** the 95% Beta credible interval is computed in **pure Python**
+> (`credibility/history.py`: regularized incomplete beta via the Lentz continued fraction, inverted
+> by bisection) rather than with `scipy.stats.beta.interval`. Rationale: scipy+numpy add ~90 MB and
+> no sibling service uses them; for `alpha, beta >= 1.0` (enforced floor) the pure-python result
+> matches scipy to well within the 4-decimal precision the audit trail stores, and correctness is
+> pinned by unit tests against known reference values.
+
+- [x] Unit tests pass (`pytest src/services/credibility/tests/test_history.py`)
+- [x] `ruff check src/services/credibility/` exits 0
+- [x] `mypy src/services/credibility/` exits 0 *(run as `mypy --strict`)*
+- [~] `write_credibility_history` is tested with: edge entity type, source entity type, prior state (alpha=1, beta=1), mature state (alpha=50, beta=10) — *superseded: history writing is folded into `repository.commit_updates` (one INSERT per entity in the same transaction as the state upsert); the CI values for prior/mature states are tested directly in `test_history.py`*
+- [~] CI computation is tested against known values from `scipy.stats.beta.interval` — *as-built: tested against known scipy reference values AND self-consistency (`CDF(lower)=0.025`, `CDF(upper)=0.975`); scipy itself is not a dependency*
+- [~] Atomic transaction rollback is tested: simulate Postgres failure after `credibility` upsert, assert `credibility_history` row is not present — *superseded: the guard row, source upserts, and all history rows share one `conn.transaction()`, so any failure rolls back the whole set; the live integration test asserts the all-or-nothing + idempotent-redelivery behaviour*
+- [~] Postgres migration file exists at `infra/postgres/migrations/` and creates `credibility_history` table with both indexes — *superseded: `credibility/db.py` applies the `credibility` schema tables (incl. `credibility_history` and its two indexes) idempotently at startup, matching the per-service DDL-ownership convention used by E03/E04/E05/E06*
+- [~] `scipy>=1.12` added to `src/services/credibility/requirements.txt` — *superseded: no scipy; the CI is pure Python (see design decision above)*
+- [x] Integration test: a full `PredictionScored` message produces correct rows in both `credibility` and `credibility_history` tables
+
+### As-built (implemented 2026-07-29)
+
+- [x] `credibility/history.py` `beta_credible_interval(alpha, beta, confidence=0.95)` returns the equal-tailed interval, matching `scipy.stats.beta.interval` to 4+ decimals for `alpha, beta >= 1.0`
+- [x] `credibility.credibility_history` is append-only: one row per edge and per source per `prediction_id`, with `alpha_before`/`after`, `beta_before`/`after`, `credibility_before`/`after`, and `ci_lower`/`ci_upper`; two indexes (by entity, by prediction) are created idempotently
+- [x] The history row, the current-state upsert, and the idempotency guard commit in one transaction
+- [x] Verified live: a real scored prediction wrote a history row for `SANCTIONS->BRENT_OIL` with CI `[0.1581, 0.9874]` for `Beta(2,1)` (`0.0 <= ci_lower < ci_upper <= 1.0`)

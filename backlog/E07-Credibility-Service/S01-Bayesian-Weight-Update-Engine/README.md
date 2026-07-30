@@ -1,5 +1,7 @@
 # S01 - Bayesian Weight Update Engine
 
+> As-built (implemented 2026-07-29): built at `src/services/credibility/` — modules `config.py`, `db.py`, `updater.py` (T01/T02 credit math), `history.py` (T03 pure-python Beta CI), `repository.py` (Postgres state/history + idempotency guard), `pipeline.py` (orchestration), `app.py` (FastAPI lifespan + consumer). Consumes the **`credibility.scored`** queue (routing key `prediction.scored`); the message field for sources is **`source_ids`**. See the epic README for the full contract-vs-legacy delta.
+
 ## Overview
 
 This story builds the complete Credibility Service: a single consumer that reads `PredictionScored` events and applies a Beta-Bernoulli Bayesian update to two independent dimensions of credibility:
@@ -21,7 +23,7 @@ A full audit trail with 95% confidence intervals is stored in `credibility_histo
 
 Before this story can start the following must exist:
 
-- **E05 / Verification Service** — must publish valid `PredictionScored` messages to the `scored-predictions` RabbitMQ queue. The `contributing_edges` and `sources` arrays must be populated.
+- **E06 / Verification Service** — must publish valid `PredictionScored` messages to `feed.events` (routing key `prediction.scored`, delivered to the `credibility.scored` queue). *(As-built: E06 is built and does publish these; "E05" in the original line was a mislabel — the producer is the Verification Service, E06.)* The `contributing_edges` and `source_ids` arrays must be populated.
 - **Neo4j knowledge graph** — causal edges must exist with at least `edge_id`, `alpha`, and `beta` properties. The graph is seeded by the data engineering setup (see `infra/neo4j/`).
 - **Postgres schema** — `credibility` and `credibility_history` tables must be created (migrations in `infra/postgres/`).
 - **`src/shared/` library** — `PredictionScored` Pydantic schema, RabbitMQ client wrapper, and database session factories must exist.

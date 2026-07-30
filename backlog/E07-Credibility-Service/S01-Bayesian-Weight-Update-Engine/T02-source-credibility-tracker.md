@@ -153,11 +153,22 @@ For a source row, `entity_id = 'di.se'` and `entity_type = 'source'`.
 
 ## Definition of Done
 
-- [ ] Unit tests pass (`pytest src/services/credibility/tests/test_source_credibility.py`)
-- [ ] `ruff check src/services/credibility/` exits 0
-- [ ] `mypy src/services/credibility/` exits 0
-- [ ] `compute_source_credits` is tested with: two sources, one source, empty list
-- [ ] `update_source_credibility` is tested with: first-time source (new row), returning source (existing row), is_correct=True, is_correct=False
-- [ ] Integration with T01: a single `PredictionScored` message triggers both edge and source updates in the correct order
-- [ ] Postgres `credibility` table contains `entity_type='source'` rows after processing
-- [ ] Source domain lowercasing is tested with mixed-case input
+> The original checklist below predates the contract freeze (`sources` field name, `test_source_credibility.py`
+> split). It is retained for history; superseded lines are marked and the authoritative outcome is
+> the **As-built** checklist that follows.
+
+- [x] Unit tests pass — *as-built: source-credit tests live in `tests/test_updater.py` and `tests/test_pipeline.py`, not a separate `test_source_credibility.py`*
+- [x] `ruff check src/services/credibility/` exits 0
+- [x] `mypy src/services/credibility/` exits 0 *(run as `mypy --strict`)*
+- [x] `compute_source_credits` is tested with: two sources, one source, empty list
+- [~] `update_source_credibility` is tested with: first-time source (new row), returning source (existing row), is_correct=True, is_correct=False — *superseded: source state is applied in `pipeline._update_sources` + `repository.commit_updates`; the first-time-vs-returning and hit-vs-miss cases are covered by `test_pipeline.py` and the live `test_integration.py`*
+- [x] Integration with T01: a single `PredictionScored` message triggers both edge and source updates in the correct order (edges then sources, committed atomically)
+- [x] Postgres `credibility` table contains `entity_type='source'` rows after processing
+- [x] Source domain lowercasing is tested with mixed-case input
+
+### As-built (implemented 2026-07-29)
+
+- [x] `credibility/updater.py` `compute_source_credits` splits credit equally (`1/n`) and lowercases/strips domains defensively; empty list returns no credits
+- [x] `credibility/pipeline.py` reads each source's current `(alpha, beta)` from Postgres (new source starts at the prior floor), applies the Bernoulli delta, and an empty `source_ids` logs `scored_message_has_no_sources` and skips source updates without failing the message
+- [x] `credibility/repository.py` upserts `entity_type='source'` rows with `credibility_score = alpha / (alpha + beta)` inside the same transaction as the history rows and the idempotency guard — edge and source updates for one message commit atomically
+- [x] The source dimension is fully independent of the edge dimension (T01), exactly as specified
