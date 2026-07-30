@@ -54,6 +54,7 @@ if (-not (Test-Path $venvPython)) {
 & $venvPython -m pip install -e src\services\prediction --no-deps
 & $venvPython -m pip install -e src\services\market-data --no-deps
 & $venvPython -m pip install -e src\services\verification --no-deps
+& $venvPython -m pip install -e src\services\credibility --no-deps
 
 Write-Host ""
 Write-Host "Virtual environment ready."

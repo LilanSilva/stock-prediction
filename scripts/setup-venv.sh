@@ -46,6 +46,7 @@ fi
 "$venv_python" -m pip install -e src/services/prediction --no-deps
 "$venv_python" -m pip install -e src/services/market-data --no-deps
 "$venv_python" -m pip install -e src/services/verification --no-deps
+"$venv_python" -m pip install -e src/services/credibility --no-deps
 
 echo
 echo "Virtual environment ready."
