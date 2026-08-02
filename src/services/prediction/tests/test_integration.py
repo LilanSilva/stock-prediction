@@ -30,6 +30,9 @@ class _StubPriceReader:
     async def is_elevated(self, asset_id: AssetId) -> bool:
         return False
 
+    async def is_price_available(self, asset_id: AssetId) -> bool:
+        return True
+
 
 def _event(asset: AssetId, event_type: EventType) -> EventDetected:
     now = datetime.now(UTC)

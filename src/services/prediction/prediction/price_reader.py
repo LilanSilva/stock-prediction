@@ -46,6 +46,14 @@ class PriceReader:
             return False
         return latest > baseline_mean * (Decimal(1) + self._threshold)
 
+    async def is_price_available(self, asset_id: AssetId) -> bool:
+        """Return whether Market Data currently exposes at least one recent close for the asset.
+
+        Used to decide the market-open vs collapse path: no reachable price (weekend/holiday with no
+        stored close, or a transport failure) selects the closed path.
+        """
+        return len(await self._recent_closes(asset_id)) >= 1
+
     async def _recent_closes(self, asset_id: AssetId) -> list[Decimal]:
         params = {"asset_id": asset_id.value, "sessions": self._lookback + 1}
         try:

@@ -19,7 +19,7 @@ from shared.schemas.messages import (
 
 from verification.config import VerificationSettings
 from verification.exceptions import InvalidPredictionError, PriceValidationError
-from verification.models import EvaluationRecord
+from verification.models import EvaluationRecord, EvaluationStatus
 from verification.scoring import score
 
 logger = structlog.get_logger(__name__)
@@ -42,6 +42,8 @@ class PipelineRepository(Protocol):
     ) -> EvaluationRecord | None: ...
 
     async def store_score_with_outbox(self, scored: PredictionScored) -> bool: ...
+
+    async def withdraw_evaluation(self, prediction_id: uuid.UUID) -> bool: ...
 
 
 def _deterministic_request_id(prediction_id: uuid.UUID, registry_version: str) -> uuid.UUID:
@@ -105,6 +107,17 @@ class VerificationPipeline:
             settlement_session=settlement_session.isoformat(),
         )
 
+        # A weekend/closed-market collapse supersedes the prior stance: withdraw its evaluation so
+        # the replaced prediction is never scored (it never had its own price outcome).
+        if message.supersedes_prediction_id is not None:
+            withdrawn = await self._repo.withdraw_evaluation(message.supersedes_prediction_id)
+            if withdrawn:
+                logger.info(
+                    "evaluation_withdrawn",
+                    prediction_id=str(message.supersedes_prediction_id),
+                    superseded_by=str(message.prediction_id),
+                )
+
     def _validate_observation(
         self, message: PriceObserved, evaluation: EvaluationRecord
     ) -> None:
@@ -128,6 +141,14 @@ class VerificationPipeline:
         evaluation = await self._repo.load_evaluation_by_request_id(message.request_id)
         if evaluation is None:
             raise PriceValidationError(f"no evaluation for request {message.request_id}")
+        if evaluation.status is EvaluationStatus.WITHDRAWN:
+            # The prediction was superseded by a market-closed collapse; do not score it.
+            logger.info(
+                "score_skipped_withdrawn",
+                prediction_id=str(evaluation.prediction_id),
+                request_id=str(message.request_id),
+            )
+            return
         self._validate_observation(message, evaluation)
 
         await self._repo.store_price_observation(message)

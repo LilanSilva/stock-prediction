@@ -27,6 +27,10 @@ For each new immutable prediction:
 
 Session resolution uses the asset registry calendar and timezone, including holidays and non-trading days.
 
+When a `PredictionMade` carries `supersedes_prediction_id` (a market-closed stance collapse from
+Prediction), withdraw the superseded prediction's evaluation so it is never scored. A `PriceObserved`
+that arrives for a withdrawn evaluation is acknowledged without producing a `PredictionScored`.
+
 ## 4. Scoring
 
 After a matching `PriceObserved` is validated against the evaluation's frozen registry version, price kind, session policy, adjustment flag, and rollover policy:

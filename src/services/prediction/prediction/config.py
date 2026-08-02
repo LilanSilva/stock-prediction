@@ -20,7 +20,7 @@ class PredictionSettings(BaseSettings):
 
     # Event-time context aggregation. Distinct events for one asset within a tumbling window of this
     # size form one versioned context (ADR-001). Article/event count never triggers a prediction.
-    context_window_minutes: int = Field(default=60, gt=0)
+    context_window_minutes: int = Field(default=15, gt=0)
     # Grace after a window's end before it is eligible to close, allowing slightly late events in.
     close_grace_minutes: int = Field(default=5, ge=0)
     close_interval_seconds: int = Field(default=60, gt=0)

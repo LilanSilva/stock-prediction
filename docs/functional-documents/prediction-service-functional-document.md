@@ -18,7 +18,7 @@ An `EventDetected` is not automatically a final prediction trigger. The service:
 
 1. Validates canonical event and asset IDs.
 2. Adds the event to each affected asset's event-time context.
-3. Uses an initial configurable 60-minute window and watermark.
+3. Uses an initial configurable 15-minute window and watermark.
 4. Retains distinct causal events rather than merging them.
 5. Persists context ID, version, window start/end, watermark, event IDs, and asset ID.
 6. Creates a new version for an eligible late event; previously published predictions stay immutable.
@@ -49,6 +49,18 @@ Neo4j stores causal graph state only. Prediction context and published predictio
 ### Graph-only path
 
 When all material retained forces agree, compute direction, confidence, and magnitude deterministically and set `decision_method=GRAPH_ONLY`. No LLM call is permitted.
+
+### Stance management
+
+Predictions are managed as a per-asset stance, keyed on the market state:
+
+- **Trading day (price available):** if the new decision matches the asset's latest active
+  prediction on `(direction, magnitude)`, produce nothing; if it differs, publish a new independent
+  prediction (no supersede) — an asset may hold several active predictions, each scored on its own.
+- **Market closed / price unavailable (weekend, holiday, fetch failure):** collapse to one active
+  prediction per asset — the new prediction sets `supersedes_prediction_id` to the prior stance,
+  which Verification withdraws (unscored). Market state is `shared.calendar.is_trading_day` in
+  America/New_York AND a reachable Market Data price.
 
 ### Conflict path
 

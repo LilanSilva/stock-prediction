@@ -16,6 +16,7 @@ class EvaluationStatus(StrEnum):
     PENDING = "PENDING"
     AWAITING_PRICE = "AWAITING_PRICE"
     SCORED = "SCORED"
+    WITHDRAWN = "WITHDRAWN"
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,7 @@ class EvaluationRecord:
     correlation_id: uuid.UUID
     contributing_edges: list[ContributingEdge] = field(default_factory=list)
     source_ids: list[str] = field(default_factory=list)
+    status: EvaluationStatus = EvaluationStatus.PENDING
 
 
 @dataclass(frozen=True)

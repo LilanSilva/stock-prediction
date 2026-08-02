@@ -14,11 +14,12 @@ from shared.schemas.messages import (
     EventPolarity,
     EventType,
     ExtractionMethod,
+    Magnitude,
     PredictionMade,
 )
 
 from prediction.config import PredictionSettings
-from prediction.models import ContextEvent, ContextRecord, ContextState
+from prediction.models import ActivePrediction, ContextEvent, ContextRecord, ContextState
 from prediction.pipeline import PredictionPipeline
 
 _NOW = datetime(2026, 7, 27, 14, 30, tzinfo=UTC)
@@ -74,13 +75,16 @@ class _FakeRepo:
         claimed: list[ContextRecord] | None = None,
         events: dict[uuid.UUID, list[ContextEvent]] | None = None,
         store_result: bool = True,
+        active: ActivePrediction | None = None,
     ) -> None:
         self.assigned: list[dict[str, object]] = []
         self._claimed = claimed or []
         self._events = events or {}
         self._store_result = store_result
+        self._active = active
         self.states: dict[uuid.UUID, ContextState] = {}
         self.stored: list[tuple[PredictionMade, str]] = []
+        self.withdrawals: list[bool] = []
 
     async def assign_event(self, **kwargs: object) -> None:
         self.assigned.append(kwargs)
@@ -93,18 +97,17 @@ class _FakeRepo:
     async def load_context_events(self, context_id: uuid.UUID) -> list[ContextEvent]:
         return self._events.get(context_id, [])
 
-    async def latest_prediction_id(
-        self, asset_id: AssetId, window_start: datetime
-    ) -> uuid.UUID | None:
-        return None
+    async def latest_active_prediction(self, asset_id: AssetId) -> ActivePrediction | None:
+        return self._active
 
     async def set_context_state(self, context_id: uuid.UUID, state: ContextState) -> None:
         self.states[context_id] = state
 
     async def store_prediction_with_outbox(
-        self, message: PredictionMade, *, idempotency_key: str
+        self, message: PredictionMade, *, idempotency_key: str, withdraw_superseded: bool = False
     ) -> bool:
         self.stored.append((message, idempotency_key))
+        self.withdrawals.append(withdraw_superseded)
         return self._store_result
 
 
@@ -141,20 +144,24 @@ class _FakeGraph:
 
 
 class _FakePriceReader:
-    def __init__(self, *, elevated: bool = False) -> None:
+    def __init__(self, *, elevated: bool = False, available: bool = True) -> None:
         self._elevated = elevated
+        self._available = available
         self.calls: list[AssetId] = []
 
     async def is_elevated(self, asset_id: AssetId) -> bool:
         self.calls.append(asset_id)
         return self._elevated
 
+    async def is_price_available(self, asset_id: AssetId) -> bool:
+        return self._available
+
 
 def _pipeline(
-    repo: _FakeRepo, graph: _FakeGraph, *, elevated: bool = False
+    repo: _FakeRepo, graph: _FakeGraph, *, elevated: bool = False, available: bool = True
 ) -> PredictionPipeline:
     return PredictionPipeline(
-        repo, graph, _FakePriceReader(elevated=elevated), PredictionSettings()
+        repo, graph, _FakePriceReader(elevated=elevated, available=available), PredictionSettings()
     )
 
 
@@ -174,7 +181,8 @@ async def test_process_event_assigns_to_each_affected_asset() -> None:
     pipeline = _pipeline(repo, _FakeGraph())
     await pipeline.process_event(_event(assets=[AssetId.GOLD, AssetId.BRENT_OIL]))
     assert {a["asset_id"] for a in repo.assigned} == {AssetId.GOLD, AssetId.BRENT_OIL}
-    assert all(a["window_start"] == datetime(2026, 7, 27, 14, 0, tzinfo=UTC) for a in repo.assigned)
+    expected_window = datetime(2026, 7, 27, 14, 30, tzinfo=UTC)
+    assert all(a["window_start"] == expected_window for a in repo.assigned)
 
 
 async def test_process_event_without_assets_is_a_noop() -> None:
@@ -384,3 +392,49 @@ async def test_occurrence_conflict_unaffected_by_elevated_price() -> None:
     assert produced == 0
     assert repo.stored == []
     assert repo.states[ctx.context_id] == ContextState.PREDICTED
+
+
+_WEEKDAY = datetime(2026, 8, 5, 12, 0, tzinfo=UTC)  # Wednesday
+_WEEKEND = datetime(2026, 8, 8, 12, 0, tzinfo=UTC)  # Saturday
+
+
+async def test_open_market_skips_duplicate_signal() -> None:
+    ctx = _context()
+    events = [ContextEvent(uuid.uuid4(), EventType.MILITARY_CONFLICT, _NOW)]
+    active = ActivePrediction(uuid.uuid4(), Direction.UP, Magnitude.LARGE)
+    repo = _FakeRepo(claimed=[ctx], events={ctx.context_id: events}, active=active)
+    graph = _FakeGraph(edges=[_edge(EventType.MILITARY_CONFLICT, Direction.UP, 0.75)])
+    produced = await _pipeline(repo, graph).close_ready_contexts(now=_WEEKDAY)
+    # Same (direction, magnitude) as the active stance on a trading day -> do nothing.
+    assert produced == 0
+    assert repo.stored == []
+    assert repo.states[ctx.context_id] == ContextState.PREDICTED
+
+
+async def test_open_market_adds_new_prediction_on_change() -> None:
+    ctx = _context()
+    events = [ContextEvent(uuid.uuid4(), EventType.MILITARY_CONFLICT, _NOW)]
+    active = ActivePrediction(uuid.uuid4(), Direction.DOWN, Magnitude.LARGE)
+    repo = _FakeRepo(claimed=[ctx], events={ctx.context_id: events}, active=active)
+    graph = _FakeGraph(edges=[_edge(EventType.MILITARY_CONFLICT, Direction.UP, 0.75)])
+    produced = await _pipeline(repo, graph).close_ready_contexts(now=_WEEKDAY)
+    # Direction changed on a trading day -> add a new independent prediction, no supersede/withdraw.
+    assert produced == 1
+    message, _ = repo.stored[0]
+    assert message.direction == Direction.UP
+    assert message.supersedes_prediction_id is None
+    assert repo.withdrawals == [False]
+
+
+async def test_closed_market_collapses_and_withdraws() -> None:
+    ctx = _context()
+    events = [ContextEvent(uuid.uuid4(), EventType.MILITARY_CONFLICT, _NOW)]
+    active = ActivePrediction(uuid.uuid4(), Direction.UP, Magnitude.LARGE)
+    repo = _FakeRepo(claimed=[ctx], events={ctx.context_id: events}, active=active)
+    graph = _FakeGraph(edges=[_edge(EventType.MILITARY_CONFLICT, Direction.UP, 0.75)])
+    produced = await _pipeline(repo, graph).close_ready_contexts(now=_WEEKEND)
+    # Market closed -> collapse to one: supersede + withdraw the prior stance, ignore direction.
+    assert produced == 1
+    message, _ = repo.stored[0]
+    assert message.supersedes_prediction_id == active.prediction_id
+    assert repo.withdrawals == [True]

@@ -41,6 +41,15 @@ class ContextRecord:
 
 
 @dataclass(frozen=True)
+class ActivePrediction:
+    """The asset's most recent still-open (PENDING) prediction, for stance comparison."""
+
+    prediction_id: uuid.UUID
+    direction: Direction
+    magnitude: Magnitude
+
+
+@dataclass(frozen=True)
 class ContextEvent:
     """One distinct event that is a member of a context.
 

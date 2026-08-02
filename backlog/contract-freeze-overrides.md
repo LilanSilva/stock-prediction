@@ -84,6 +84,12 @@ After the contract freeze and POC-6 updates are propagated, affected tasks will 
 - Publish only `PredictionMade` using `prediction.made`.
 - Remove every requirement for Prediction to create or publish `PriceRequested`.
 - Use `alpha=1.0`, `beta=1.0` for seeded learnable graph state.
+- Stance management (news-driven, per asset): on a **trading day**, a new decision that matches the
+  asset's latest active prediction on `(direction, magnitude)` produces nothing; a changed decision
+  adds a new independent prediction (no supersede; each is scored). When the **market is closed or a
+  price is unavailable** (weekend/holiday/fetch failure), the asset collapses to one active
+  prediction: the new one sets `supersedes_prediction_id` to the prior stance, which is withdrawn
+  and not scored. Replacement is always supersede, never in-place overwrite.
 
 ### E05 Market Data
 
@@ -100,6 +106,9 @@ After the contract freeze and POC-6 updates are propagated, affected tasks will 
 - Resolve canonical baseline/settlement sessions without look-ahead and publish one dual-session request.
 - Score only the dual-close `PriceObserved` using the fixed close-to-close/deadband/magnitude rules.
 - Publish one idempotent `PredictionScored` and preserve both close observations.
+- When a `PredictionMade` carries `supersedes_prediction_id` (a market-closed collapse), withdraw
+  the superseded prediction's evaluation so it is never scored; a `PriceObserved` for a withdrawn
+  evaluation is acknowledged without scoring.
 
 ### E07 Credibility
 

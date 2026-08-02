@@ -23,7 +23,7 @@ The POC does not execute trades or provide personalized financial advice.
 
 - Prediction must not process each event as an isolated final decision.
 - Events are accumulated into an event-time context window and grouped by canonical asset ID.
-- The initial configurable context window is 60 minutes.
+- The initial configurable context window is 15 minutes.
 - A context may contain multiple distinct `EventDetected` messages.
 - The context records a version, window start/end, watermark, event IDs, and affected assets.
 - Late events create a new context version. Published predictions remain immutable and may be superseded by a newer prediction.

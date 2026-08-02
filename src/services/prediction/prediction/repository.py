@@ -9,12 +9,14 @@ import asyncpg
 from shared.schemas.messages import (
     AssetId,
     ConditionCode,
+    Direction,
     EventPolarity,
     EventType,
+    Magnitude,
     PredictionMade,
 )
 
-from prediction.models import ContextEvent, ContextRecord, ContextState
+from prediction.models import ActivePrediction, ContextEvent, ContextRecord, ContextState
 
 # States in which a new event joins the existing latest context version rather than starting a new
 # one. A PREDICTED/PREDICTING/ERROR context is immutable to new members, so a late event supersedes.
@@ -213,6 +215,29 @@ class PredictionRepository:
         )
         return value if value is None else uuid.UUID(str(value))
 
+    async def latest_active_prediction(self, asset_id: AssetId) -> ActivePrediction | None:
+        """The asset's most recent PENDING prediction (its current stance), or None.
+
+        Used weekdays to skip a duplicate signal and weekends to pick the prediction to withdraw.
+        """
+        row = await self._pool.fetchrow(
+            """
+            SELECT prediction_id, direction, magnitude
+            FROM prediction.predictions
+            WHERE asset_id = $1 AND status = 'PENDING'
+            ORDER BY decision_at DESC
+            LIMIT 1
+            """,
+            asset_id.value,
+        )
+        if row is None:
+            return None
+        return ActivePrediction(
+            prediction_id=uuid.UUID(str(row["prediction_id"])),
+            direction=Direction(row["direction"]),
+            magnitude=Magnitude(row["magnitude"]),
+        )
+
     async def set_context_state(self, context_id: uuid.UUID, state: ContextState) -> None:
         await self._pool.execute(
             "UPDATE prediction.contexts SET state = $2, updated_at = now() WHERE context_id = $1",
@@ -221,12 +246,14 @@ class PredictionRepository:
         )
 
     async def store_prediction_with_outbox(
-        self, message: PredictionMade, *, idempotency_key: str
+        self, message: PredictionMade, *, idempotency_key: str, withdraw_superseded: bool = False
     ) -> bool:
         """Insert the prediction, its edges, and an outbox row in one transaction.
 
-        Returns False when the idempotency key already exists (duplicate context version replay), in
-        which case no second identity is created.
+        When ``withdraw_superseded`` is set (weekend/closed-market collapse), the superseded
+        prediction is marked WITHDRAWN in the same transaction so it is never scored. Returns False
+        when the idempotency key already exists (duplicate context version replay), in which case no
+        second identity is created.
         """
         async with self._pool.acquire() as conn:
             async with conn.transaction():
@@ -261,6 +288,13 @@ class PredictionRepository:
                         message.context_id,
                     )
                     return False
+
+                if withdraw_superseded and message.supersedes_prediction_id is not None:
+                    await conn.execute(
+                        "UPDATE prediction.predictions SET status = 'WITHDRAWN' "
+                        "WHERE prediction_id = $1 AND status = 'PENDING'",
+                        message.supersedes_prediction_id,
+                    )
 
                 for edge in message.contributing_edges:
                     await conn.execute(

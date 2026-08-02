@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from typing import Protocol
 
 import structlog
+from shared.calendar import is_trading_day, new_york_offset
 from shared.graph import FiringEdge
 from shared.graph.exceptions import GraphError
 from shared.schemas.messages import (
@@ -23,7 +24,7 @@ from shared.schemas.messages import (
 from prediction.config import PredictionSettings
 from prediction.context import window_bounds
 from prediction.decision import decide
-from prediction.models import ContextEvent, ContextRecord, ContextState
+from prediction.models import ActivePrediction, ContextEvent, ContextRecord, ContextState
 
 logger = structlog.get_logger(__name__)
 
@@ -50,14 +51,14 @@ class PipelineRepository(Protocol):
 
     async def load_context_events(self, context_id: uuid.UUID) -> list[ContextEvent]: ...
 
-    async def latest_prediction_id(
-        self, asset_id: AssetId, window_start: datetime
-    ) -> uuid.UUID | None: ...
+    async def latest_active_prediction(
+        self, asset_id: AssetId
+    ) -> ActivePrediction | None: ...
 
     async def set_context_state(self, context_id: uuid.UUID, state: ContextState) -> None: ...
 
     async def store_prediction_with_outbox(
-        self, message: PredictionMade, *, idempotency_key: str
+        self, message: PredictionMade, *, idempotency_key: str, withdraw_superseded: bool = False
     ) -> bool: ...
 
 
@@ -76,6 +77,8 @@ class PriceSource(Protocol):
     """Structural type for the recent-price reader used by the Scope-B price gate."""
 
     async def is_elevated(self, asset_id: AssetId) -> bool: ...
+
+    async def is_price_available(self, asset_id: AssetId) -> bool: ...
 
 
 class PredictionPipeline:
@@ -166,9 +169,18 @@ class PredictionPipeline:
             for event_type, pols in polarities.items()
         }
 
-    async def close_ready_contexts(self) -> int:
+    async def _is_market_open(self, asset_id: AssetId, now: datetime) -> bool:
+        # The market is "open" for stance purposes when today is a trading day AND Market Data can
+        # currently serve a price. A non-trading day (weekend/holiday) or an unreachable price feed
+        # selects the collapse-to-one path.
+        ny_date = (now + new_york_offset(now.date())).date()
+        if not is_trading_day(ny_date):
+            return False
+        return await self._price_reader.is_price_available(asset_id)
+
+    async def close_ready_contexts(self, now: datetime | None = None) -> int:
         """Close all due contexts into predictions. Returns the number of predictions produced."""
-        now = datetime.now(UTC)
+        now = now or datetime.now(UTC)
         claimed = await self._repo.claim_ready_contexts(
             now, grace_minutes=self._settings.close_grace_minutes
         )
@@ -207,9 +219,32 @@ class PredictionPipeline:
                 )
                 continue
 
-            supersedes = await self._repo.latest_prediction_id(
-                record.asset_id, record.window_start
-            )
+            active = await self._repo.latest_active_prediction(record.asset_id)
+            market_open = await self._is_market_open(record.asset_id, now)
+
+            if market_open:
+                # Weekday: skip a duplicate signal; otherwise add a new independent prediction that
+                # accumulates (no supersede, both scored on their own).
+                if active is not None and (
+                    active.direction == decision.direction
+                    and active.magnitude == decision.magnitude
+                ):
+                    await self._repo.set_context_state(record.context_id, ContextState.PREDICTED)
+                    logger.info(
+                        "prediction_unchanged",
+                        context_id=str(record.context_id),
+                        asset_id=record.asset_id.value,
+                        direction=decision.direction.value,
+                    )
+                    continue
+                supersedes = None
+                withdraw = False
+            else:
+                # Weekend/closed market: collapse to one active prediction per asset by superseding
+                # and withdrawing the prior stance (it never gets its own price outcome).
+                supersedes = active.prediction_id if active is not None else None
+                withdraw = supersedes is not None
+
             message = PredictionMade(
                 correlation_id=uuid.uuid4(),
                 occurred_at=now,
@@ -233,7 +268,9 @@ class PredictionPipeline:
                 f"{record.asset_id.value}|{record.window_start.isoformat()}"
                 f"|{Horizon.ONE_TRADING_DAY.value}|{record.context_version}"
             )
-            if await self._repo.store_prediction_with_outbox(message, idempotency_key=key):
+            if await self._repo.store_prediction_with_outbox(
+                message, idempotency_key=key, withdraw_superseded=withdraw
+            ):
                 produced += 1
                 logger.info(
                     "prediction_made",

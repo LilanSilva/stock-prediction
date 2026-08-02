@@ -14,7 +14,7 @@ from shared.schemas.messages import (
     PriceRequested,
 )
 
-from verification.models import EvaluationRecord
+from verification.models import EvaluationRecord, EvaluationStatus
 
 _PRICE_REQUESTED = "PriceRequested"
 _PREDICTION_SCORED = "PredictionScored"
@@ -118,7 +118,8 @@ class VerificationRepository:
             """
             SELECT prediction_id, context_id, asset_id, predicted_direction, predicted_magnitude,
                    confidence, decision_at, baseline_session, settlement_session, market_calendar,
-                   registry_version, request_id, correlation_id, contributing_edges, source_ids
+                   registry_version, request_id, correlation_id, contributing_edges, source_ids,
+                   status
             FROM verification.evaluations
             WHERE request_id = $1
             """,
@@ -147,7 +148,21 @@ class VerificationRepository:
                 for item in _json_list(row["contributing_edges"])
             ],
             source_ids=[str(item) for item in _json_list(row["source_ids"])],
+            status=EvaluationStatus(row["status"]),
         )
+
+    async def withdraw_evaluation(self, prediction_id: uuid.UUID) -> bool:
+        """Mark a superseded prediction's evaluation WITHDRAWN so it is never scored.
+
+        Returns True when a PENDING evaluation was withdrawn; a missing or already-terminal
+        evaluation is a no-op (the collapse signal is idempotent).
+        """
+        result = await self._pool.execute(
+            "UPDATE verification.evaluations SET status = 'WITHDRAWN', updated_at = now() "
+            "WHERE prediction_id = $1 AND status = 'PENDING'",
+            prediction_id,
+        )
+        return str(result).endswith("1")
 
     async def store_score_with_outbox(self, scored: PredictionScored) -> bool:
         """Insert the score and outbox the PredictionScored in one transaction.

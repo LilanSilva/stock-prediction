@@ -22,7 +22,7 @@ from shared.schemas.messages import (
 
 from verification.config import VerificationSettings
 from verification.exceptions import PriceValidationError
-from verification.models import EvaluationRecord
+from verification.models import EvaluationRecord, EvaluationStatus
 from verification.pipeline import VerificationPipeline
 
 _REGISTRY = "biquote-reference-v1"
@@ -30,7 +30,9 @@ _DECISION_AT = datetime(2026, 7, 27, 22, 46, tzinfo=UTC)  # Monday after the 17:
 
 
 def _prediction(
-    asset: AssetId = AssetId.GOLD, direction: Direction = Direction.UP
+    asset: AssetId = AssetId.GOLD,
+    direction: Direction = Direction.UP,
+    supersedes: uuid.UUID | None = None,
 ) -> PredictionMade:
     return PredictionMade(
         correlation_id=uuid.uuid4(),
@@ -55,11 +57,17 @@ def _prediction(
             )
         ],
         decision_at=_DECISION_AT,
+        supersedes_prediction_id=supersedes,
         decision_method=DecisionMethod.GRAPH_ONLY,
     )
 
 
-def _evaluation(request_id: uuid.UUID, *, direction: Direction = Direction.UP) -> EvaluationRecord:
+def _evaluation(
+    request_id: uuid.UUID,
+    *,
+    direction: Direction = Direction.UP,
+    status: EvaluationStatus = EvaluationStatus.PENDING,
+) -> EvaluationRecord:
     return EvaluationRecord(
         prediction_id=uuid.uuid4(),
         context_id=uuid.uuid4(),
@@ -76,6 +84,7 @@ def _evaluation(request_id: uuid.UUID, *, direction: Direction = Direction.UP) -
         correlation_id=uuid.uuid4(),
         contributing_edges=[],
         source_ids=[],
+        status=status,
     )
 
 
@@ -130,12 +139,17 @@ class _FakeRepo:
         self._create_result = create_result
         self._store_score_result = store_score_result
         self._evaluation = evaluation
+        self.withdrawn: list[uuid.UUID] = []
 
     async def create_evaluation_with_outbox(
         self, evaluation: EvaluationRecord, request: PriceRequested
     ) -> bool:
         self.created.append((evaluation, request))
         return self._create_result
+
+    async def withdraw_evaluation(self, prediction_id: uuid.UUID) -> bool:
+        self.withdrawn.append(prediction_id)
+        return True
 
     async def store_price_observation(self, message: PriceObserved) -> bool:
         self.observations.append(message)
@@ -176,6 +190,31 @@ async def test_request_id_is_deterministic() -> None:
     await _pipeline(repo_a).process_prediction(prediction)
     await _pipeline(repo_b).process_prediction(prediction)
     assert repo_a.created[0][1].request_id == repo_b.created[0][1].request_id
+
+
+async def test_process_prediction_withdraws_superseded() -> None:
+    repo = _FakeRepo()
+    superseded = uuid.uuid4()
+    await _pipeline(repo).process_prediction(_prediction(supersedes=superseded))
+    # A weekend-collapse supersede must withdraw the prior stance's evaluation.
+    assert repo.withdrawn == [superseded]
+
+
+async def test_process_prediction_without_supersede_withdraws_nothing() -> None:
+    repo = _FakeRepo()
+    await _pipeline(repo).process_prediction(_prediction())
+    assert repo.withdrawn == []
+
+
+async def test_process_price_skips_withdrawn_evaluation() -> None:
+    request_id = uuid.uuid4()
+    repo = _FakeRepo(
+        evaluation=_evaluation(request_id, status=EvaluationStatus.WITHDRAWN)
+    )
+    await _pipeline(repo).process_price(_observed(request_id, "100.00", "103.00"))
+    # A withdrawn (superseded) evaluation is never scored.
+    assert repo.scored == []
+    assert repo.observations == []
 
 
 async def test_process_price_scores_and_publishes() -> None:
