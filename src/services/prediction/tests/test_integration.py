@@ -24,6 +24,13 @@ RABBITMQ_URL = os.environ.get("RABBITMQ_URL")
 NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD")
 
 
+class _StubPriceReader:
+    """No-network price reader; these integration events are OCCURRENCE, so elevation is moot."""
+
+    async def is_elevated(self, asset_id: AssetId) -> bool:
+        return False
+
+
 def _event(asset: AssetId, event_type: EventType) -> EventDetected:
     now = datetime.now(UTC)
     return EventDetected(
@@ -70,7 +77,9 @@ async def test_assign_and_close_produces_graph_only_prediction() -> None:
     try:
         await apply_schema(pool)
         settings = PredictionSettings()
-        pipeline = PredictionPipeline(PredictionRepository(pool), graph, settings)
+        pipeline = PredictionPipeline(
+            PredictionRepository(pool), graph, _StubPriceReader(), settings
+        )
 
         event = _event(AssetId.GOLD, EventType.MILITARY_CONFLICT)
         await pipeline.process_event(event)
@@ -130,7 +139,9 @@ async def test_outbox_relay_publishes_prediction_made() -> None:
     try:
         await apply_schema(pool)
         settings = PredictionSettings()
-        pipeline = PredictionPipeline(PredictionRepository(pool), graph, settings)
+        pipeline = PredictionPipeline(
+            PredictionRepository(pool), graph, _StubPriceReader(), settings
+        )
 
         event = _event(AssetId.BRENT_OIL, EventType.SUPPLY_DISRUPTION)
         await pipeline.process_event(event)

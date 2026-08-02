@@ -21,8 +21,37 @@ The policy is sufficient for POC scoring and graph-only M1 scope. It is not an a
 | `GOLD` | Gold | Commodity | USD | COMEX / America-New_York | `GC=F` | `CMX`, America/New_York | none validated | POC reference-close approved |
 | `BRENT_OIL` | Brent crude oil | Commodity | USD | Yahoo Brent Crude Oil Last Day Financial / America-New_York provider calendar | `BZ=F` | `NYM`, America/New_York | none validated | POC reference-close approved |
 
-## Required reference-series fields
+## Industry-sector equities (biquote bellwethers)
 
+Beyond the two commodities, the registry defines industry-sector assets, each priced by a
+representative large-cap **bellwether** stock that `biquote.io` actually serves (sector ETFs and
+non-US listings are not served by the provider). The executable registry
+(`shared/reference/asset_registry.py`) is the source of truth; provider symbols live only there and
+in Market Data adapters.
+
+| asset_id | Sector | Bellwether symbol |
+|---|---|---|
+| `PHARMA` | Pharmaceutical (incl. diabetic/insulin, vaccine) | `LLY` |
+| `DEFENSE_AEROSPACE` | Defence, aircraft, fighter jets | `LMT` |
+| `AI_COMPUTE` | AI compute | `NVDA` |
+| `SEMICONDUCTOR` | Semiconductor, CPU | `TSM` |
+| `SOFTWARE` | Software, operating systems | `MSFT` |
+| `ENTERPRISE_SOFTWARE` | ERP / enterprise software | `ORCL` |
+| `INTERNET_SEARCH` | Internet search | `GOOGL` |
+| `CONSUMER_ELECTRONICS` | Mobile / phones | `AAPL` |
+| `BANKING` | Banking | `JPM` |
+| `PAYMENTS_FINANCE` | Payments / investment finance | `V` |
+| `AUTOMOTIVE` | Cars | `TSLA` |
+| `FOOD_BEVERAGE` | Food & beverage | `KO` |
+| `REAL_ESTATE` | Housing / real estate | `AMT` |
+| `INDUSTRIAL` | Industrial manufacturing | `MMM` |
+| `APPAREL` | Clothing | `NKE` |
+
+Bellwether closes are `PROVIDER_DAILY_CLOSE`, not official settlements. A sector is a proxy: the
+stock represents the industry, not a full sector index. Causal edges for these assets are seeded
+empty and populated by the offline structure learner as news + prices accumulate.
+
+## Required reference-series fields
 Before an asset may be scored, its registry version must declare:
 
 - provider and provider symbol;

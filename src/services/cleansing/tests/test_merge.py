@@ -6,7 +6,13 @@ from typing import Any, cast
 
 import pytest
 from shared.llm.gateway import LLMGateway, LLMResult
-from shared.schemas.messages import EventType, ExtractionMethod
+from shared.schemas.messages import (
+    AssetId,
+    ConditionCode,
+    EventPolarity,
+    EventType,
+    ExtractionMethod,
+)
 
 from cleansing.exceptions import AmbiguousMergeError
 from cleansing.merge import ClusterInputs, LlmMerger, build_local_event, detect_fact_conflicts
@@ -39,7 +45,14 @@ def _article(title: str, source: str) -> dict[str, Any]:
     }
 
 
-def _action(actor: str | None, lemma: str, assets: list[str]) -> dict[str, Any]:
+def _action(
+    actor: str | None,
+    lemma: str,
+    assets: list[str],
+    *,
+    polarity: str = "OCCURRENCE",
+    context_tags: list[str] | None = None,
+) -> dict[str, Any]:
     return {
         "article_id": uuid.uuid4(),
         "actor": actor,
@@ -47,6 +60,8 @@ def _action(actor: str | None, lemma: str, assets: list[str]) -> dict[str, Any]:
         "object": None,
         "event_type": EventType.SANCTIONS.value,
         "affected_asset_ids": assets,
+        "polarity": polarity,
+        "context_tags": context_tags or [],
     }
 
 
@@ -89,6 +104,59 @@ def test_build_local_event_without_articles_uses_record_window() -> None:
     assert event.last_seen_at == record.last_seen_at
     assert event.canonical_summary == EventType.OTHER.value
     assert event.sources == []
+
+
+def test_build_local_event_defaults_polarity_and_no_tags() -> None:
+    record = _record(EventType.SANCTIONS)
+    articles: list[Any] = [_article("EU sanctions exports", "reuters")]
+    actions: list[Any] = [_action("EU", "sanction", ["BRENT_OIL"])]
+    event = build_local_event(ClusterInputs(record=record, articles=articles, actions=actions))
+    assert event.polarity == EventPolarity.OCCURRENCE
+    assert event.context_tags == []
+
+
+def test_build_local_event_carries_polarity_and_context_tags() -> None:
+    record = _record(EventType.MILITARY_CONFLICT)
+    articles: list[Any] = [_article("Strike called off", "reuters")]
+    actions: list[Any] = [
+        _action("USA", "attack", [], polarity="RESOLUTION", context_tags=["SAFE_HAVEN_ONLY"]),
+        _action("USA", "attack", [], polarity="RESOLUTION", context_tags=["SAFE_HAVEN_ONLY"]),
+    ]
+    event = build_local_event(ClusterInputs(record=record, articles=articles, actions=actions))
+    assert event.polarity == EventPolarity.RESOLUTION
+    assert event.context_tags == [ConditionCode.SAFE_HAVEN_ONLY]
+
+
+def test_build_local_event_polarity_needs_strict_majority() -> None:
+    record = _record(EventType.MILITARY_CONFLICT)
+    actions: list[Any] = [
+        _action("USA", "attack", [], polarity="RESOLUTION"),
+        _action("USA", "attack", [], polarity="OCCURRENCE"),
+    ]
+    event = build_local_event(ClusterInputs(record=record, articles=[], actions=actions))
+    # A tie is not a majority, so the conservative OCCURRENCE default holds.
+    assert event.polarity == EventPolarity.OCCURRENCE
+
+
+def test_build_local_event_context_tags_are_unioned() -> None:
+    record = _record(EventType.MILITARY_CONFLICT)
+    actions: list[Any] = [
+        _action("USA", "attack", [], context_tags=["TRANSPORT_AFFECTED"]),
+        _action("USA", "attack", [], context_tags=["SAFE_HAVEN_ONLY", "TRANSPORT_AFFECTED"]),
+    ]
+    event = build_local_event(ClusterInputs(record=record, articles=[], actions=actions))
+    assert event.context_tags == [
+        ConditionCode.TRANSPORT_AFFECTED,
+        ConditionCode.SAFE_HAVEN_ONLY,
+    ]
+
+
+def test_build_local_event_asset_fallback_from_event_type() -> None:
+    # Geopolitical cluster whose actions named no asset still resolves to its graph assets.
+    record = _record(EventType.MILITARY_CONFLICT)
+    actions: list[Any] = [_action("USA", "attack", [])]
+    event = build_local_event(ClusterInputs(record=record, articles=[], actions=actions))
+    assert set(event.affected_asset_ids) == {AssetId.GOLD, AssetId.BRENT_OIL}
 
 
 class _FakeGateway:

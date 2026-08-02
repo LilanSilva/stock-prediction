@@ -20,7 +20,9 @@ import structlog
 from shared.llm.gateway import LLMGateway
 from shared.schemas.messages import (
     AssetId,
+    ConditionCode,
     EventDetected,
+    EventPolarity,
     EventType,
     ExtractionMethod,
     FactConflict,
@@ -32,6 +34,7 @@ from shared.schemas.messages import (
 
 from cleansing.exceptions import AmbiguousMergeError
 from cleansing.models import ClusterRecord
+from cleansing.taxonomy import assets_for_event_type
 
 logger = structlog.get_logger(__name__)
 
@@ -105,6 +108,37 @@ def _affected_assets(actions: list[asyncpg.Record]) -> list[AssetId]:
     return collected
 
 
+def _resolved_assets(actions: list[asyncpg.Record], event_type: EventType) -> list[AssetId]:
+    """Assets from the cluster's actions, falling back to the event type's graph assets when none
+    were named, so geopolitical clusters still carry downstream assets."""
+    assets = _affected_assets(actions)
+    if assets:
+        return assets
+    return list(assets_for_event_type(event_type))
+
+
+def _event_polarity(actions: list[asyncpg.Record]) -> EventPolarity:
+    """RESOLUTION only when a strict majority of the cluster's actions signal resolution."""
+    values = [EventPolarity(row["polarity"]) for row in actions if row["polarity"]]
+    if not values:
+        return EventPolarity.OCCURRENCE
+    resolution = sum(1 for v in values if v == EventPolarity.RESOLUTION)
+    if resolution > len(values) - resolution:
+        return EventPolarity.RESOLUTION
+    return EventPolarity.OCCURRENCE
+
+
+def _context_tags(actions: list[asyncpg.Record]) -> list[ConditionCode]:
+    """Union of the cluster's per-article context tags, preserving first-seen order."""
+    seen: list[ConditionCode] = []
+    for row in actions:
+        for raw in row["context_tags"] or []:
+            code = ConditionCode(raw)
+            if code not in seen:
+                seen.append(code)
+    return seen
+
+
 def _envelope_ids(articles: list[asyncpg.Record]) -> uuid.UUID:
     """Propagate the earliest source article's correlation_id onto the event."""
     if articles:
@@ -130,7 +164,9 @@ def build_local_event(inputs: ClusterInputs) -> EventDetected:
         action=_majority([row["action_lemma"] for row in inputs.actions]),
         object=_majority([row["object"] for row in inputs.actions]),
         entities=[],
-        affected_asset_ids=_affected_assets(inputs.actions),
+        affected_asset_ids=_resolved_assets(inputs.actions, record.event_type),
+        polarity=_event_polarity(inputs.actions),
+        context_tags=_context_tags(inputs.actions),
         first_seen_at=first_seen,
         last_seen_at=last_seen,
         sources=_sources(articles),
@@ -238,7 +274,9 @@ class LlmMerger:
             action=_opt_str(content.get("action")),
             object=_opt_str(content.get("object")),
             entities=[],
-            affected_asset_ids=_affected_assets(inputs.actions),
+            affected_asset_ids=_resolved_assets(inputs.actions, inputs.record.event_type),
+            polarity=_event_polarity(inputs.actions),
+            context_tags=_context_tags(inputs.actions),
             first_seen_at=first_seen,
             last_seen_at=last_seen,
             sources=_sources(articles),

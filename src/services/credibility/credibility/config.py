@@ -28,3 +28,7 @@ class CredibilitySettings(BaseSettings):
 
     db_pool_min_size: int = Field(default=1, ge=1)
     db_pool_max_size: int = Field(default=5, ge=1)
+
+    # Offline structure learner scheduled in-process. Disable to run it only as a manual CLI batch.
+    learning_enabled: bool = Field(default=True)
+    learning_interval_hours: int = Field(default=24, ge=1)

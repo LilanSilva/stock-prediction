@@ -45,10 +45,27 @@ class RoutingKey(StrEnum):
 
 
 class AssetId(StrEnum):
-    """Canonical assets approved for the initial POC."""
+    """Canonical assets. GOLD/BRENT_OIL are the original commodities; the remainder are
+    industry-sector equities, each priced by a representative large-cap bellwether (see
+    shared.reference.asset_registry for the provider symbol mapping)."""
 
     GOLD = "GOLD"
     BRENT_OIL = "BRENT_OIL"
+    PHARMA = "PHARMA"
+    DEFENSE_AEROSPACE = "DEFENSE_AEROSPACE"
+    AI_COMPUTE = "AI_COMPUTE"
+    SEMICONDUCTOR = "SEMICONDUCTOR"
+    SOFTWARE = "SOFTWARE"
+    ENTERPRISE_SOFTWARE = "ENTERPRISE_SOFTWARE"
+    INTERNET_SEARCH = "INTERNET_SEARCH"
+    CONSUMER_ELECTRONICS = "CONSUMER_ELECTRONICS"
+    BANKING = "BANKING"
+    PAYMENTS_FINANCE = "PAYMENTS_FINANCE"
+    AUTOMOTIVE = "AUTOMOTIVE"
+    FOOD_BEVERAGE = "FOOD_BEVERAGE"
+    REAL_ESTATE = "REAL_ESTATE"
+    INDUSTRIAL = "INDUSTRIAL"
+    APPAREL = "APPAREL"
 
 
 class EventType(StrEnum):
@@ -103,6 +120,26 @@ class PriceKind(StrEnum):
 class LlmStatus(StrEnum):
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
+
+
+class EventPolarity(StrEnum):
+    """Whether an event is the onset of a factor or its resolution/reversal.
+
+    OCCURRENCE is the default and preserves pre-2.x behavior (the factor is happening). RESOLUTION
+    marks de-escalation/negation (e.g. a planned strike called off), which inverts the sign of the
+    factor's causal edge at decision time.
+    """
+
+    OCCURRENCE = "OCCURRENCE"
+    RESOLUTION = "RESOLUTION"
+
+
+class ConditionCode(StrEnum):
+    """Context qualifiers that gate which causal edge fires (stored as a CAUSES-edge property)."""
+
+    TRANSPORT_AFFECTED = "TRANSPORT_AFFECTED"
+    SAFE_HAVEN_ONLY = "SAFE_HAVEN_ONLY"
+    RISK_PREMIUM_ELEVATED = "RISK_PREMIUM_ELEVATED"
 
 
 def _assume_utc_for_naive(value: object) -> object:
@@ -250,6 +287,9 @@ class EventDetected(FeedMessage):
     object: str | None = None
     entities: list[str] = Field(default_factory=list)
     affected_asset_ids: list[AssetId] = Field(default_factory=list)
+    # Added in 1.x (backward-compatible defaults): conditional-causality qualifiers.
+    polarity: EventPolarity = EventPolarity.OCCURRENCE
+    context_tags: list[ConditionCode] = Field(default_factory=list)
     first_seen_at: UtcDatetime
     last_seen_at: UtcDatetime
     sources: list[SourceRef] = Field(default_factory=list)

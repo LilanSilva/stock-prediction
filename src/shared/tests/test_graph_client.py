@@ -100,7 +100,11 @@ async def test_get_firing_edges_parses_rows() -> None:
     # The query is parameterized with canonical string values, never provider symbols.
     assert driver.last_session is not None
     _, params = driver.last_session.run_calls[0]
-    assert params == {"event_type": "MILITARY_CONFLICT", "asset_ids": ["GOLD"]}
+    assert params == {
+        "event_type": "MILITARY_CONFLICT",
+        "asset_ids": ["GOLD"],
+        "conditions": None,
+    }
 
 
 async def test_get_firing_edges_empty_returns_empty_list() -> None:

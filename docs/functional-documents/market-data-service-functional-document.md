@@ -57,6 +57,7 @@ The uniqueness rules prevent duplicate requests and duplicate provider observati
 
 - `/health` reports liveness.
 - `/ready` checks PostgreSQL, RabbitMQ, the persistent scheduler, and required registry entries; it need not call providers on every probe.
+- `GET /prices/recent?asset_id=<canonical>&sessions=<N>` returns the most recent stored session closes for an asset (canonical IDs only, closes as decimal strings). It is a read-only projection used by Prediction to derive the `RISK_PREMIUM_ELEVATED` condition; it triggers no provider fetch.
 - Shutdown stops new consumption, persists scheduler state, safely handles in-flight fetches, and closes connections.
 - Logs use canonical asset ID and correlation IDs; provider symbols appear only in adapter/audit fields.
 

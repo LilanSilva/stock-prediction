@@ -18,6 +18,14 @@ The Cleansing Service maps local NLP output to one of these event types before p
 | `NATURAL_DISASTER` | earthquake, flood, wildfire, hurricane |
 | `OTHER` | Valid event not yet represented |
 
+## Event polarity and conditions
+
+Each published event also carries a `polarity` and optional `context_tags` (see the message
+contract). `polarity` is `OCCURRENCE` (factor onset, default) or `RESOLUTION` (de-escalation/
+negation), which inverts the factor's causal edge sign at decision time. `context_tags` are
+`ConditionCode` values (`TRANSPORT_AFFECTED`, `SAFE_HAVEN_ONLY`, `RISK_PREMIUM_ELEVATED`) that gate
+which conditioned causal edge fires.
+
 ## Multilingual normalization
 
 - spaCy extracts actor/action/object in the article language.

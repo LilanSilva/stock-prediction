@@ -11,10 +11,12 @@ import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 import asyncpg
 import structlog
 from aio_pika.abc import AbstractIncomingMessage
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
@@ -27,6 +29,8 @@ from shared.schemas.messages import PredictionScored
 from credibility.config import CredibilitySettings
 from credibility.db import apply_schema, create_pool
 from credibility.exceptions import InvalidScoredMessageError
+from credibility.learning.config import LearningSettings
+from credibility.learning.run import run_with as run_learning
 from credibility.pipeline import CredibilityPipeline
 from credibility.repository import CredibilityRepository
 
@@ -48,6 +52,7 @@ class AppContext:
     graph: CausalGraphClient
     pipeline: CredibilityPipeline
     consumer_task: asyncio.Task[None]
+    scheduler: AsyncIOScheduler | None
     state: ServiceState
 
 
@@ -69,6 +74,16 @@ def _make_scored_consumer(app: FastAPI) -> ConsumerCallback:
             ctx.state.scored_duplicate += 1
 
     return _on_message
+
+
+async def _run_learning(app: FastAPI) -> None:
+    """Scheduled offline structure-learning pass, reusing the service pool + graph."""
+    ctx: AppContext = app.state.ctx
+    try:
+        written = await run_learning(ctx.pool, ctx.graph, LearningSettings())
+        logger.info("learning_sweep_done", edges_written=written)
+    except Exception:  # noqa: BLE001 - a scheduled learner must never crash the scheduler
+        logger.exception("learning_sweep_failed")
 
 
 @asynccontextmanager
@@ -96,6 +111,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         rabbit.consume(settings.scored_queue, _make_scored_consumer(app))
     )
 
+    scheduler: AsyncIOScheduler | None = None
+    if settings.learning_enabled:
+        scheduler = AsyncIOScheduler()
+        scheduler.add_job(
+            _run_learning,
+            "interval",
+            hours=settings.learning_interval_hours,
+            args=[app],
+            id="structure_learning_sweep",
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=3600,
+            next_run_time=datetime.now(UTC),
+        )
+
     app.state.ctx = AppContext(
         settings=settings,
         pool=pool,
@@ -103,12 +133,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         graph=graph,
         pipeline=pipeline,
         consumer_task=consumer_task,
+        scheduler=scheduler,
         state=ServiceState(),
     )
-    logger.info("credibility_started", scored_queue=settings.scored_queue)
+    if scheduler is not None:
+        scheduler.start()
+    logger.info(
+        "credibility_started",
+        scored_queue=settings.scored_queue,
+        learning_enabled=settings.learning_enabled,
+    )
     try:
         yield
     finally:
+        if scheduler is not None:
+            scheduler.shutdown(wait=False)
         consumer_task.cancel()
         try:
             await consumer_task

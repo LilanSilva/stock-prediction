@@ -17,7 +17,7 @@ The agreed requirements are authoritative in [agreed-system-requirements.md](../
 
 1. Ingestion polls the small P06-approved source set, normalizes and stores new articles, then publishes `ArticleIngested`. GDELT remains optional until its failure behavior and corpus path pass.
 2. Cleansing removes near-duplicates, maps multilingual actions locally, conservatively clusters related coverage, and publishes one provenance-rich `EventDetected` when a cluster is ready.
-3. Prediction groups distinct events by canonical asset in a 60-minute event-time context window. Graph paths produce signed forces.
+3. Prediction groups distinct events by canonical asset in a 60-minute event-time context window. Graph paths produce signed forces. Conditioned edges fire only when the event's `context_tags` are active, an event `polarity` of `RESOLUTION` inverts the edge sign, and a price-derived `RISK_PREMIUM_ELEVATED` condition gates de-escalation reversals so a resolved factor only predicts a drop when there is a premium to unwind.
 4. Prediction publishes graph-only results for M1. Genuine conflict LLM arbitration is deferred after the POC-6 `STOP` result unless a new controlled hypothesis is approved.
 5. Verification persists the prediction's evaluation state, resolves its baseline and settlement sessions, and publishes one dual-session `PriceRequested`.
 6. Market Data persists the request before acknowledgement, fetches both closes, and publishes one `PriceObserved`.
@@ -44,8 +44,7 @@ The agreed requirements are authoritative in [agreed-system-requirements.md](../
 - Service-owned schemas: `ingestion`, `cleansing`, `prediction`, `market_data`, `verification`, `credibility`.
 - A service writes only its own schema. Cross-service reads use approved views or messages.
 - The Gateway receives read-only grants.
-- Neo4j stores only the causal graph and learned edge state.
-- Provider symbols are adapter details; all business boundaries use canonical asset IDs.
+- Neo4j stores only the causal graph and learned edge state.- Provider symbols are adapter details; all business boundaries use canonical asset IDs.
 
 ## 5. Messaging architecture
 

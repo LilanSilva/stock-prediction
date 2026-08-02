@@ -25,6 +25,26 @@ After the contract freeze and POC-6 updates are propagated, affected tasks will 
 - Use local deterministic processing before LLM calls and record token metadata without additional calls.
 - Formal `FR-*`, `NFR-*`, and `BR-*` traceability is removed.
 
+## Conditional causality (condition-qualified causal edges + historical learning)
+
+- `EventDetected` carries optional `polarity` (`OCCURRENCE`/`RESOLUTION`, default `OCCURRENCE`) and
+  `context_tags` (list[ConditionCode], default `[]`). Additive, backward-compatible within major
+  version 1.
+- The causal graph stores the condition as a property on the `CAUSES` edge; each
+  `(factor, asset, condition)` is a distinct edge. Unconditional edges omit `condition` and always
+  fire. The blanket `MILITARY_CONFLICT -> BRENT_OIL` edge is superseded by conditioned edges
+  (`TRANSPORT_AFFECTED` fires oil; `SAFE_HAVEN_ONLY` fires gold only).
+- `ContributingEdge.edge_id` is `FACTOR->ASSET` (unconditional) or `FACTOR|CONDITION->ASSET`
+  (conditioned). Credibility parses both forms.
+- Prediction: conditions gate which edges fire; a `RESOLUTION` event inverts the edge sign; a
+  `RESOLUTION`-driven DOWN on an asset is suppressed unless `RISK_PREMIUM_ELEVATED` is active
+  (derived from Market Data `GET /prices/recent`). Still graph-only and zero prediction-time LLM
+  calls (POC-6 `STOP` preserved).
+- Credibility owns an offline, deterministic structure learner
+  (`python -m credibility.learning.run`) that mines historical `EventDetected` payloads against
+  realized price moves and upserts conditioned edges. It is a batch job, not an always-on service,
+  and reads `cleansing.*`/`market_data.*` read-only as an offline-analytics exception.
+
 ## Epic overrides
 
 ### P06 POC-6 Validation Remediation

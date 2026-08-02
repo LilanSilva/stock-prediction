@@ -11,8 +11,10 @@ from shared.graph import FiringEdge
 from shared.graph.exceptions import GraphError
 from shared.schemas.messages import (
     AssetId,
+    ConditionCode,
     DecisionMethod,
     EventDetected,
+    EventPolarity,
     EventType,
     Horizon,
     PredictionMade,
@@ -38,6 +40,8 @@ class PipelineRepository(Protocol):
         first_seen_at: datetime,
         window_start: datetime,
         window_end: datetime,
+        polarity: EventPolarity = EventPolarity.OCCURRENCE,
+        context_tags: list[ConditionCode] | None = None,
     ) -> None: ...
 
     async def claim_ready_contexts(
@@ -61,8 +65,17 @@ class GraphSource(Protocol):
     """Structural type for the causal-graph read client."""
 
     async def get_firing_edges(
-        self, event_type: EventType, asset_ids: list[AssetId] | None = None
+        self,
+        event_type: EventType,
+        asset_ids: list[AssetId] | None = None,
+        conditions: set[ConditionCode] | None = None,
     ) -> list[FiringEdge]: ...
+
+
+class PriceSource(Protocol):
+    """Structural type for the recent-price reader used by the Scope-B price gate."""
+
+    async def is_elevated(self, asset_id: AssetId) -> bool: ...
 
 
 class PredictionPipeline:
@@ -72,10 +85,12 @@ class PredictionPipeline:
         self,
         repository: PipelineRepository,
         graph: GraphSource,
+        price_reader: PriceSource,
         settings: PredictionSettings,
     ) -> None:
         self._repo = repository
         self._graph = graph
+        self._price_reader = price_reader
         self._settings = settings
 
     async def process_event(self, event: EventDetected) -> None:
@@ -96,22 +111,60 @@ class PredictionPipeline:
                 first_seen_at=event.first_seen_at,
                 window_start=window_start,
                 window_end=window_end,
+                polarity=event.polarity,
+                context_tags=list(event.context_tags),
             )
         logger.info(
             "event_contextualized",
             event_id=str(event.event_id),
             event_type=event.event_type.value,
+            polarity=event.polarity.value,
+            context_tags=[c.value for c in event.context_tags],
             assets=[a.value for a in event.affected_asset_ids],
         )
 
     async def _firing_edges(
-        self, asset_id: AssetId, events: list[ContextEvent]
+        self, asset_id: AssetId, events: list[ContextEvent], *, elevated: bool
     ) -> list[FiringEdge]:
         # Distinct event types only: repeated coverage of one factor must not double-count it.
+        # Each factor's conditioned edges are gated by that factor's aggregated context tags; an
+        # empty tag set fires only the factor's unconditional edges. An elevated price injects the
+        # asset-level RISK_PREMIUM_ELEVATED condition so any price-conditioned edges may fire.
+        conditions_by_type = self._conditions_by_type(events)
+        extra = {ConditionCode.RISK_PREMIUM_ELEVATED} if elevated else set()
         edges: list[FiringEdge] = []
-        for event_type in {e.event_type for e in events}:
-            edges.extend(await self._graph.get_firing_edges(event_type, [asset_id]))
+        for event_type, conditions in conditions_by_type.items():
+            edges.extend(
+                await self._graph.get_firing_edges(
+                    event_type, [asset_id], conditions=conditions | extra
+                )
+            )
         return edges
+
+    @staticmethod
+    def _conditions_by_type(
+        events: list[ContextEvent],
+    ) -> dict[EventType, set[ConditionCode]]:
+        by_type: dict[EventType, set[ConditionCode]] = {}
+        for event in events:
+            by_type.setdefault(event.event_type, set()).update(event.context_tags)
+        return by_type
+
+    @staticmethod
+    def _polarity_by_type(
+        events: list[ContextEvent],
+    ) -> dict[EventType, EventPolarity]:
+        # Conservative: flip a factor only when every contributing event of that type resolved;
+        # any OCCURRENCE (the default) leaves the edge's stored sign unchanged.
+        polarities: dict[EventType, list[EventPolarity]] = {}
+        for event in events:
+            polarities.setdefault(event.event_type, []).append(event.polarity)
+        return {
+            event_type: EventPolarity.RESOLUTION
+            if pols and all(p is EventPolarity.RESOLUTION for p in pols)
+            else EventPolarity.OCCURRENCE
+            for event_type, pols in polarities.items()
+        }
 
     async def close_ready_contexts(self) -> int:
         """Close all due contexts into predictions. Returns the number of predictions produced."""
@@ -122,8 +175,9 @@ class PredictionPipeline:
         produced = 0
         for record in claimed:
             events = await self._repo.load_context_events(record.context_id)
+            elevated = await self._price_reader.is_elevated(record.asset_id)
             try:
-                edges = await self._firing_edges(record.asset_id, events)
+                edges = await self._firing_edges(record.asset_id, events, elevated=elevated)
             except GraphError as exc:
                 logger.warning(
                     "graph_inference_deferred",
@@ -141,6 +195,8 @@ class PredictionPipeline:
                 deadband=self._settings.decision_deadband,
                 small_max=self._settings.magnitude_small_max,
                 medium_max=self._settings.magnitude_medium_max,
+                polarity_by_type=self._polarity_by_type(events),
+                elevated=elevated,
             )
             if decision is None:
                 await self._repo.set_context_state(record.context_id, ContextState.PREDICTED)

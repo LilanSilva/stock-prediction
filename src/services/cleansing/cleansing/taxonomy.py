@@ -11,7 +11,7 @@ canonical taxonomy locally, never translated by an LLM (functional document sec 
 
 from __future__ import annotations
 
-from shared.schemas.messages import AssetId, EventType
+from shared.schemas.messages import AssetId, ConditionCode, EventPolarity, EventType
 
 # Keyword/lemma (lowercase) -> canonical event type. Swedish and English forms map to the same type.
 ACTION_TAXONOMY: dict[str, EventType] = {
@@ -91,7 +91,9 @@ ACTION_TAXONOMY: dict[str, EventType] = {
     "översvämning": EventType.NATURAL_DISASTER,  # sv
 }
 
-# Canonical asset inference keywords (lowercase). Only the POC assets are recognized.
+# Canonical asset inference keywords (lowercase). Commodities plus industry-sector bellwethers.
+# Keywords are distinctive whole words/phrases to avoid false positives (e.g. "artificial
+# intelligence" not the bare token "ai").
 ASSET_KEYWORDS: dict[AssetId, tuple[str, ...]] = {
     AssetId.GOLD: ("gold", "bullion", "guld", "xau"),
     AssetId.BRENT_OIL: (
@@ -103,6 +105,29 @@ ASSET_KEYWORDS: dict[AssetId, tuple[str, ...]] = {
         "olja",
         "råolja",
     ),
+    AssetId.PHARMA: ("pharmaceutical", "pharma", "medicine", "drugmaker", "insulin", "vaccine"),
+    AssetId.DEFENSE_AEROSPACE: (
+        "defense",
+        "defence",
+        "lockheed",
+        "fighter jet",
+        "aircraft",
+        "aerospace",
+        "missile",
+    ),
+    AssetId.AI_COMPUTE: ("artificial intelligence", "nvidia", "gpu", "machine learning"),
+    AssetId.SEMICONDUCTOR: ("semiconductor", "chipmaker", "microchip", "foundry", "wafer", "cpu"),
+    AssetId.SOFTWARE: ("microsoft", "windows", "operating system", "azure"),
+    AssetId.ENTERPRISE_SOFTWARE: ("oracle", "erp", "enterprise software"),
+    AssetId.INTERNET_SEARCH: ("google", "alphabet", "search engine", "android"),
+    AssetId.CONSUMER_ELECTRONICS: ("apple", "iphone", "smartphone"),
+    AssetId.BANKING: ("bank", "jpmorgan", "banking", "lender"),
+    AssetId.PAYMENTS_FINANCE: ("visa", "mastercard", "payments network", "asset manager"),
+    AssetId.AUTOMOTIVE: ("automaker", "carmaker", "electric vehicle", "automobile"),
+    AssetId.FOOD_BEVERAGE: ("coca-cola", "beverage", "packaged food", "soft drink"),
+    AssetId.REAL_ESTATE: ("real estate", "housing", "homebuilder", "property market"),
+    AssetId.INDUSTRIAL: ("industrial manufacturer", "factory output", "machinery maker"),
+    AssetId.APPAREL: ("apparel", "clothing", "sportswear", "footwear"),
 }
 
 
@@ -150,3 +175,109 @@ def gate2_compatible(left: EventType, right: EventType) -> bool:
     known. OTHER is never compatible with anything (including another OTHER), because unknown
     events must not be silently merged."""
     return left == right and left != EventType.OTHER
+
+
+# Downstream assets implied by each canonical event type, mirroring the seeded Neo4j CAUSES edges
+# (infra/neo4j/init/04+05). Used only as a fallback when title/body keywords name no asset, so a
+# geopolitical headline like "USA calls off Iran attack" still resolves to its graph assets. Assets
+# are listed in canonical enum order (GOLD, BRENT_OIL).
+EVENT_TYPE_ASSETS: dict[EventType, tuple[AssetId, ...]] = {
+    EventType.MILITARY_CONFLICT: (AssetId.GOLD, AssetId.BRENT_OIL),
+    EventType.STRAIT_CLOSURE: (AssetId.GOLD, AssetId.BRENT_OIL),
+    EventType.SUPPLY_DISRUPTION: (AssetId.BRENT_OIL,),
+    EventType.SANCTIONS: (AssetId.GOLD, AssetId.BRENT_OIL),
+    EventType.RATE_DECISION: (AssetId.GOLD, AssetId.BRENT_OIL),
+    EventType.INFLATION_CHANGE: (AssetId.GOLD,),
+    EventType.RECESSION_SIGNAL: (AssetId.GOLD, AssetId.BRENT_OIL),
+    EventType.NATURAL_DISASTER: (AssetId.GOLD, AssetId.BRENT_OIL),
+    EventType.POLITICAL_TRANSITION: (AssetId.GOLD,),
+}
+
+# Resolution/negation cues (lowercase). Presence of any flips event polarity to RESOLUTION, which
+# inverts the causal sign at decision time (e.g. a planned strike called off pushes oil DOWN).
+# English and Swedish forms are listed because articles are never translated by an LLM.
+RESOLUTION_CUES: tuple[str, ...] = (
+    "calls off",
+    "call off",
+    "called off",
+    "calling off",
+    "cancel",
+    "cancels",
+    "cancelled",
+    "canceled",
+    "avert",
+    "averts",
+    "averted",
+    "ceasefire",
+    "truce",
+    "de-escalate",
+    "de-escalation",
+    "agreement",
+    "deal",
+    "resolved",
+    "avbryter",  # sv: calls off / cancels
+    "ställer in",  # sv: calls off
+    "blåser av",  # sv: calls off
+    "drar tillbaka",  # sv: withdraws
+)
+
+# Transport/supply cues (lowercase) that qualify a factor as physically threatening oil logistics,
+# selecting the TRANSPORT_AFFECTED conditioned edge over the SAFE_HAVEN_ONLY one.
+TRANSPORT_CUES: tuple[str, ...] = (
+    "strait",
+    "hormuz",
+    "shipping",
+    "tanker",
+    "pipeline",
+    "refinery",
+    "blockade",
+    "port",
+    "export terminal",
+    "oil route",
+    "sjöfart",  # sv: shipping
+)
+
+# Event types whose geopolitical nature warrants a SAFE_HAVEN_ONLY tag when no transport cue is
+# present (a distant conflict/sanction/transition is a safe-haven bid for gold, not an oil shock).
+GEOPOLITICAL_EVENT_TYPES: frozenset[EventType] = frozenset(
+    {
+        EventType.MILITARY_CONFLICT,
+        EventType.SANCTIONS,
+        EventType.POLITICAL_TRANSITION,
+    }
+)
+
+
+def _cue_present(haystack: str, cue: str) -> bool:
+    """Whole-word match for single tokens; substring match for multi-word phrases."""
+    needle = cue if " " in cue else f" {cue} "
+    return needle in haystack
+
+
+def classify_polarity(text: str) -> EventPolarity:
+    """Return RESOLUTION when a de-escalation/negation cue is present, else OCCURRENCE."""
+    haystack = f" {text.lower()} "
+    for cue in RESOLUTION_CUES:
+        if _cue_present(haystack, cue):
+            return EventPolarity.RESOLUTION
+    return EventPolarity.OCCURRENCE
+
+
+def infer_conditions(text: str, event_type: EventType) -> list[ConditionCode]:
+    """Deterministically infer context tags gating which conditioned causal edge fires.
+
+    A transport/supply cue yields TRANSPORT_AFFECTED. Otherwise a geopolitical event type yields
+    SAFE_HAVEN_ONLY. RISK_PREMIUM_ELEVATED is never inferred here; it is price-derived and added
+    later by Prediction.
+    """
+    haystack = f" {text.lower()} "
+    if any(_cue_present(haystack, cue) for cue in TRANSPORT_CUES):
+        return [ConditionCode.TRANSPORT_AFFECTED]
+    if event_type in GEOPOLITICAL_EVENT_TYPES:
+        return [ConditionCode.SAFE_HAVEN_ONLY]
+    return []
+
+
+def assets_for_event_type(event_type: EventType) -> tuple[AssetId, ...]:
+    """Return the downstream assets a canonical event type maps to (empty when it has no edge)."""
+    return EVENT_TYPE_ASSETS.get(event_type, ())

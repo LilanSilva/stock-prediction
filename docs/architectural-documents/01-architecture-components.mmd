@@ -49,7 +49,9 @@ flowchart TB
     cleanse -. ambiguous only .-> llm
     predict -. future approved arbitration only .-> llm
     predict --> kgdb
+    predict -.->|read recent closes /prices/recent| market
     cred -->|idempotent edge updates| kgdb
+    cred -.->|offline structure learner upserts conditioned edges| kgdb
 
     ingest --- rawdb
     cleanse --- evdb

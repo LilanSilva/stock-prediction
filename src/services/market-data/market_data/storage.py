@@ -19,6 +19,7 @@ import hashlib
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from typing import Protocol
 
 import asyncpg
@@ -33,6 +34,34 @@ from shared.schemas.messages import (
 STATE_PENDING = "PENDING"
 STATE_BASELINE_OBSERVED = "BASELINE_OBSERVED"
 STATE_COMPLETED = "COMPLETED"
+
+# Inclusive bounds for the recent-closes read query; caps the row count a single caller can pull.
+MIN_RECENT_SESSIONS = 1
+MAX_RECENT_SESSIONS = 250
+
+
+async def get_recent_closes(
+    pool: asyncpg.Pool, asset_id: AssetId, sessions: int
+) -> list[tuple[date, Decimal]]:
+    """Return the most recent (session, close) pairs for an asset, ordered by session DESC.
+
+    `sessions` is clamped to [MIN_RECENT_SESSIONS, MAX_RECENT_SESSIONS] so a direct caller cannot
+    request an unbounded scan; the canonical asset id and limit are passed as bound parameters.
+    """
+    bounded = max(MIN_RECENT_SESSIONS, min(sessions, MAX_RECENT_SESSIONS))
+    rows = await pool.fetch(
+        """
+        SELECT session, close
+        FROM market_data.close_observations
+        WHERE asset_id = $1
+        ORDER BY session DESC
+        LIMIT $2
+        """,
+        str(asset_id),
+        bounded,
+    )
+    return [(row["session"], row["close"]) for row in rows]
+
 
 
 def observation_content_hash(asset_id: AssetId, observation: CloseObservation) -> str:

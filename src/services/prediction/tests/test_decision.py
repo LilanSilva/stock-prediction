@@ -1,7 +1,14 @@
 from __future__ import annotations
 
 from shared.graph import FiringEdge
-from shared.schemas.messages import AssetId, Direction, EventType, Magnitude
+from shared.schemas.messages import (
+    AssetId,
+    ConditionCode,
+    Direction,
+    EventPolarity,
+    EventType,
+    Magnitude,
+)
 
 from prediction.decision import decide
 
@@ -16,6 +23,7 @@ def _edge(
     asset: AssetId = AssetId.GOLD,
     alpha: float = 1.0,
     beta: float = 1.0,
+    condition: ConditionCode | None = None,
 ) -> FiringEdge:
     return FiringEdge(
         factor_id=factor,
@@ -25,6 +33,7 @@ def _edge(
         confidence=0.7,
         alpha=alpha,
         beta=beta,
+        condition=condition,
     )
 
 
@@ -91,3 +100,78 @@ def test_contributing_edge_reports_reliability_and_weight() -> None:
     assert contributing.current_weight == 0.75  # reliability alpha/(alpha+beta)
     assert contributing.influence_weight == 0.75  # expert magnitude
     assert "MILITARY_CONFLICT" in decision.rationale
+
+
+def test_resolution_polarity_flips_edge_sign() -> None:
+    edge = _edge(
+        EventType.MILITARY_CONFLICT,
+        Direction.UP,
+        0.65,
+        asset=AssetId.BRENT_OIL,
+        condition=ConditionCode.TRANSPORT_AFFECTED,
+    )
+    polarities = {EventType.MILITARY_CONFLICT: EventPolarity.RESOLUTION}
+    # The Scope-B gate requires an elevated price for a RESOLUTION-driven DOWN to apply.
+    decision = decide(
+        AssetId.BRENT_OIL, [edge], **_KW, polarity_by_type=polarities, elevated=True
+    )
+    assert decision is not None
+    assert decision.direction == Direction.DOWN
+    contributing = decision.contributing_edges[0]
+    # Reported sign follows the flipped force; the edge identity is unchanged.
+    assert contributing.direction == Direction.DOWN
+    assert contributing.edge_id == "MILITARY_CONFLICT|TRANSPORT_AFFECTED->BRENT_OIL"
+
+
+def test_occurrence_polarity_leaves_sign_unchanged() -> None:
+    edge = _edge(EventType.MILITARY_CONFLICT, Direction.UP, 0.65, asset=AssetId.BRENT_OIL)
+    polarities = {EventType.MILITARY_CONFLICT: EventPolarity.OCCURRENCE}
+    decision = decide(AssetId.BRENT_OIL, [edge], **_KW, polarity_by_type=polarities)
+    assert decision is not None
+    assert decision.direction == Direction.UP
+
+
+def test_resolution_down_suppressed_when_not_elevated() -> None:
+    edge = _edge(
+        EventType.MILITARY_CONFLICT,
+        Direction.UP,
+        0.65,
+        asset=AssetId.BRENT_OIL,
+        condition=ConditionCode.TRANSPORT_AFFECTED,
+    )
+    polarities = {EventType.MILITARY_CONFLICT: EventPolarity.RESOLUTION}
+    # Flat price: the flipped-to-DOWN edge is dropped, leaving no material edge -> no prediction.
+    decision = decide(
+        AssetId.BRENT_OIL, [edge], **_KW, polarity_by_type=polarities, elevated=False
+    )
+    assert decision is None
+
+
+def test_resolution_down_applies_when_elevated() -> None:
+    edge = _edge(
+        EventType.MILITARY_CONFLICT,
+        Direction.UP,
+        0.65,
+        asset=AssetId.BRENT_OIL,
+        condition=ConditionCode.TRANSPORT_AFFECTED,
+    )
+    polarities = {EventType.MILITARY_CONFLICT: EventPolarity.RESOLUTION}
+    decision = decide(
+        AssetId.BRENT_OIL, [edge], **_KW, polarity_by_type=polarities, elevated=True
+    )
+    assert decision is not None
+    assert decision.direction == Direction.DOWN
+    assert decision.contributing_edges[0].direction == Direction.DOWN
+
+
+def test_occurrence_up_is_unaffected_by_elevated_state() -> None:
+    edge = _edge(EventType.MILITARY_CONFLICT, Direction.UP, 0.65, asset=AssetId.BRENT_OIL)
+    polarities = {EventType.MILITARY_CONFLICT: EventPolarity.OCCURRENCE}
+    not_elevated = decide(
+        AssetId.BRENT_OIL, [edge], **_KW, polarity_by_type=polarities, elevated=False
+    )
+    elevated = decide(
+        AssetId.BRENT_OIL, [edge], **_KW, polarity_by_type=polarities, elevated=True
+    )
+    assert not_elevated is not None and not_elevated.direction == Direction.UP
+    assert elevated is not None and elevated.direction == Direction.UP

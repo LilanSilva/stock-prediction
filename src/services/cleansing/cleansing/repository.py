@@ -79,8 +79,8 @@ class CleansingRepository:
             """
             INSERT INTO cleansing.article_actions
                 (article_id, actor, action_lemma, object, original_lemma,
-                 event_type, language, affected_asset_ids)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                 event_type, language, affected_asset_ids, polarity, context_tags)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             ON CONFLICT (article_id) DO NOTHING
             """,
             article_id,
@@ -91,6 +91,8 @@ class CleansingRepository:
             action.event_type.value,
             language,
             [asset.value for asset in action.affected_asset_ids],
+            action.polarity.value,
+            [tag.value for tag in action.context_tags],
         )
 
     async def find_candidate_clusters(
@@ -294,7 +296,7 @@ class CleansingRepository:
             await self._pool.fetch(
                 """
                 SELECT a.article_id, a.actor, a.action_lemma, a.object, a.event_type,
-                       a.affected_asset_ids
+                       a.affected_asset_ids, a.polarity, a.context_tags
                 FROM cleansing.article_actions a
                 JOIN cleansing.cluster_articles ca ON ca.article_id = a.article_id
                 WHERE ca.cluster_id = $1

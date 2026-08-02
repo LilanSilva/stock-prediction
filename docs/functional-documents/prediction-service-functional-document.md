@@ -30,9 +30,16 @@ The prediction idempotency key is `(asset_id, context_window_start, ONE_TRADING_
 For every event in a ready context:
 
 - Match its canonical event type to graph nodes.
+- Gate conditioned edges by the event's `context_tags` (e.g. `TRANSPORT_AFFECTED`): a conditioned
+  edge fires only when its condition is active; unconditional edges always fire.
 - Traverse only configured, bounded causal paths relevant to the asset.
-- Convert retained paths into signed `UP`, `DOWN`, or `NEUTRAL` forces.
-- Include edge ID, direction, current weight, influence weight, and compact path provenance.
+- Convert retained paths into signed `UP`, `DOWN`, or `NEUTRAL` forces. When the contributing event
+  `polarity` is `RESOLUTION` (de-escalation), invert the edge sign before summing.
+- Derive `RISK_PREMIUM_ELEVATED` at decision time from recent price history (Market Data
+  `GET /prices/recent`). A `RESOLUTION`-driven `DOWN` on an asset is suppressed unless the asset is
+  elevated, so a de-escalation only predicts a drop when there is a premium to unwind.
+- Include edge ID, direction, current weight, influence weight, and compact path provenance. The
+  edge ID is `FACTOR->ASSET` (unconditional) or `FACTOR|CONDITION->ASSET` (conditioned).
 - Ignore/quarantine unknown graph mappings rather than inventing edges.
 
 Neo4j stores causal graph state only. Prediction context and published prediction records are stored in PostgreSQL.

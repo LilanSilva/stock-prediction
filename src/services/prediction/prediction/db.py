@@ -31,9 +31,17 @@ CREATE TABLE IF NOT EXISTS prediction.context_events (
     event_id       UUID NOT NULL,
     event_type     TEXT NOT NULL,
     first_seen_at  TIMESTAMPTZ NOT NULL,
+    polarity       TEXT NOT NULL DEFAULT 'OCCURRENCE',
+    context_tags   TEXT[] NOT NULL DEFAULT '{}',
     added_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (context_id, event_id)
 );
+
+-- Conditional-causality columns for already-provisioned databases (idempotent).
+ALTER TABLE prediction.context_events
+    ADD COLUMN IF NOT EXISTS polarity TEXT NOT NULL DEFAULT 'OCCURRENCE';
+ALTER TABLE prediction.context_events
+    ADD COLUMN IF NOT EXISTS context_tags TEXT[] NOT NULL DEFAULT '{}';
 
 -- One immutable prediction per ready asset/context version. The idempotency key
 -- (asset_id, window_start, horizon, context_version) prevents duplicate identities.

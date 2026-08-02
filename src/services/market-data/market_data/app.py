@@ -17,29 +17,51 @@ import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from decimal import Decimal
+from typing import Annotated
 
 import asyncpg
 import httpx
 import structlog
 from aio_pika.abc import AbstractIncomingMessage
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from shared.logging import setup_logging
 from shared.messaging.client import RabbitMQClient
 from shared.messaging.exceptions import MessagePoisonError
 from shared.reference import supported_assets
-from shared.schemas.messages import PriceRequested
+from shared.schemas.messages import AssetId, PriceRequested
 
 from market_data.adapters.biquote import BiquoteAdapter
 from market_data.config import MarketDataSettings
 from market_data.db import apply_schema, create_pool
 from market_data.exceptions import InvalidObservationError
 from market_data.handler import PriceRequestProcessor
-from market_data.storage import OutboxPublisher, PriceRequestRepository
+from market_data.storage import (
+    MAX_RECENT_SESSIONS,
+    MIN_RECENT_SESSIONS,
+    OutboxPublisher,
+    PriceRequestRepository,
+    get_recent_closes,
+)
 
 logger = structlog.get_logger(__name__)
+
+
+class RecentClose(BaseModel):
+    """A single immutable session close. `close` serializes as a string to avoid float rounding."""
+
+    session: date
+    close: Decimal
+
+
+class RecentClosesResponse(BaseModel):
+    asset_id: AssetId
+    closes: list[RecentClose]
+
 
 
 @dataclass
@@ -226,3 +248,23 @@ async def ready() -> JSONResponse:
     ok = all(checks.values())
     status_code = 200 if ok else 503
     return JSONResponse({"ready": ok, "checks": checks}, status_code=status_code)
+
+
+@app.get("/prices/recent")
+async def prices_recent(
+    asset_id: Annotated[AssetId, Query(description="Canonical asset id (e.g. GOLD, BRENT_OIL).")],
+    sessions: Annotated[
+        int, Query(ge=MIN_RECENT_SESSIONS, le=MAX_RECENT_SESSIONS)
+    ] = 20,
+) -> RecentClosesResponse:
+    """Read-only recent closes for an asset. Canonical id only; provider symbols never leave here.
+
+    An unknown `asset_id` or out-of-range `sessions` is rejected by request validation (HTTP 422).
+    """
+    ctx: AppContext = app.state.ctx
+    pairs = await get_recent_closes(ctx.pool, asset_id, sessions)
+    return RecentClosesResponse(
+        asset_id=asset_id,
+        closes=[RecentClose(session=session, close=close) for session, close in pairs],
+    )
+

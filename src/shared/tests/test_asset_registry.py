@@ -14,8 +14,10 @@ from shared.reference import (
 from shared.schemas.messages import AssetId, PriceKind
 
 
-def test_supported_assets_are_the_poc_pair() -> None:
-    assert set(supported_assets()) == {AssetId.GOLD, AssetId.BRENT_OIL}
+def test_supported_assets_cover_every_canonical_asset() -> None:
+    # Every AssetId must have an approved reference series (commodities + sector bellwethers).
+    assert set(supported_assets()) == set(AssetId)
+    assert {AssetId.GOLD, AssetId.BRENT_OIL} <= set(supported_assets())
 
 
 @pytest.mark.parametrize(

@@ -39,7 +39,22 @@ Each contributing edge is judged against the actual market direction represented
 - Otherwise increment beta by that contribution.
 - Store evidence operation, before/after state, and score provenance.
 
+Contributing edges are keyed by the full edge ID, `FACTOR->ASSET` (unconditional) or
+`FACTOR|CONDITION->ASSET` (conditioned). Each `(factor, asset, condition)` triple is a distinct edge
+with its own Beta-Bernoulli counts, so evidence for a conditioned edge is never collapsed into the
+unconditional one.
+
 This allows a dissenting edge to receive evidence when it was right even if arbitration chose the other direction.
+
+## 5a. Offline structure learning
+
+Beyond online per-edge updates, Credibility owns a deterministic offline batch learner
+(`python -m credibility.learning.run`). It mines historical `EventDetected` payloads against realized
+next-session price moves, aggregates by `(factor, condition, polarity, asset)`, and upserts
+conditioned edges with data-derived direction/weight and Beta-Bernoulli priors. It is not an
+always-on service, performs no prediction-time work, uses no LLM, and reads `cleansing.*`/
+`market_data.*` read-only as an offline-analytics exception. Expert seeds remain the prior; the
+learner only refines or adds edges via idempotent `MERGE`.
 
 ## 6. Arbiter decision quality
 

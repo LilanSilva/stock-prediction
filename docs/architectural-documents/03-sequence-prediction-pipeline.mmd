@@ -6,6 +6,7 @@ sequenceDiagram
     participant C as Cleansing
     participant P as Prediction Context Aggregator
     participant KG as Neo4j
+    participant MD as Market Data
     participant LLM as LLM Gateway
 
     T->>I: Fire bounded polling job
@@ -14,17 +15,20 @@ sequenceDiagram
     EX->>C: cleansing.articles
     C->>C: SimHash, BGE-m3, taxonomy Gate 2
     alt Deterministic extraction is valid
-        C->>C: Build canonical EventDetected locally
+        C->>C: Build canonical EventDetected locally (polarity, context_tags)
     else Ambiguous merge or fact conflict
         C->>LLM: Compact untrusted article excerpts
         LLM-->>C: Schema-constrained event fields
     end
     C->>EX: event.detected
     EX->>P: prediction.events
-    P->>P: Add event to asset context window
+    P->>P: Add event to asset context window (store polarity, context_tags)
     Note over P: Context closes at watermark or creates a newer version for late events
-    P->>KG: Fetch relevant paths for all events in context
+    P->>MD: GET /prices/recent (is asset elevated?)
+    MD-->>P: Recent session closes
+    P->>KG: Fetch edges for event type gated by active conditions
     KG-->>P: Signed weighted forces by canonical asset
+    Note over P: RESOLUTION inverts edge sign; resolution-driven DOWN suppressed unless RISK_PREMIUM_ELEVATED
     alt All retained forces agree
         P->>P: Deterministic GRAPH_ONLY prediction
     else Forces conflict in M1

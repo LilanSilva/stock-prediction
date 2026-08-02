@@ -11,6 +11,7 @@ from shared.graph.models import FiringEdge
 from shared.schemas.messages import (
     AssetId,
     CloseObservation,
+    ConditionCode,
     ContributingEdge,
     Direction,
     EventType,
@@ -25,17 +26,26 @@ from credibility.updater import WeightUpdate
 
 
 class FakeGraph:
-    """In-memory stand-in for the shared CausalGraphClient."""
+    """In-memory stand-in for the shared CausalGraphClient.
 
-    def __init__(self, edges: dict[tuple[EventType, AssetId], tuple[float, float]]) -> None:
+    Edges are keyed by ``(factor, asset, condition)`` so conditioned and unconditional edges that
+    share a ``(factor, asset)`` pair stay distinct (``condition=None`` is the unconditional edge).
+    """
+
+    def __init__(
+        self,
+        edges: dict[tuple[EventType, AssetId, ConditionCode | None], tuple[float, float]],
+    ) -> None:
         self._edges = edges
-        self.writes: list[tuple[EventType, AssetId, float, float]] = []
+        self.writes: list[
+            tuple[EventType, AssetId, ConditionCode | None, float, float]
+        ] = []
 
     async def get_firing_edges(
         self, event_type: EventType, asset_ids: list[AssetId] | None = None
     ) -> list[FiringEdge]:
         out: list[FiringEdge] = []
-        for (factor, asset), (alpha, beta) in self._edges.items():
+        for (factor, asset, condition), (alpha, beta) in self._edges.items():
             if factor != event_type:
                 continue
             if asset_ids is not None and asset not in asset_ids:
@@ -49,15 +59,22 @@ class FakeGraph:
                     confidence=0.5,
                     alpha=alpha,
                     beta=beta,
+                    condition=condition,
                 )
             )
         return out
 
     async def update_edge_weight(
-        self, factor_id: EventType, asset_id: AssetId, *, alpha: float, beta: float
+        self,
+        factor_id: EventType,
+        asset_id: AssetId,
+        *,
+        alpha: float,
+        beta: float,
+        condition: ConditionCode | None = None,
     ) -> None:
-        self.writes.append((factor_id, asset_id, alpha, beta))
-        self._edges[(factor_id, asset_id)] = (alpha, beta)
+        self.writes.append((factor_id, asset_id, condition, alpha, beta))
+        self._edges[(factor_id, asset_id, condition)] = (alpha, beta)
 
 
 class FakeRepo:
@@ -140,8 +157,20 @@ def _scored(
     )
 
 
-def test_parse_edge_id_valid() -> None:
-    assert parse_edge_id("MILITARY_CONFLICT->GOLD") == (EventType.MILITARY_CONFLICT, AssetId.GOLD)
+def test_parse_edge_id_unconditional() -> None:
+    assert parse_edge_id("MILITARY_CONFLICT->GOLD") == (
+        EventType.MILITARY_CONFLICT,
+        None,
+        AssetId.GOLD,
+    )
+
+
+def test_parse_edge_id_conditioned() -> None:
+    assert parse_edge_id("MILITARY_CONFLICT|TRANSPORT_AFFECTED->BRENT_OIL") == (
+        EventType.MILITARY_CONFLICT,
+        ConditionCode.TRANSPORT_AFFECTED,
+        AssetId.BRENT_OIL,
+    )
 
 
 def test_parse_edge_id_malformed() -> None:
@@ -154,11 +183,16 @@ def test_parse_edge_id_unknown_factor() -> None:
         parse_edge_id("NOT_A_FACTOR->GOLD")
 
 
+def test_parse_edge_id_unknown_condition() -> None:
+    with pytest.raises(InvalidScoredMessageError):
+        parse_edge_id("MILITARY_CONFLICT|NOT_A_CONDITION->BRENT_OIL")
+
+
 async def test_hit_adds_proportional_credit_to_edge_alpha() -> None:
     graph = FakeGraph(
         {
-            (EventType.MILITARY_CONFLICT, AssetId.GOLD): (1.0, 1.0),
-            (EventType.INFLATION_CHANGE, AssetId.GOLD): (1.0, 1.0),
+            (EventType.MILITARY_CONFLICT, AssetId.GOLD, None): (1.0, 1.0),
+            (EventType.INFLATION_CHANGE, AssetId.GOLD, None): (1.0, 1.0),
         }
     )
     repo = FakeRepo()
@@ -171,24 +205,24 @@ async def test_hit_adds_proportional_credit_to_edge_alpha() -> None:
     applied = await pipeline.process(message)
     assert applied is True
 
-    written = {(f, a): (alpha, beta) for f, a, alpha, beta in graph.writes}
+    written = {(f, a): (alpha, beta) for f, a, _c, alpha, beta in graph.writes}
     assert written[(EventType.MILITARY_CONFLICT, AssetId.GOLD)] == pytest.approx((1.7, 1.0))
     assert written[(EventType.INFLATION_CHANGE, AssetId.GOLD)] == pytest.approx((1.3, 1.0))
 
 
 async def test_miss_adds_proportional_credit_to_edge_beta() -> None:
-    graph = FakeGraph({(EventType.SANCTIONS, AssetId.BRENT_OIL): (2.0, 2.0)})
+    graph = FakeGraph({(EventType.SANCTIONS, AssetId.BRENT_OIL, None): (2.0, 2.0)})
     repo = FakeRepo()
     pipeline = CredibilityPipeline(repo, graph, prior_floor=1.0)
     message = _scored(is_correct=False, edges=[("SANCTIONS->BRENT_OIL", 0.5)], sources=[])
     await pipeline.process(message)
 
-    factor, asset, alpha, beta = graph.writes[0]
+    _factor, _asset, _condition, alpha, beta = graph.writes[0]
     assert (alpha, beta) == pytest.approx((2.0, 3.0))  # sole edge -> full credit 1.0 to beta
 
 
 async def test_missing_edge_is_skipped_not_fatal() -> None:
-    graph = FakeGraph({(EventType.MILITARY_CONFLICT, AssetId.GOLD): (1.0, 1.0)})
+    graph = FakeGraph({(EventType.MILITARY_CONFLICT, AssetId.GOLD, None): (1.0, 1.0)})
     repo = FakeRepo()
     pipeline = CredibilityPipeline(repo, graph, prior_floor=1.0)
     message = _scored(
@@ -222,7 +256,7 @@ async def test_sources_get_equal_credit_and_new_source_starts_at_prior() -> None
 
 async def test_duplicate_prediction_is_skipped() -> None:
     pid = uuid.uuid4()
-    graph = FakeGraph({(EventType.SANCTIONS, AssetId.GOLD): (1.0, 1.0)})
+    graph = FakeGraph({(EventType.SANCTIONS, AssetId.GOLD, None): (1.0, 1.0)})
     repo = FakeRepo(processed={pid})
     pipeline = CredibilityPipeline(repo, graph, prior_floor=1.0)
     message = _scored(
@@ -235,7 +269,7 @@ async def test_duplicate_prediction_is_skipped() -> None:
 
 
 async def test_empty_sources_still_processes() -> None:
-    graph = FakeGraph({(EventType.SANCTIONS, AssetId.GOLD): (1.0, 1.0)})
+    graph = FakeGraph({(EventType.SANCTIONS, AssetId.GOLD, None): (1.0, 1.0)})
     repo = FakeRepo()
     pipeline = CredibilityPipeline(repo, graph, prior_floor=1.0)
     message = _scored(is_correct=True, edges=[("SANCTIONS->GOLD", 1.0)], sources=[])
@@ -243,3 +277,36 @@ async def test_empty_sources_still_processes() -> None:
     assert applied is True
     _, updates = repo.committed[0]
     assert all(u.entity_type == "edge" for u in updates)
+
+
+async def test_conditioned_edge_passes_condition_to_graph_and_keys_history_by_full_id() -> None:
+    # The conditioned edge must be selected and updated distinctly from the sibling unconditional
+    # edge that shares the same (factor, asset) pair; only the conditioned one carries the message.
+    graph = FakeGraph(
+        {
+            (EventType.MILITARY_CONFLICT, AssetId.BRENT_OIL, None): (1.0, 1.0),
+            (EventType.MILITARY_CONFLICT, AssetId.BRENT_OIL, ConditionCode.TRANSPORT_AFFECTED): (
+                1.0,
+                1.0,
+            ),
+        }
+    )
+    repo = FakeRepo()
+    pipeline = CredibilityPipeline(repo, graph, prior_floor=1.0)
+    edge_id = "MILITARY_CONFLICT|TRANSPORT_AFFECTED->BRENT_OIL"
+    message = _scored(is_correct=True, edges=[(edge_id, 1.0)], sources=[])
+    applied = await pipeline.process(message)
+    assert applied is True
+
+    assert len(graph.writes) == 1
+    factor, asset, condition, alpha, beta = graph.writes[0]
+    assert (factor, asset, condition) == (
+        EventType.MILITARY_CONFLICT,
+        AssetId.BRENT_OIL,
+        ConditionCode.TRANSPORT_AFFECTED,
+    )
+    assert (alpha, beta) == pytest.approx((2.0, 1.0))  # sole edge -> full hit credit to alpha
+
+    _, updates = repo.committed[0]
+    edge_ids = {u.entity_id for u in updates if u.entity_type == "edge"}
+    assert edge_ids == {edge_id}  # history keyed by the full conditioned edge id, not collapsed

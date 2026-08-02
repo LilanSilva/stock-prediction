@@ -19,7 +19,9 @@ SCHEMA_DDL = """
 CREATE SCHEMA IF NOT EXISTS credibility;
 
 -- Current Beta-Bernoulli state. One row per (entity_id, entity_type). entity_type is 'edge'
--- (Neo4j CAUSES edge, entity_id = 'FACTOR->ASSET') or 'source' (news domain, entity_id = domain).
+-- (Neo4j CAUSES edge, entity_id = 'FACTOR->ASSET' or conditioned 'FACTOR|CONDITION->ASSET') or
+-- 'source' (news domain, entity_id = domain). entity_id is TEXT: the full conditioned key is
+-- stored verbatim so Beta-Bernoulli history stays keyed per conditioned edge, never collapsed.
 CREATE TABLE IF NOT EXISTS credibility.credibility (
     entity_id          TEXT NOT NULL,
     entity_type        TEXT NOT NULL,

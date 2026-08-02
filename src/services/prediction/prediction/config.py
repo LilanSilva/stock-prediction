@@ -31,5 +31,13 @@ class PredictionSettings(BaseSettings):
     magnitude_small_max: float = Field(default=0.40, gt=0.0, lt=1.0)
     magnitude_medium_max: float = Field(default=0.70, gt=0.0, le=1.0)
 
+    # Scope-B price gate. A RESOLUTION-driven DOWN is only emitted when the asset's latest close is
+    # elevated versus the mean of the prior sessions by at least this fraction; otherwise there is
+    # no risk premium to unwind. Recent closes are read from the Market Data service.
+    market_data_base_url: str = Field(default="http://feed-market-data:8000")
+    price_lookback_sessions: int = Field(default=10, gt=0)
+    price_elevated_threshold_pct: float = Field(default=0.01, ge=0.0)
+    market_data_timeout_seconds: float = Field(default=5.0, gt=0)
+
     db_pool_min_size: int = Field(default=1, ge=1)
     db_pool_max_size: int = Field(default=5, ge=1)

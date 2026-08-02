@@ -212,3 +212,32 @@ async def test_process_price_registry_mismatch_is_rejected() -> None:
     bad = _observed(request_id, "100", "103", registry_version="other-policy-v9")
     with pytest.raises(PriceValidationError, match="registry version mismatch"):
         await _pipeline(repo).process_price(bad)
+
+
+async def test_conditioned_edge_id_passes_through_unchanged() -> None:
+    # A 3-part "FACTOR|CONDITION->ASSET" edge_id is opaque: it must survive PredictionMade ->
+    # evaluation -> PredictionScored verbatim (no split on "->" or "|", no truncation).
+    conditioned = "MILITARY_CONFLICT|TRANSPORT_AFFECTED->BRENT_OIL"
+    edge = ContributingEdge(
+        edge_id=conditioned,
+        direction=Direction.UP,
+        current_weight=0.65,
+        influence_weight=0.65,
+        path=conditioned,
+    )
+    prediction = _prediction(asset=AssetId.BRENT_OIL).model_copy(
+        update={"contributing_edges": [edge]}
+    )
+
+    create_repo = _FakeRepo()
+    await _pipeline(create_repo).process_prediction(prediction)
+    evaluation, _request = create_repo.created[0]
+    assert [e.edge_id for e in evaluation.contributing_edges] == [conditioned]
+
+    observed = _observed(evaluation.request_id, "100.00", "103.00").model_copy(
+        update={"asset_id": AssetId.BRENT_OIL}
+    )
+    score_repo = _FakeRepo(evaluation=evaluation)
+    await _pipeline(score_repo).process_price(observed)
+
+    assert [e.edge_id for e in score_repo.scored[0].contributing_edges] == [conditioned]

@@ -38,8 +38,17 @@ CREATE TABLE IF NOT EXISTS cleansing.article_actions (
     original_lemma     TEXT,
     event_type         TEXT NOT NULL,
     language           TEXT NOT NULL,
-    affected_asset_ids TEXT[] NOT NULL DEFAULT '{{}}'
+    affected_asset_ids TEXT[] NOT NULL DEFAULT '{{}}',
+    polarity           TEXT NOT NULL DEFAULT 'OCCURRENCE',
+    context_tags       TEXT[] NOT NULL DEFAULT '{{}}'
 );
+
+-- Backfill the conditional-causality columns on databases created before they were added; the
+-- CREATE above only applies to fresh installs (functional document conditional-causality change).
+ALTER TABLE cleansing.article_actions
+    ADD COLUMN IF NOT EXISTS polarity TEXT NOT NULL DEFAULT 'OCCURRENCE';
+ALTER TABLE cleansing.article_actions
+    ADD COLUMN IF NOT EXISTS context_tags TEXT[] NOT NULL DEFAULT '{{}}';
 
 CREATE TABLE IF NOT EXISTS cleansing.event_clusters (
     cluster_id        UUID PRIMARY KEY,

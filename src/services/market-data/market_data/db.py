@@ -53,6 +53,10 @@ CREATE TABLE IF NOT EXISTS market_data.close_observations (
     UNIQUE (asset_id, session, registry_version)
 );
 
+-- Supports the read-only recent-closes lookup (asset_id filter, session DESC ordering + LIMIT).
+CREATE INDEX IF NOT EXISTS ix_close_observations_recent
+    ON market_data.close_observations (asset_id, session DESC);
+
 CREATE TABLE IF NOT EXISTS market_data.outbox (
     id              BIGSERIAL PRIMARY KEY,
     message_id      UUID NOT NULL UNIQUE,

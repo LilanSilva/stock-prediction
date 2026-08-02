@@ -80,6 +80,8 @@ FactConflict:
 | `object` | string or null | Yes |
 | `entities` | list[string] | Yes |
 | `affected_asset_ids` | list[AssetId] | Yes |
+| `polarity` | `OCCURRENCE` or `RESOLUTION` | No (default `OCCURRENCE`) |
+| `context_tags` | list[ConditionCode] | No (default `[]`) |
 | `first_seen_at` | UTC datetime | Yes |
 | `last_seen_at` | UTC datetime | Yes |
 | `sources` | list[SourceRef] | Yes |
@@ -93,7 +95,7 @@ Routing key: `prediction.made`.
 
 ```text
 ContributingEdge:
-  edge_id: string
+  edge_id: string  # "FACTOR->ASSET" (unconditional) or "FACTOR|CONDITION->ASSET" (conditioned)
   direction: UP | DOWN | NEUTRAL
   current_weight: float [0,1]
   influence_weight: float [0,1]
@@ -192,6 +194,36 @@ Routing key: `prediction.scored`.
 | `baseline` | CloseObservation | Yes |
 | `settlement` | CloseObservation | Yes |
 | `scored_at` | UTC datetime | Yes |
+
+## Conditional causality
+
+`EventDetected.polarity` and `EventDetected.context_tags` qualify how an event maps to the causal
+graph. Both are optional with backward-compatible defaults (`OCCURRENCE`, `[]`), so pre-existing
+producers/consumers stay valid within major version 1.
+
+- `EventPolarity`: `OCCURRENCE` (factor onset — default) or `RESOLUTION` (de-escalation/negation).
+  A `RESOLUTION` event inverts the sign of the factor's causal edge at decision time (e.g. a
+  called-off conflict turns an oil-up edge into an oil-down force).
+- `ConditionCode`: `TRANSPORT_AFFECTED`, `SAFE_HAVEN_ONLY`, `RISK_PREMIUM_ELEVATED`. Conditions gate
+  which causal edge fires. `RISK_PREMIUM_ELEVATED` is derived at decision time by Prediction from
+  recent price history (Market Data `GET /prices/recent`), not by Cleansing.
+
+### Causal graph schema
+
+The condition is a property on the `CAUSES` edge, so each `(factor, asset, condition)` is a distinct
+edge with its own weight and Beta-Bernoulli reliability:
+
+```text
+(:CausalFactor {id})-[:CAUSES {condition, direction, weight, confidence, alpha, beta,
+                               last_updated}]->(:Asset {id})
+```
+
+An edge with no `condition` property is unconditional and always fires. The condition is a plain
+edge property whose values are the canonical `ConditionCode` enum, so no separate node type is
+needed. The `ContributingEdge.edge_id` business key is `FACTOR->ASSET` for
+unconditional edges and `FACTOR|CONDITION->ASSET` for conditioned edges. Edge weights are refined
+online by Credibility (per scored prediction) and offline by the structure learner
+(`python -m credibility.learning.run`) which mines historical events against realized price moves.
 
 ## Compatibility
 

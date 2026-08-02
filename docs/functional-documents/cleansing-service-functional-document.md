@@ -32,7 +32,10 @@ The service uses local processing first. LLM use is reserved for ambiguous extra
    - Gate 2: canonical event types/actions are compatible.
 7. Add the article to an existing open/quiet cluster or create a new cluster.
 8. Close clusters using quiet period and event-time watermark rules.
-9. Build `EventDetected` locally when the required structured fields are unambiguous.
+9. Build `EventDetected` locally when the required structured fields are unambiguous, including
+   `polarity` (`OCCURRENCE`/`RESOLUTION` from local negation/resolution cues) and `context_tags`
+   (e.g. `TRANSPORT_AFFECTED` vs `SAFE_HAVEN_ONLY`). When no asset keyword matches, derive
+   `affected_asset_ids` from the event type so geopolitical events still reach the graph.
 10. Call the LLM only for ambiguous merge/extraction or factual conflict resolution.
 11. Validate taxonomy and canonical asset IDs.
 12. Store the event and publish through the outbox/reconciliation path.

@@ -17,7 +17,14 @@ from typing import Protocol, runtime_checkable
 from shared.schemas.messages import EventType
 
 from cleansing.models import ExtractedAction
-from cleansing.taxonomy import classify_text, infer_assets, map_action
+from cleansing.taxonomy import (
+    assets_for_event_type,
+    classify_polarity,
+    classify_text,
+    infer_assets,
+    infer_conditions,
+    map_action,
+)
 
 
 @runtime_checkable
@@ -29,6 +36,33 @@ class ActionExtractor(Protocol):
     async def extract(self, text: str, language: str) -> ExtractedAction: ...
 
 
+def _build_action(
+    text: str,
+    event_type: EventType,
+    *,
+    actor: str | None,
+    action_lemma: str | None,
+    obj: str | None,
+    original_lemma: str | None,
+) -> ExtractedAction:
+    """Assemble an ExtractedAction, enriching it with polarity, context tags, and assets.
+
+    Assets fall back to the event type's downstream graph assets when no asset keyword is present,
+    so geopolitical headlines that never name a commodity still resolve to their assets.
+    """
+    assets = infer_assets(text) or assets_for_event_type(event_type)
+    return ExtractedAction(
+        actor=actor,
+        action_lemma=action_lemma,
+        object=obj,
+        original_lemma=original_lemma,
+        event_type=event_type,
+        affected_asset_ids=assets,
+        polarity=classify_polarity(text),
+        context_tags=tuple(infer_conditions(text, event_type)),
+    )
+
+
 class KeywordExtractor:
     """Deterministic taxonomy-keyword extractor (POC default, no external model)."""
 
@@ -37,14 +71,13 @@ class KeywordExtractor:
 
     async def extract(self, text: str, language: str) -> ExtractedAction:
         event_type, keyword = classify_text(text)
-        assets = infer_assets(text)
-        return ExtractedAction(
+        return _build_action(
+            text,
+            event_type,
             actor=None,
             action_lemma=keyword,
-            object=None,
+            obj=None,
             original_lemma=keyword,
-            event_type=event_type,
-            affected_asset_ids=assets,
         )
 
 
@@ -81,13 +114,13 @@ class SpacyExtractor:
         if nlp is None:
             # Fall back to the deterministic classifier if no pipeline is loaded.
             event_type, keyword = classify_text(text)
-            return ExtractedAction(
+            return _build_action(
+                text,
+                event_type,
                 actor=None,
                 action_lemma=keyword,
-                object=None,
+                obj=None,
                 original_lemma=keyword,
-                event_type=event_type,
-                affected_asset_ids=infer_assets(text),
             )
 
         def _parse() -> ExtractedAction:
@@ -107,13 +140,13 @@ class SpacyExtractor:
                 # Back off to a full-text keyword scan before giving up on the type.
                 mapped, keyword = classify_text(text)
                 action_lemma = action_lemma or keyword
-            return ExtractedAction(
+            return _build_action(
+                text,
+                mapped,
                 actor=actor,
                 action_lemma=action_lemma,
-                object=obj,
+                obj=obj,
                 original_lemma=action_lemma,
-                event_type=mapped,
-                affected_asset_ids=infer_assets(text),
             )
 
         return await asyncio.to_thread(_parse)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from shared.schemas.messages import EventType
+from shared.schemas.messages import AssetId, ConditionCode, EventPolarity, EventType
 
 from cleansing.extraction import KeywordExtractor, SpacyExtractor, build_extractor
 
@@ -20,6 +20,23 @@ async def test_keyword_extractor_returns_other_without_a_keyword() -> None:
     action = await KeywordExtractor().extract("A quiet day with nothing notable", "en")
     assert action.event_type == EventType.OTHER
     assert action.actor is None
+
+
+async def test_keyword_extractor_populates_polarity_and_context_tags() -> None:
+    action = await KeywordExtractor().extract("Tanker blocked in Strait of Hormuz", "en")
+    assert action.event_type == EventType.STRAIT_CLOSURE
+    assert action.polarity == EventPolarity.OCCURRENCE
+    assert ConditionCode.TRANSPORT_AFFECTED in action.context_tags
+
+
+async def test_keyword_extractor_detects_resolution() -> None:
+    action = await KeywordExtractor().extract("USA calls off Iran attack", "en")
+    assert action.event_type == EventType.MILITARY_CONFLICT
+    assert action.polarity == EventPolarity.RESOLUTION
+    # No commodity is named, so assets fall back to the event type's graph assets.
+    assert set(action.affected_asset_ids) == {AssetId.GOLD, AssetId.BRENT_OIL}
+    # A distant conflict with no transport cue is a safe-haven tag.
+    assert action.context_tags == (ConditionCode.SAFE_HAVEN_ONLY,)
 
 
 async def test_spacy_extractor_falls_back_when_no_pipeline_loaded() -> None:

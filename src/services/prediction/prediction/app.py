@@ -30,6 +30,7 @@ from prediction.config import PredictionSettings
 from prediction.db import apply_schema, create_pool
 from prediction.outbox import PredictionOutboxPublisher
 from prediction.pipeline import PredictionPipeline
+from prediction.price_reader import PriceReader
 from prediction.repository import PredictionRepository
 
 logger = structlog.get_logger(__name__)
@@ -49,6 +50,7 @@ class AppContext:
     pool: asyncpg.Pool
     rabbit: RabbitMQClient
     graph: CausalGraphClient
+    price_reader: PriceReader
     scheduler: AsyncIOScheduler
     pipeline: PredictionPipeline
     outbox: PredictionOutboxPublisher
@@ -101,9 +103,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     graph = CausalGraphClient(Neo4jSettings())
     await graph.connect()
 
+    price_reader = PriceReader(settings)
+
     repository = PredictionRepository(pool)
     outbox = PredictionOutboxPublisher(pool, rabbit)
-    pipeline = PredictionPipeline(repository, graph, settings)
+    pipeline = PredictionPipeline(repository, graph, price_reader, settings)
 
     # Reconcile any outbox rows left pending by a previous crash before starting new work.
     await outbox.publish_pending()
@@ -130,6 +134,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.ctx = AppContext(
         settings=settings,
         pool=pool,
+        price_reader=price_reader,
         rabbit=rabbit,
         graph=graph,
         scheduler=scheduler,
@@ -152,6 +157,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await consumer_task
         except asyncio.CancelledError:
             pass
+        await price_reader.close()
         await graph.close()
         await rabbit.close()
         await pool.close()

@@ -63,6 +63,83 @@ class AssetReferenceSeries(BaseModel):
     registry_version: str = Field(min_length=1)
 
 
+# Industry-sector equities. Each canonical sector asset is priced by a representative large-cap
+# bellwether that biquote.io actually serves (sector ETFs and non-US listings are not served, so a
+# bellwether stock is the pragmatic reference). (symbol, economic identity, NYSE|NASDAQ).
+_EQUITY_BELLWETHERS: Mapping[AssetId, tuple[str, str, str]] = MappingProxyType(
+    {
+        AssetId.PHARMA: ("LLY", "Pharmaceutical sector (Eli Lilly bellwether)", "NYSE"),
+        AssetId.DEFENSE_AEROSPACE: (
+            "LMT",
+            "Defense & aerospace sector (Lockheed Martin bellwether)",
+            "NYSE",
+        ),
+        AssetId.AI_COMPUTE: ("NVDA", "AI compute sector (Nvidia bellwether)", "NASDAQ"),
+        AssetId.SEMICONDUCTOR: (
+            "TSM",
+            "Semiconductor sector (TSMC bellwether)",
+            "NYSE",
+        ),
+        AssetId.SOFTWARE: ("MSFT", "Software sector (Microsoft bellwether)", "NASDAQ"),
+        AssetId.ENTERPRISE_SOFTWARE: (
+            "ORCL",
+            "Enterprise software sector (Oracle bellwether)",
+            "NYSE",
+        ),
+        AssetId.INTERNET_SEARCH: (
+            "GOOGL",
+            "Internet search sector (Alphabet bellwether)",
+            "NASDAQ",
+        ),
+        AssetId.CONSUMER_ELECTRONICS: (
+            "AAPL",
+            "Consumer electronics sector (Apple bellwether)",
+            "NASDAQ",
+        ),
+        AssetId.BANKING: ("JPM", "Banking sector (JPMorgan bellwether)", "NYSE"),
+        AssetId.PAYMENTS_FINANCE: (
+            "V",
+            "Payments & finance sector (Visa bellwether)",
+            "NYSE",
+        ),
+        AssetId.AUTOMOTIVE: ("TSLA", "Automotive sector (Tesla bellwether)", "NASDAQ"),
+        AssetId.FOOD_BEVERAGE: (
+            "KO",
+            "Food & beverage sector (Coca-Cola bellwether)",
+            "NYSE",
+        ),
+        AssetId.REAL_ESTATE: (
+            "AMT",
+            "Real estate sector (American Tower REIT bellwether)",
+            "NYSE",
+        ),
+        AssetId.INDUSTRIAL: ("MMM", "Industrial manufacturing sector (3M bellwether)", "NYSE"),
+        AssetId.APPAREL: ("NKE", "Apparel sector (Nike bellwether)", "NYSE"),
+    }
+)
+
+
+def _equity_series() -> dict[AssetId, AssetReferenceSeries]:
+    """Build the sector-equity reference entries from the bellwether table."""
+    return {
+        asset_id: AssetReferenceSeries(
+            asset_id=asset_id,
+            provider="biquote.io",
+            provider_symbol=symbol,
+            economic_identity=identity,
+            expected_exchange=exchange,
+            timezone="America/New_York",
+            currency="USD",
+            price_kind=PriceKind.PROVIDER_DAILY_CLOSE,
+            is_adjusted=False,
+            rollover_policy=ROLLOVER_INCLUDE_ALL,
+            fallback=None,
+            registry_version=REGISTRY_VERSION,
+        )
+        for asset_id, (symbol, identity, exchange) in _EQUITY_BELLWETHERS.items()
+    }
+
+
 _REGISTRY: Mapping[AssetId, AssetReferenceSeries] = MappingProxyType(
     {
         AssetId.GOLD: AssetReferenceSeries(
@@ -93,6 +170,7 @@ _REGISTRY: Mapping[AssetId, AssetReferenceSeries] = MappingProxyType(
             fallback=None,
             registry_version=REGISTRY_VERSION,
         ),
+        **_equity_series(),
     }
 )
 

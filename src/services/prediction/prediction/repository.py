@@ -6,7 +6,13 @@ import uuid
 from datetime import datetime, timedelta
 
 import asyncpg
-from shared.schemas.messages import AssetId, EventType, PredictionMade
+from shared.schemas.messages import (
+    AssetId,
+    ConditionCode,
+    EventPolarity,
+    EventType,
+    PredictionMade,
+)
 
 from prediction.models import ContextEvent, ContextRecord, ContextState
 
@@ -30,6 +36,8 @@ class PredictionRepository:
         first_seen_at: datetime,
         window_start: datetime,
         window_end: datetime,
+        polarity: EventPolarity = EventPolarity.OCCURRENCE,
+        context_tags: list[ConditionCode] | None = None,
     ) -> None:
         """Add a distinct event to the correct per-asset context version (idempotent membership).
 
@@ -100,8 +108,9 @@ class PredictionRepository:
                     await conn.execute(
                         """
                         INSERT INTO prediction.context_events
-                            (context_id, event_id, event_type, first_seen_at)
-                        SELECT $1, event_id, event_type, first_seen_at
+                            (context_id, event_id, event_type, first_seen_at, polarity,
+                             context_tags)
+                        SELECT $1, event_id, event_type, first_seen_at, polarity, context_tags
                         FROM prediction.context_events
                         WHERE context_id = $2
                         ON CONFLICT (context_id, event_id) DO NOTHING
@@ -113,14 +122,16 @@ class PredictionRepository:
                 await conn.execute(
                     """
                     INSERT INTO prediction.context_events
-                        (context_id, event_id, event_type, first_seen_at)
-                    VALUES ($1, $2, $3, $4)
+                        (context_id, event_id, event_type, first_seen_at, polarity, context_tags)
+                    VALUES ($1, $2, $3, $4, $5, $6)
                     ON CONFLICT (context_id, event_id) DO NOTHING
                     """,
                     context_id,
                     event_id,
                     event_type.value,
                     first_seen_at,
+                    polarity.value,
+                    [c.value for c in (context_tags or [])],
                 )
 
     async def claim_ready_contexts(
@@ -164,7 +175,7 @@ class PredictionRepository:
     async def load_context_events(self, context_id: uuid.UUID) -> list[ContextEvent]:
         rows = await self._pool.fetch(
             """
-            SELECT event_id, event_type, first_seen_at
+            SELECT event_id, event_type, first_seen_at, polarity, context_tags
             FROM prediction.context_events
             WHERE context_id = $1
             ORDER BY first_seen_at
@@ -176,6 +187,8 @@ class PredictionRepository:
                 event_id=row["event_id"],
                 event_type=EventType(row["event_type"]),
                 first_seen_at=row["first_seen_at"],
+                polarity=EventPolarity(row["polarity"]),
+                context_tags=[ConditionCode(tag) for tag in row["context_tags"]],
             )
             for row in rows
         ]

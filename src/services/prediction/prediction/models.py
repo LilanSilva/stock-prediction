@@ -9,8 +9,10 @@ from enum import StrEnum
 
 from shared.schemas.messages import (
     AssetId,
+    ConditionCode,
     ContributingEdge,
     Direction,
+    EventPolarity,
     EventType,
     Magnitude,
 )
@@ -40,11 +42,17 @@ class ContextRecord:
 
 @dataclass(frozen=True)
 class ContextEvent:
-    """One distinct event that is a member of a context."""
+    """One distinct event that is a member of a context.
+
+    ``polarity`` and ``context_tags`` gate and sign the causal edges the event fires: RESOLUTION
+    inverts the factor's stored direction, and the tags select which conditioned edges may fire.
+    """
 
     event_id: uuid.UUID
     event_type: EventType
     first_seen_at: datetime
+    polarity: EventPolarity = EventPolarity.OCCURRENCE
+    context_tags: list[ConditionCode] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

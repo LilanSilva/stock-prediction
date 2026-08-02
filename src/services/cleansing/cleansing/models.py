@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 
-from shared.schemas.messages import AssetId, EventType
+from shared.schemas.messages import AssetId, ConditionCode, EventPolarity, EventType
 
 
 class ClusterState(StrEnum):
@@ -56,6 +56,8 @@ class ExtractedAction:
     original_lemma: str | None
     event_type: EventType
     affected_asset_ids: tuple[AssetId, ...] = ()
+    polarity: EventPolarity = EventPolarity.OCCURRENCE
+    context_tags: tuple[ConditionCode, ...] = ()
 
 
 @dataclass

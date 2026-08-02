@@ -167,6 +167,8 @@ class FakeRepository:
                     "object": action.object,
                     "event_type": action.event_type.value,
                     "affected_asset_ids": [a.value for a in action.affected_asset_ids],
+                    "polarity": action.polarity.value,
+                    "context_tags": [c.value for c in action.context_tags],
                 }
             )
         return rows

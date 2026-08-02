@@ -20,7 +20,7 @@ from typing import Protocol
 
 import structlog
 from shared.graph.models import FiringEdge
-from shared.schemas.messages import AssetId, EventType, PredictionScored
+from shared.schemas.messages import AssetId, ConditionCode, EventType, PredictionScored
 
 from credibility.exceptions import InvalidScoredMessageError
 from credibility.updater import (
@@ -45,7 +45,13 @@ class GraphClient(Protocol):
     ) -> list[FiringEdge]: ...
 
     async def update_edge_weight(
-        self, factor_id: EventType, asset_id: AssetId, *, alpha: float, beta: float
+        self,
+        factor_id: EventType,
+        asset_id: AssetId,
+        *,
+        alpha: float,
+        beta: float,
+        condition: ConditionCode | None = None,
     ) -> None: ...
 
 
@@ -61,19 +67,29 @@ class Repository(Protocol):
     ) -> bool: ...
 
 
-def parse_edge_id(edge_id: str) -> tuple[EventType, AssetId]:
-    """Parse a contributing ``edge_id`` (``'FACTOR->ASSET'``) into its Neo4j lookup keys.
+def parse_edge_id(edge_id: str) -> tuple[EventType, ConditionCode | None, AssetId]:
+    """Parse a contributing ``edge_id`` into its Neo4j lookup keys.
 
-    The format is the deterministic business key produced by ``FiringEdge.edge_id``. A malformed or
-    unknown value is terminal (the message is dead-lettered), never retried.
+    Two forms of the deterministic business key produced by ``FiringEdge.edge_id`` are accepted:
+    ``'FACTOR->ASSET'`` (unconditional/legacy, condition is ``None``) and
+    ``'FACTOR|CONDITION->ASSET'`` (conditioned). A malformed or unknown value is terminal (the
+    message is dead-lettered), never retried.
     """
-    factor_str, sep, asset_str = edge_id.partition("->")
-    if not sep or not factor_str or not asset_str:
-        raise InvalidScoredMessageError(f"malformed edge_id {edge_id!r} (expected 'FACTOR->ASSET')")
+    left, sep, asset_str = edge_id.partition("->")
+    if not sep or not left or not asset_str:
+        raise InvalidScoredMessageError(
+            f"malformed edge_id {edge_id!r} (expected 'FACTOR->ASSET' or 'FACTOR|CONDITION->ASSET')"
+        )
+    factor_str, cond_sep, condition_str = left.partition("|")
     try:
-        return EventType(factor_str), AssetId(asset_str)
+        factor = EventType(factor_str)
+        asset = AssetId(asset_str)
+        condition = ConditionCode(condition_str) if cond_sep else None
     except ValueError as exc:
-        raise InvalidScoredMessageError(f"unknown factor/asset in edge_id {edge_id!r}") from exc
+        raise InvalidScoredMessageError(
+            f"unknown factor/condition/asset in edge_id {edge_id!r}"
+        ) from exc
+    return factor, condition, asset
 
 
 class CredibilityPipeline:
@@ -89,9 +105,11 @@ class CredibilityPipeline:
         credits = compute_proportional_credits(list(message.contributing_edges))
         updates: list[WeightUpdate] = []
         for edge in message.contributing_edges:
-            factor_id, asset_id = parse_edge_id(edge.edge_id)
+            factor_id, condition, asset_id = parse_edge_id(edge.edge_id)
             firing = await self._graph.get_firing_edges(factor_id, [asset_id])
-            current = next((e for e in firing if e.asset_id == asset_id), None)
+            # Match on the full business key so the right conditioned edge is picked when several
+            # conditions share one (factor, asset) pair.
+            current = next((e for e in firing if e.edge_id == edge.edge_id), None)
             if current is None:
                 logger.warning(
                     "edge_missing_in_graph",
@@ -108,7 +126,7 @@ class CredibilityPipeline:
                 floor=self._floor,
             )
             await self._graph.update_edge_weight(
-                factor_id, asset_id, alpha=alpha_after, beta=beta_after
+                factor_id, asset_id, alpha=alpha_after, beta=beta_after, condition=condition
             )
             updates.append(
                 WeightUpdate(
