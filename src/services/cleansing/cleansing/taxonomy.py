@@ -93,6 +93,202 @@ ACTION_TAXONOMY: dict[str, EventType] = {
     "hurricane": EventType.NATURAL_DISASTER,
     "jordbävning": EventType.NATURAL_DISASTER,  # sv
     "översvämning": EventType.NATURAL_DISASTER,  # sv
+    # CORPORATE_ACQUISITION
+    "merger": EventType.CORPORATE_ACQUISITION,
+    "mergers": EventType.CORPORATE_ACQUISITION,
+    "acquisition": EventType.CORPORATE_ACQUISITION,
+    "acquire": EventType.CORPORATE_ACQUISITION,
+    "takeover": EventType.CORPORATE_ACQUISITION,
+    "buyout": EventType.CORPORATE_ACQUISITION,
+    "bid for": EventType.CORPORATE_ACQUISITION,
+    "fusion": EventType.CORPORATE_ACQUISITION,         # sv
+    "jättefusion": EventType.CORPORATE_ACQUISITION, # sv: mega-merger compound
+    "förvärv": EventType.CORPORATE_ACQUISITION,     # sv
+    "uppköp": EventType.CORPORATE_ACQUISITION,      # sv
+    "samgående": EventType.CORPORATE_ACQUISITION,   # sv
+    "bud på": EventType.CORPORATE_ACQUISITION,      # sv
+    # EXECUTIVE_CHANGE
+    "ceo": EventType.EXECUTIVE_CHANGE,
+    "cfo": EventType.EXECUTIVE_CHANGE,
+    "coo": EventType.EXECUTIVE_CHANGE,
+    "chief executive": EventType.EXECUTIVE_CHANGE,
+    "steps down": EventType.EXECUTIVE_CHANGE,
+    "step down": EventType.EXECUTIVE_CHANGE,
+    "fired": EventType.EXECUTIVE_CHANGE,
+    "vd avgår": EventType.EXECUTIVE_CHANGE,         # sv: CEO resigns
+    "ny vd": EventType.EXECUTIVE_CHANGE,            # sv: new CEO
+    "vd utsedd": EventType.EXECUTIVE_CHANGE,        # sv: CEO appointed
+    "styrelseordförande": EventType.EXECUTIVE_CHANGE,  # sv: chairman
+    # REGULATORY_ACTION
+    "approved": EventType.REGULATORY_ACTION,
+    "approval": EventType.REGULATORY_ACTION,
+    "rejected": EventType.REGULATORY_ACTION,
+    "rejection": EventType.REGULATORY_ACTION,
+    "fda": EventType.REGULATORY_ACTION,
+    "regulator": EventType.REGULATORY_ACTION,
+    "licence": EventType.REGULATORY_ACTION,
+    "license": EventType.REGULATORY_ACTION,
+    "cleared": EventType.REGULATORY_ACTION,
+    "fined": EventType.REGULATORY_ACTION,
+    "penalty": EventType.REGULATORY_ACTION,
+    "godkänd": EventType.REGULATORY_ACTION,         # sv: approved
+    "godkännande": EventType.REGULATORY_ACTION,     # sv: approval
+    "tillstånd": EventType.REGULATORY_ACTION,       # sv: licence/permit
+    "böter": EventType.REGULATORY_ACTION,           # sv: fine
+    # DEBT_CRISIS
+    "bankruptcy": EventType.DEBT_CRISIS,
+    "bankrupt": EventType.DEBT_CRISIS,
+    "default": EventType.DEBT_CRISIS,
+    "insolvent": EventType.DEBT_CRISIS,
+    "insolvency": EventType.DEBT_CRISIS,
+    "credit downgrade": EventType.DEBT_CRISIS,
+    "konkurs": EventType.DEBT_CRISIS,               # sv
+    "betalningsinställelse": EventType.DEBT_CRISIS, # sv: suspension of payments
+    "kreditbetyg": EventType.DEBT_CRISIS,           # sv: credit rating
+    # RESTRUCTURING
+    "layoffs": EventType.RESTRUCTURING,
+    "layoff": EventType.RESTRUCTURING,
+    "redundancies": EventType.RESTRUCTURING,
+    "job cuts": EventType.RESTRUCTURING,
+    "cost cutting": EventType.RESTRUCTURING,
+    "restructure": EventType.RESTRUCTURING,
+    "restructuring": EventType.RESTRUCTURING,
+    "spin-off": EventType.RESTRUCTURING,
+    "divestiture": EventType.RESTRUCTURING,
+    "divest": EventType.RESTRUCTURING,
+    "varsel": EventType.RESTRUCTURING,              # sv: redundancy notice
+    "nedskärningar": EventType.RESTRUCTURING,       # sv: cutbacks
+    "omstrukturering": EventType.RESTRUCTURING,     # sv
+    "avknoppning": EventType.RESTRUCTURING,         # sv: spin-off
+    # LEGAL_DISPUTE
+    "lawsuit": EventType.LEGAL_DISPUTE,
+    "sued": EventType.LEGAL_DISPUTE,
+    "litigation": EventType.LEGAL_DISPUTE,
+    "class action": EventType.LEGAL_DISPUTE,
+    "fraud": EventType.LEGAL_DISPUTE,
+    "investigation": EventType.LEGAL_DISPUTE,
+    "settlement": EventType.LEGAL_DISPUTE,
+    "stämning": EventType.LEGAL_DISPUTE,            # sv: lawsuit
+    "utredning": EventType.LEGAL_DISPUTE,           # sv: investigation
+    "uppgörelse": EventType.LEGAL_DISPUTE,          # sv: settlement
+    "bedrägeri": EventType.LEGAL_DISPUTE,           # sv: fraud
+    # PRODUCT_RECALL
+    "recall": EventType.PRODUCT_RECALL,
+    "recalls": EventType.PRODUCT_RECALL,
+    "recalled": EventType.PRODUCT_RECALL,
+    "withdrawn": EventType.PRODUCT_RECALL,
+    "safety warning": EventType.PRODUCT_RECALL,
+    "market ban": EventType.PRODUCT_RECALL,
+    "återkallelse": EventType.PRODUCT_RECALL,       # sv
+    "återkallar": EventType.PRODUCT_RECALL,         # sv
+    "säkerhetsvarning": EventType.PRODUCT_RECALL,   # sv
+    # DIVIDEND_CHANGE
+    "dividend": EventType.DIVIDEND_CHANGE,
+    "dividends": EventType.DIVIDEND_CHANGE,
+    "payout": EventType.DIVIDEND_CHANGE,
+    "utdelning": EventType.DIVIDEND_CHANGE,         # sv
+    # CONTRACT_WIN
+    "contract": EventType.CONTRACT_WIN,
+    "deal signed": EventType.CONTRACT_WIN,
+    "agreement signed": EventType.CONTRACT_WIN,
+    "partnership": EventType.CONTRACT_WIN,
+    "supply agreement": EventType.CONTRACT_WIN,
+    "kontrakt": EventType.CONTRACT_WIN,             # sv
+    "avtal": EventType.CONTRACT_WIN,                # sv: agreement/deal
+    "partnerskap": EventType.CONTRACT_WIN,          # sv
+    # SHARE_BUYBACK
+    "buyback": EventType.SHARE_BUYBACK,
+    "buy back": EventType.SHARE_BUYBACK,
+    "share repurchase": EventType.SHARE_BUYBACK,
+    "återköp": EventType.SHARE_BUYBACK,             # sv
+    # IPO_LISTING
+    "ipo": EventType.IPO_LISTING,
+    "listing": EventType.IPO_LISTING,
+    "stock market debut": EventType.IPO_LISTING,
+    "börsnot": EventType.IPO_LISTING,               # sv: stock listing
+    "börsnotering": EventType.IPO_LISTING,          # sv
+    # CYBERSECURITY_INCIDENT
+    "data breach": EventType.CYBERSECURITY_INCIDENT,
+    "cyberattack": EventType.CYBERSECURITY_INCIDENT,
+    "ransomware": EventType.CYBERSECURITY_INCIDENT,
+    "hacked": EventType.CYBERSECURITY_INCIDENT,
+    "hack": EventType.CYBERSECURITY_INCIDENT,
+    "dataintrång": EventType.CYBERSECURITY_INCIDENT,  # sv
+    "cyberangrepp": EventType.CYBERSECURITY_INCIDENT, # sv
+    # TRADE_POLICY
+    "tariff": EventType.TRADE_POLICY,
+    "tariffs": EventType.TRADE_POLICY,
+    "trade war": EventType.TRADE_POLICY,
+    "trade deal": EventType.TRADE_POLICY,
+    "import ban": EventType.TRADE_POLICY,
+    "export ban": EventType.TRADE_POLICY,
+    "tull": EventType.TRADE_POLICY,                 # sv: tariff/customs
+    "handelskrig": EventType.TRADE_POLICY,          # sv: trade war
+    "handelsavtal": EventType.TRADE_POLICY,         # sv: trade deal
+    # FISCAL_POLICY
+    "stimulus": EventType.FISCAL_POLICY,
+    "budget": EventType.FISCAL_POLICY,
+    "tax cut": EventType.FISCAL_POLICY,
+    "tax hike": EventType.FISCAL_POLICY,
+    "infrastructure spending": EventType.FISCAL_POLICY,
+    "statsbudget": EventType.FISCAL_POLICY,         # sv: state budget
+    "skattesänkning": EventType.FISCAL_POLICY,      # sv: tax cut
+    "stimulans": EventType.FISCAL_POLICY,           # sv
+    # CURRENCY_CRISIS
+    "devaluation": EventType.CURRENCY_CRISIS,
+    "devalued": EventType.CURRENCY_CRISIS,
+    "currency collapse": EventType.CURRENCY_CRISIS,
+    "exchange rate": EventType.CURRENCY_CRISIS,
+    "valutakris": EventType.CURRENCY_CRISIS,        # sv: currency crisis
+    "devalvering": EventType.CURRENCY_CRISIS,       # sv
+    "växelkurs": EventType.CURRENCY_CRISIS,         # sv: exchange rate
+    # SOVEREIGN_DEBT
+    "sovereign debt": EventType.SOVEREIGN_DEBT,
+    "imf bailout": EventType.SOVEREIGN_DEBT,
+    "country default": EventType.SOVEREIGN_DEBT,
+    "statsskuld": EventType.SOVEREIGN_DEBT,         # sv: national debt
+    "statsobligation": EventType.SOVEREIGN_DEBT,    # sv: government bond
+    # GEOPOLITICAL_TENSION
+    "military exercises": EventType.GEOPOLITICAL_TENSION,
+    "missile test": EventType.GEOPOLITICAL_TENSION,
+    "nuclear threat": EventType.GEOPOLITICAL_TENSION,
+    "tensions": EventType.GEOPOLITICAL_TENSION,
+    "militärövning": EventType.GEOPOLITICAL_TENSION,  # sv
+    "kärnvapenhot": EventType.GEOPOLITICAL_TENSION,   # sv: nuclear threat
+    "spänningar": EventType.GEOPOLITICAL_TENSION,     # sv: tensions
+    # COMMODITY_PRICE_SHOCK
+    "opec": EventType.COMMODITY_PRICE_SHOCK,
+    "oil production cut": EventType.COMMODITY_PRICE_SHOCK,
+    "commodity price": EventType.COMMODITY_PRICE_SHOCK,
+    "grain price": EventType.COMMODITY_PRICE_SHOCK,
+    "råvarupris": EventType.COMMODITY_PRICE_SHOCK,  # sv: commodity price
+    "oljepris": EventType.COMMODITY_PRICE_SHOCK,    # sv: oil price
+    # ECONOMIC_DATA_RELEASE
+    "gdp": EventType.ECONOMIC_DATA_RELEASE,
+    "jobs report": EventType.ECONOMIC_DATA_RELEASE,
+    "unemployment": EventType.ECONOMIC_DATA_RELEASE,
+    "pmi": EventType.ECONOMIC_DATA_RELEASE,
+    "retail sales": EventType.ECONOMIC_DATA_RELEASE,
+    "bnp": EventType.ECONOMIC_DATA_RELEASE,         # sv: GDP
+    "arbetslöshet": EventType.ECONOMIC_DATA_RELEASE,  # sv: unemployment
+    "inköpschefsindex": EventType.ECONOMIC_DATA_RELEASE,  # sv: PMI
+    # PANDEMIC_OUTBREAK
+    "pandemic": EventType.PANDEMIC_OUTBREAK,
+    "epidemic": EventType.PANDEMIC_OUTBREAK,
+    "outbreak": EventType.PANDEMIC_OUTBREAK,
+    "lockdown": EventType.PANDEMIC_OUTBREAK,
+    "pandemi": EventType.PANDEMIC_OUTBREAK,         # sv
+    "utbrott": EventType.PANDEMIC_OUTBREAK,         # sv: outbreak
+    "nedstängning": EventType.PANDEMIC_OUTBREAK,    # sv: lockdown
+    # ENERGY_POLICY
+    "carbon tax": EventType.ENERGY_POLICY,
+    "green deal": EventType.ENERGY_POLICY,
+    "renewable energy": EventType.ENERGY_POLICY,
+    "nuclear power": EventType.ENERGY_POLICY,
+    "combustion ban": EventType.ENERGY_POLICY,
+    "koldioxidskatt": EventType.ENERGY_POLICY,      # sv: carbon tax
+    "kärnkraft": EventType.ENERGY_POLICY,           # sv: nuclear power
+    "förnybar energi": EventType.ENERGY_POLICY,     # sv: renewable energy
 }
 
 def _asset_keywords() -> dict[AssetId, tuple[str, ...]]:
