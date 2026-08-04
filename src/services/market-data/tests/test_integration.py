@@ -15,6 +15,7 @@ import asyncpg
 import pytest
 from fastapi.testclient import TestClient
 from shared.messaging.client import RabbitMQClient
+from shared.reference import REGISTRY_VERSION
 from shared.schemas.messages import (
     AssetId,
     CloseObservation,
@@ -47,7 +48,7 @@ def _observation(session: date, close: str) -> CloseObservation:
         provider_symbol="XAUUSD",
         price_kind=PriceKind.PROVIDER_DAILY_CLOSE,
         is_adjusted=False,
-        registry_version="biquote-reference-v1",
+        registry_version=REGISTRY_VERSION,
     )
 
 
@@ -73,7 +74,7 @@ async def _cleanup(pool: asyncpg.Pool, request_id: uuid.UUID) -> None:
     await pool.execute(
         "DELETE FROM market_data.close_observations "
         "WHERE registry_version = $1 AND session = ANY($2::date[])",
-        "biquote-reference-v1",
+        REGISTRY_VERSION,
         [date(2026, 7, 10), date(2026, 7, 13)],
     )
 
@@ -145,7 +146,7 @@ async def test_both_closes_are_persisted_immutably() -> None:
             WHERE registry_version = $1 AND session = ANY($2::date[])
             ORDER BY session
             """,
-            "biquote-reference-v1",
+            REGISTRY_VERSION,
             [date(2026, 7, 10), date(2026, 7, 13)],
         )
         assert len(rows) == 2

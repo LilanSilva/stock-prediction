@@ -38,6 +38,12 @@ dev = [
 where = ["."]
 include = ["shared*"]
 
+# The JSON asset registry must ship inside the wheel: it is the packaged default that services fall
+# back to when ASSET_REGISTRY_PATH is not set. Without this, `pip install` drops the file and every
+# service fails at startup on a missing registry.
+[tool.setuptools.package-data]
+"shared.reference" = ["assets.json"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 markers = [

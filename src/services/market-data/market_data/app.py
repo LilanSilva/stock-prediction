@@ -36,6 +36,8 @@ from shared.reference import supported_assets
 from shared.schemas.messages import AssetId, PriceRequested
 
 from market_data.adapters.biquote import BiquoteAdapter
+from market_data.adapters.router import AdapterRouter
+from market_data.adapters.yahoo import YahooAdapter
 from market_data.config import MarketDataSettings
 from market_data.db import apply_schema, create_pool
 from market_data.exceptions import InvalidObservationError
@@ -155,10 +157,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await rabbit.connect()
 
     http = httpx.AsyncClient(timeout=settings.provider_timeout_seconds)
-    adapter = BiquoteAdapter(
-        http,
-        base_url=settings.biquote_base_url,
-        fetch_window_days=settings.fetch_window_days,
+    # One adapter per provider; the registry decides which one prices each asset.
+    adapter = AdapterRouter(
+        {
+            "biquote.io": BiquoteAdapter(
+                http,
+                base_url=settings.biquote_base_url,
+                fetch_window_days=settings.fetch_window_days,
+            ),
+            "yahoo": YahooAdapter(
+                http,
+                base_url=settings.yahoo_base_url,
+                fetch_window_days=settings.fetch_window_days,
+            ),
+        }
     )
     repository = PriceRequestRepository(pool)
     processor = PriceRequestProcessor(

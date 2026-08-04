@@ -27,7 +27,12 @@ async def run_with(
     pool: asyncpg.Pool, graph: CausalGraphClient, settings: LearningSettings
 ) -> int:
     """Run one build -> estimate -> write pass on an existing pool + graph; return edges written."""
-    samples = await build_samples(pool, lookback_days=settings.lookback_days)
+    samples = await build_samples(
+        pool,
+        lookback_days=settings.lookback_days,
+        volatility_lookback_days=settings.volatility_lookback_days,
+        abnormal_threshold=settings.abnormal_threshold,
+    )
     estimates = estimate_edges(
         samples, deadband=settings.deadband, min_samples=settings.min_samples
     )

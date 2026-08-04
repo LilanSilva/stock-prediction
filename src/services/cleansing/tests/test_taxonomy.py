@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from shared.reference import members_of
 from shared.schemas.messages import AssetId, ConditionCode, EventPolarity, EventType
 
 from cleansing.taxonomy import (
@@ -105,11 +106,18 @@ def test_infer_conditions_never_returns_risk_premium() -> None:
 
 
 def test_assets_for_event_type_geopolitical() -> None:
-    assert assets_for_event_type(EventType.MILITARY_CONFLICT) == (
-        AssetId.GOLD,
-        AssetId.BRENT_OIL,
-    )
-    assert assets_for_event_type(EventType.SUPPLY_DISRUPTION) == (AssetId.BRENT_OIL,)
+    # A conflict moves the safe-haven commodities AND the weapons makers, across markets.
+    conflict = assets_for_event_type(EventType.MILITARY_CONFLICT)
+    assert {AssetId.GOLD, AssetId.BRENT_OIL} <= set(conflict)
+    assert set(members_of("WEAPON_INDUSTRY")) <= set(conflict)
+
+    # A supply disruption moves oil and the producers/refiners, not defence.
+    disruption = assets_for_event_type(EventType.SUPPLY_DISRUPTION)
+    assert AssetId.BRENT_OIL in disruption
+    assert set(members_of("OIL_GAS")) <= set(disruption)
+    assert AssetId.SAAB_B_STO not in disruption
+
+    # An event type with no group mapping stays commodity-only.
     assert assets_for_event_type(EventType.INFLATION_CHANGE) == (AssetId.GOLD,)
 
 

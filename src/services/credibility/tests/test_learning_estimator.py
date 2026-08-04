@@ -22,9 +22,17 @@ def _sample(
     factor: EventType = EventType.MILITARY_CONFLICT,
     condition: ConditionCode | None = ConditionCode.TRANSPORT_AFFECTED,
     asset: AssetId = AssetId.BRENT_OIL,
+    is_abnormal: bool = False,
+    asset_volatility: float = 0.0,
 ) -> Sample:
     return Sample(
-        factor=factor, condition=condition, polarity=polarity, asset=asset, actual_return=ret
+        factor=factor,
+        condition=condition,
+        polarity=polarity,
+        asset=asset,
+        actual_return=ret,
+        is_abnormal=is_abnormal,
+        asset_volatility=asset_volatility,
     )
 
 
@@ -92,6 +100,30 @@ def test_alpha_beta_count_agreeing_and_disagreeing() -> None:
 def test_group_below_min_samples_is_dropped() -> None:
     samples = [_sample(0.03), _sample(0.02)]
     assert estimate_edges(samples, deadband=0.002, min_samples=3) == []
+
+
+def test_single_abnormal_sample_bypasses_min_samples() -> None:
+    # One sample normally requires min_samples=5, but is_abnormal=True reduces effective min to 1.
+    samples = [_sample(0.12, is_abnormal=True, asset_volatility=0.01)]
+    (estimate,) = estimate_edges(samples, deadband=0.002, min_samples=5)
+    assert estimate.direction is Direction.UP
+    assert estimate.sample_count == 1
+
+
+def test_normal_single_sample_still_dropped_by_min_samples() -> None:
+    samples = [_sample(0.12, is_abnormal=False, asset_volatility=0.01)]
+    assert estimate_edges(samples, deadband=0.002, min_samples=5) == []
+
+
+def test_mixed_group_with_one_abnormal_sample_uses_effective_min_one() -> None:
+    # Two samples: one normal, one abnormal. Group total=2, effective_min=1 -> passes.
+    samples = [
+        _sample(0.03, is_abnormal=False),
+        _sample(0.10, is_abnormal=True, asset_volatility=0.01),
+    ]
+    (estimate,) = estimate_edges(samples, deadband=0.002, min_samples=5)
+    assert estimate.direction is Direction.UP
+    assert estimate.sample_count == 2
 
 
 def test_groups_are_split_by_factor_condition_and_asset() -> None:

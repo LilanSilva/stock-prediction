@@ -55,7 +55,10 @@ class PriceReader:
         return len(await self._recent_closes(asset_id)) >= 1
 
     async def _recent_closes(self, asset_id: AssetId) -> list[Decimal]:
-        params = {"asset_id": asset_id.value, "sessions": self._lookback + 1}
+        params: dict[str, str | int] = {
+            "asset_id": asset_id.value,
+            "sessions": self._lookback + 1,
+        }
         try:
             response = await self._client.get(f"{self._base_url}/prices/recent", params=params)
             response.raise_for_status()

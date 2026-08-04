@@ -19,6 +19,8 @@ class MarketDataSettings(BaseSettings):
     # Provider (biquote.io OHLC JSON; POC-7). Canonical asset IDs are resolved to provider symbols
     # via the shared asset registry; no provider symbol is configured here.
     biquote_base_url: str = "https://biquote.io/api"
+    # Non-US listings route here: biquote serves a curated set of US mega-caps only.
+    yahoo_base_url: str = "https://query1.finance.yahoo.com/v8/finance/chart"
     provider_timeout_seconds: float = Field(default=30.0, gt=0)
     # Calendar days of history fetched around a session so weekend/holiday gaps still yield a bar.
     fetch_window_days: int = Field(default=10, ge=2)

@@ -18,6 +18,7 @@ import asyncpg
 import structlog
 from pydantic import ValidationError
 from shared.calendar import NEW_YORK, resolve_baseline_settlement
+from shared.reference import UnknownAssetError, resolve
 from shared.schemas.messages import AssetId, ConditionCode, EventDetected
 
 from credibility.learning.models import Sample
@@ -39,6 +40,13 @@ ORDER BY registry_version DESC
 LIMIT 1
 """
 
+_VOLATILITY_QUERY = """
+SELECT close
+FROM market_data.close_observations
+WHERE asset_id = $1 AND session >= $2
+ORDER BY session, registry_version DESC
+"""
+
 
 async def _load_close(
     conn: asyncpg.Connection,
@@ -54,6 +62,35 @@ async def _load_close(
     return cache[key]
 
 
+def _calculate_volatility(closes: list[float]) -> float:
+    """Standard deviation of daily returns from a sequence of closes.
+
+    Returns 0.0 when fewer than two closes are available — the estimator treats this as normal
+    (non-abnormal) so those samples still require the full min_samples threshold.
+    """
+    if len(closes) < 2:
+        return 0.0
+    returns = [(closes[i] - closes[i - 1]) / closes[i - 1] for i in range(1, len(closes))]
+    mean = sum(returns) / len(returns)
+    variance = sum((r - mean) ** 2 for r in returns) / len(returns)
+    return variance ** 0.5
+
+
+async def _load_volatility(
+    conn: asyncpg.Connection,
+    cache: dict[str, float],
+    asset: AssetId,
+    cutoff: date,
+) -> float:
+    """Fetch (memoised) historical volatility for an asset over the lookback window."""
+    key = asset.value
+    if key not in cache:
+        rows = await conn.fetch(_VOLATILITY_QUERY, asset.value, cutoff)
+        closes = [float(row["close"]) for row in rows]
+        cache[key] = _calculate_volatility(closes)
+    return cache[key]
+
+
 def _conditions(event: EventDetected) -> list[ConditionCode | None]:
     """Unconditional observation plus one per context tag (deduplicated, order preserved)."""
     conditions: list[ConditionCode | None] = [None]
@@ -64,12 +101,25 @@ def _conditions(event: EventDetected) -> list[ConditionCode | None]:
 
 
 async def build_samples(
-    pool: asyncpg.Pool, *, lookback_days: int, timezone_name: str = NEW_YORK
+    pool: asyncpg.Pool,
+    *,
+    lookback_days: int,
+    timezone_name: str = NEW_YORK,
+    volatility_lookback_days: int = 30,
+    abnormal_threshold: float = 2.0,
 ) -> list[Sample]:
-    """Build the realised sample set from the last ``lookback_days`` of events."""
+    """Build the realised sample set from the last ``lookback_days`` of events.
+
+    Each sample is tagged with ``is_abnormal=True`` when the absolute return exceeds
+    ``abnormal_threshold`` multiples of the asset's historical daily volatility computed over
+    ``volatility_lookback_days`` of closes. Samples with insufficient volatility history
+    (fewer than two closes) are tagged ``is_abnormal=False``.
+    """
     cutoff = datetime.now(UTC) - timedelta(days=lookback_days)
+    volatility_cutoff = (datetime.now(UTC) - timedelta(days=volatility_lookback_days)).date()
     samples: list[Sample] = []
     close_cache: dict[tuple[str, date], float | None] = {}
+    volatility_cache: dict[str, float] = {}
     skipped_missing_price = 0
 
     async with pool.acquire() as conn:
@@ -82,8 +132,20 @@ async def build_samples(
                 logger.warning("learning_skip_unparseable_event", event_id=str(row["event_id"]))
                 continue
 
-            baseline, settlement = resolve_baseline_settlement(event.first_seen_at, timezone_name)
             for asset in event.affected_asset_ids:
+                # Sessions are resolved per asset, not per event: one event can affect listings on
+                # different exchanges, and a Stockholm close is not a New York close.
+                try:
+                    series = resolve(asset)
+                except UnknownAssetError:
+                    logger.warning("learning_skip_unknown_asset", asset_id=str(asset))
+                    continue
+                baseline, settlement = resolve_baseline_settlement(
+                    event.first_seen_at,
+                    series.timezone,
+                    hour=series.session_completion_hour,
+                    minute=series.session_completion_minute,
+                )
                 baseline_close = await _load_close(conn, close_cache, asset, baseline)
                 settlement_close = await _load_close(conn, close_cache, asset, settlement)
                 if baseline_close is None or settlement_close is None:
@@ -91,6 +153,11 @@ async def build_samples(
                     continue
 
                 actual_return = (settlement_close - baseline_close) / baseline_close
+                volatility = await _load_volatility(conn, volatility_cache, asset, volatility_cutoff)
+                is_abnormal = (
+                    volatility > 0.0 and abs(actual_return) >= abnormal_threshold * volatility
+                )
+
                 for condition in _conditions(event):
                     samples.append(
                         Sample(
@@ -99,6 +166,8 @@ async def build_samples(
                             polarity=event.polarity,
                             asset=asset,
                             actual_return=actual_return,
+                            is_abnormal=is_abnormal,
+                            asset_volatility=volatility,
                         )
                     )
 

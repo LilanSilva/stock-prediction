@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import cast
 
 from shared.graph import FiringEdge
 from shared.graph.exceptions import GraphTransportError
@@ -438,3 +439,25 @@ async def test_closed_market_collapses_and_withdraws() -> None:
     message, _ = repo.stored[0]
     assert message.supersedes_prediction_id == active.prediction_id
     assert repo.withdrawals == [True]
+
+
+# --- per-market trading calendar (S3) -----------------------------------------------------------
+
+
+async def test_market_open_uses_the_asset_own_market_calendar() -> None:
+    # A Stockholm listing and a US listing can disagree about whether "now" is a trading day, so the
+    # stance decision must consult each asset's own calendar rather than New York's.
+    pipeline = _pipeline(_FakeRepo(), _FakeGraph())
+    friday_late_utc = datetime(2026, 7, 17, 23, 0, tzinfo=UTC)
+    # 23:00 UTC Friday is already Saturday 01:00 in Stockholm -> not a trading day there.
+    assert await pipeline._is_market_open(AssetId.SAAB_B_STO, friday_late_utc) is False
+    # The same instant is still Friday evening in New York -> a trading day.
+    assert await pipeline._is_market_open(AssetId.GOLD, friday_late_utc) is True
+
+
+async def test_market_open_is_false_for_an_unregistered_asset() -> None:
+    # No registry entry means no calendar; the conservative collapse-to-one path is chosen rather
+    # than guessing a market.
+    pipeline = _pipeline(_FakeRepo(), _FakeGraph())
+    bogus = cast(AssetId, "NOT_IN_REGISTRY")
+    assert await pipeline._is_market_open(bogus, datetime(2026, 7, 15, 12, 0, tzinfo=UTC)) is False

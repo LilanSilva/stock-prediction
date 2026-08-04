@@ -39,22 +39,66 @@ Each contributing edge is judged against the actual market direction represented
 - Otherwise increment beta by that contribution.
 - Store evidence operation, before/after state, and score provenance.
 
-Contributing edges are keyed by the full edge ID, `FACTOR->ASSET` (unconditional) or
-`FACTOR|CONDITION->ASSET` (conditioned). Each `(factor, asset, condition)` triple is a distinct edge
+Contributing edges are keyed by the full edge ID, `FACTOR->TARGET` (unconditional) or
+`FACTOR|CONDITION->TARGET` (conditioned). Each `(factor, target, condition)` triple is a distinct edge
 with its own Beta-Bernoulli counts, so evidence for a conditioned edge is never collapsed into the
 unconditional one.
+
+`TARGET` is normally the canonical asset id. When a prediction fired on an **inherited** industry edge
+(the asset had no edge of its own for that factor/condition), the edge ID names the `AssetGroup`
+instead, so the update lands on the industry prior that actually fired rather than creating a per-asset
+edge that was never seeded. Consequence to be aware of: several listings in one group can contribute
+evidence to the same group edge from one industry event, so that edge accumulates faster than a
+company-specific one.
 
 This allows a dissenting edge to receive evidence when it was right even if arbitration chose the other direction.
 
 ## 5a. Offline structure learning
 
-Beyond online per-edge updates, Credibility owns a deterministic offline batch learner
-(`python -m credibility.learning.run`). It mines historical `EventDetected` payloads against realized
-next-session price moves, aggregates by `(factor, condition, polarity, asset)`, and upserts
-conditioned edges with data-derived direction/weight and Beta-Bernoulli priors. It is not an
-always-on service, performs no prediction-time work, uses no LLM, and reads `cleansing.*`/
-`market_data.*` read-only as an offline-analytics exception. Expert seeds remain the prior; the
-learner only refines or adds edges via idempotent `MERGE`.
+Beyond online per-edge updates, Credibility owns a deterministic offline batch learner. It mines
+historical `EventDetected` payloads against realized next-session price moves, aggregates by
+`(factor, condition, polarity, asset)`, and upserts conditioned edges with data-derived
+direction/weight and Beta-Bernoulli priors. It performs no prediction-time work, uses no LLM, and
+reads `cleansing.*`/`market_data.*` read-only as an offline-analytics exception. Expert seeds remain
+the prior; the learner only refines or adds edges via idempotent `MERGE`.
+
+**Scheduling:** When the Credibility Service starts, APScheduler runs the learner automatically
+every 24 hours (controlled by `CREDIBILITY_LEARNING_INTERVAL_HOURS`, default `24`). It also fires
+once immediately on startup. This behaviour is enabled by default (`CREDIBILITY_LEARNING_ENABLED=true`)
+and can be disabled to rely solely on manual runs.
+
+**Manual trigger:** The learner can also be invoked directly as a one-shot CLI batch, independent of
+the running service:
+
+```bash
+python -m credibility.learning.run
+```
+
+**Abnormal return filter:** A flat `min_samples` threshold would silently discard rare but
+high-impact events (e.g. a merger announcement causing a single 10% move) because only one
+observation exists in the lookback window. To capture these, the learner tags each sample as
+abnormal before grouping:
+
+1. For each affected asset, fetch the last `CREDIBILITY_LEARNING_VOLATILITY_LOOKBACK_DAYS` (default
+   `30`) of closing prices from `market_data.close_observations` and compute the standard deviation
+   of daily returns — the asset's historical daily volatility.
+2. A sample is `is_abnormal=True` when `|actual_return| >= abnormal_threshold × volatility`, where
+   `CREDIBILITY_LEARNING_ABNORMAL_THRESHOLD` defaults to `2.0` (the move must be at least 2× the
+   asset's normal daily swing).
+3. In the estimator, if **any** sample in a `(factor, condition, asset)` group is abnormal, the
+   effective `min_samples` is reduced to `1`. Otherwise the configured `min_samples` (default `5`)
+   applies unchanged.
+4. When no volatility history is available (fewer than two closes), the sample is treated as normal
+   — `is_abnormal=False`, `asset_volatility=0.0` — so the existing threshold still applies.
+
+This keeps the commodity repeating-event path completely unchanged while allowing single rare
+high-impact events to produce a conditioned edge when the magnitude is statistically unusual for
+that asset.
+
+| Env var | Default | Purpose |
+|---|---|---|
+| `CREDIBILITY_LEARNING_VOLATILITY_LOOKBACK_DAYS` | `30` | Days of closes used to compute per-asset historical volatility |
+| `CREDIBILITY_LEARNING_ABNORMAL_THRESHOLD` | `2.0` | Multiplier above which a move is considered abnormal |
 
 ## 6. Arbiter decision quality
 

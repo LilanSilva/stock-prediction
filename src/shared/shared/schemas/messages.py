@@ -27,6 +27,10 @@ from pydantic import (
     HttpUrl,
 )
 
+# Re-exported (redundant alias form) so `from shared.schemas.messages import AssetId` keeps working
+# for the ~100 existing call sites now that AssetId lives in its own module.
+from shared.schemas.asset_id import AssetId as AssetId
+
 # --- Routing keys (docs/contracts/message-contracts.md "Exchange and bindings") ---
 
 EXCHANGE = "feed.events"
@@ -44,28 +48,9 @@ class RoutingKey(StrEnum):
 # --- Canonical enums ---
 
 
-class AssetId(StrEnum):
-    """Canonical assets. GOLD/BRENT_OIL are the original commodities; the remainder are
-    industry-sector equities, each priced by a representative large-cap bellwether (see
-    shared.reference.asset_registry for the provider symbol mapping)."""
-
-    GOLD = "GOLD"
-    BRENT_OIL = "BRENT_OIL"
-    PHARMA = "PHARMA"
-    DEFENSE_AEROSPACE = "DEFENSE_AEROSPACE"
-    AI_COMPUTE = "AI_COMPUTE"
-    SEMICONDUCTOR = "SEMICONDUCTOR"
-    SOFTWARE = "SOFTWARE"
-    ENTERPRISE_SOFTWARE = "ENTERPRISE_SOFTWARE"
-    INTERNET_SEARCH = "INTERNET_SEARCH"
-    CONSUMER_ELECTRONICS = "CONSUMER_ELECTRONICS"
-    BANKING = "BANKING"
-    PAYMENTS_FINANCE = "PAYMENTS_FINANCE"
-    AUTOMOTIVE = "AUTOMOTIVE"
-    FOOD_BEVERAGE = "FOOD_BEVERAGE"
-    REAL_ESTATE = "REAL_ESTATE"
-    INDUSTRIAL = "INDUSTRIAL"
-    APPAREL = "APPAREL"
+# AssetId is no longer a closed enum: canonical assets are declared in the JSON asset registry so
+# companies and markets can be added without a code change (see shared.schemas.asset_id). It stays
+# str-compatible, so `asset.value` and `AssetId.GOLD` call sites are unaffected.
 
 
 class EventType(StrEnum):

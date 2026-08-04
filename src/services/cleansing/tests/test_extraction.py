@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from shared.reference import members_of
 from shared.schemas.messages import AssetId, ConditionCode, EventPolarity, EventType
 
 from cleansing.extraction import KeywordExtractor, SpacyExtractor, build_extractor
@@ -33,8 +34,10 @@ async def test_keyword_extractor_detects_resolution() -> None:
     action = await KeywordExtractor().extract("USA calls off Iran attack", "en")
     assert action.event_type == EventType.MILITARY_CONFLICT
     assert action.polarity == EventPolarity.RESOLUTION
-    # No commodity is named, so assets fall back to the event type's graph assets.
-    assert set(action.affected_asset_ids) == {AssetId.GOLD, AssetId.BRENT_OIL}
+    # No company or industry keyword is named, so assets fall back to the event type's graph
+    # assets: the safe-haven commodities plus the weapons makers a conflict moves.
+    assert {AssetId.GOLD, AssetId.BRENT_OIL} <= set(action.affected_asset_ids)
+    assert set(members_of("WEAPON_INDUSTRY")) <= set(action.affected_asset_ids)
     # A distant conflict with no transport cue is a safe-haven tag.
     assert action.context_tags == (ConditionCode.SAFE_HAVEN_ONLY,)
 

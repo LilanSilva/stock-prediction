@@ -9,6 +9,16 @@ predictions stuck `PENDING` (no price could ever be fetched to score them). biqu
 key-less alternative; this POC checks whether it meets every requirement the real Market Data
 adapter depends on before we commit to a migration.
 
+> **Correction (2026-08-04): the 429 diagnosis above was wrong.** Yahoo blocks non-browser
+> User-Agents; it was not rate-limiting this host's IP. POC-6 sent
+> `USER_AGENT = "feed-analyzer-poc6/1.0 (local research POC)"` (`src/poc/poc6/poc6.py:27`). Re-probed
+> with a browser User-Agent: **40 concurrent requests all returned 200**, while 8 with curl's default
+> agent all returned **429**. The migration to biquote remains sound on its own merits (documented,
+> stable, no UA trickery), but biquote turned out to serve only a curated list of US mega-caps — every
+> European listing returns 0 bars, including EU giants on US exchanges (`ASML`, `SAP`, `NVO`, `SHEL`).
+> Yahoo is therefore back in use for non-US listings via `market_data.adapters.yahoo`, which sends a
+> browser User-Agent. See `docs/reference/asset-registry.md` and ADR-007.
+
 ## Run
 
 ```bash

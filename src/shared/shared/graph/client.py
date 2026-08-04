@@ -30,6 +30,23 @@ RETURN cf.id AS factor_id, a.id AS asset_id, r.direction AS direction,
        r.condition AS condition
 """
 
+# Industry-level edges, returned against each member asset so the caller sees a normal FiringEdge.
+# `inherited` marks the provenance: a newly listed company has no evidence of its own yet, so it
+# predicts from its group's edges until the offline learner writes company-specific ones.
+_GROUP_FIRING_EDGES_CYPHER = """
+MATCH (cf:CausalFactor {id: $event_type})-[r:CAUSES]->(g:AssetGroup)<-[:MEMBER_OF]-(a:Asset)
+WHERE ($asset_ids IS NULL OR a.id IN $asset_ids)
+  AND (r.condition IS NULL OR $conditions IS NULL OR r.condition IN $conditions)
+  AND NOT EXISTS {
+    MATCH (cf)-[own:CAUSES]->(a)
+    WHERE (own.condition IS NULL AND r.condition IS NULL)
+       OR own.condition = r.condition
+  }
+RETURN cf.id AS factor_id, a.id AS asset_id, r.direction AS direction,
+       r.weight AS weight, r.confidence AS confidence, r.alpha AS alpha, r.beta AS beta,
+       r.condition AS condition, g.id AS group_id
+"""
+
 _UPDATE_EDGE_CYPHER = """
 MATCH (cf:CausalFactor {id: $factor_id})-[r:CAUSES]->(a:Asset {id: $asset_id})
 WHERE r.condition IS NULL
@@ -112,11 +129,18 @@ class CausalGraphClient:
         event_type: EventType,
         asset_ids: list[AssetId] | None = None,
         conditions: set[ConditionCode] | None = None,
+        *,
+        inherit_group_edges: bool = True,
     ) -> list[FiringEdge]:
         """Return edges for ``event_type`` gated by ``asset_ids`` and active ``conditions``.
 
         Unconditional edges always fire; conditioned edges fire only when their condition is in
         ``conditions`` (``None`` means no condition filter — return every conditioned edge).
+
+        With ``inherit_group_edges`` (the default), an asset that has no edge of its own for a
+        (factor, condition) pair inherits its industry group's edge, flagged ``inherited=True``. A
+        company-specific edge always wins over the group's, so evidence learned for that listing
+        overrides the industry prior rather than adding to it.
         """
         driver = self._require_driver()
         params = {
@@ -128,12 +152,16 @@ class CausalGraphClient:
             async with driver.session() as session:
                 result = await session.run(_FIRING_EDGES_CYPHER, params)
                 records = await result.data()
+                if inherit_group_edges:
+                    group_result = await session.run(_GROUP_FIRING_EDGES_CYPHER, params)
+                    records = list(records) + list(await group_result.data())
         except Exception as exc:  # noqa: BLE001 - normalized to a typed transport error
             raise GraphTransportError(f"neo4j firing-edge query failed: {exc}") from exc
 
         edges: list[FiringEdge] = []
         for row in cast(list[dict[str, Any]], records):
             raw_condition = row.get("condition")
+            group_id = row.get("group_id")
             edges.append(
                 FiringEdge(
                     factor_id=EventType(row["factor_id"]),
@@ -144,6 +172,7 @@ class CausalGraphClient:
                     alpha=float(row["alpha"]),
                     beta=float(row["beta"]),
                     condition=ConditionCode(raw_condition) if raw_condition is not None else None,
+                    inherited_from=str(group_id) if group_id is not None else None,
                 )
             )
         return edges

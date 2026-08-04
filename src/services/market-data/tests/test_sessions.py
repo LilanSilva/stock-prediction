@@ -43,6 +43,15 @@ def test_is_session_complete_boundary() -> None:
     assert is_session_complete(session, _NY, now=at_close) is True
 
 
-def test_unsupported_timezone_rejected() -> None:
+def test_european_market_timezone_is_supported() -> None:
+    # Stockholm closes at 18:00 CEST == 16:00 UTC, hours before New York.
+    completed = session_completed_at(
+        date(2026, 7, 13), "Europe/Stockholm", hour=18, minute=0
+    )
+    assert completed == datetime(2026, 7, 13, 16, 0, tzinfo=UTC)
+
+
+def test_unknown_timezone_is_dead_lettered() -> None:
+    # An unrecognised zone is terminal provider/registry data, not a transient failure.
     with pytest.raises(InvalidObservationError):
-        session_completed_at(date(2026, 7, 13), "Europe/London")
+        session_completed_at(date(2026, 7, 13), "Mars/Olympus_Mons")

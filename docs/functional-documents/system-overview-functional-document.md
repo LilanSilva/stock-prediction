@@ -2,11 +2,17 @@
 
 ## 1. Product purpose
 
-Feed Analyzer is a local proof of concept that tests whether structured news events plus a causal knowledge graph can predict the next trading-session direction of selected commodities. It does not execute trades or provide personalized financial advice.
+Feed Analyzer is a local proof of concept that tests whether structured news events plus a causal knowledge graph can predict the next trading-session direction of selected assets. It does not execute trades or provide personalized financial advice.
 
-Initial scope:
+Scope:
 
-- Assets: `GOLD` and `BRENT_OIL`.
+- Assets: declared in the [asset registry](../reference/asset-registry.md) JSON file — commodities plus
+  company listings across US, Swedish, Danish, Dutch, French and German markets in USD, SEK, EUR and
+  DKK. Adding a company or a market is a registry edit, not a code change.
+- Assets are grouped by industry, so company-specific news moves one listing while industry-wide news
+  fans out to every member across markets.
+- Each asset carries its own provider, currency, timezone and session-completion clock, so sessions and
+  prices resolve on that asset's market rather than a single global calendar.
 - Horizon: `ONE_TRADING_DAY`.
 - Outcome: `UP`, `DOWN`, or `NEUTRAL` with confidence and magnitude.
 - Evaluation: immutable close-to-close observations.

@@ -34,11 +34,40 @@ The service uses local processing first. LLM use is reserved for ambiguous extra
 8. Close clusters using quiet period and event-time watermark rules.
 9. Build `EventDetected` locally when the required structured fields are unambiguous, including
    `polarity` (`OCCURRENCE`/`RESOLUTION` from local negation/resolution cues) and `context_tags`
-   (e.g. `TRANSPORT_AFFECTED` vs `SAFE_HAVEN_ONLY`). When no asset keyword matches, derive
-   `affected_asset_ids` from the event type so geopolitical events still reach the graph.
+   (e.g. `TRANSPORT_AFFECTED` vs `SAFE_HAVEN_ONLY`). Resolve `affected_asset_ids` by news scope
+   (see 3a).
 10. Call the LLM only for ambiguous merge/extraction or factual conflict resolution.
 11. Validate taxonomy and canonical asset IDs.
 12. Store the event and publish through the outbox/reconciliation path.
+
+## 3a. News scope and asset fan-out
+
+An article's `affected_asset_ids` depend on how broadly the news applies. Scope is resolved
+deterministically from the asset registry's keywords, most specific match first:
+
+| Scope | Trigger | Result |
+|---|---|---|
+| `COMPANY` | a company's own keyword | that asset alone |
+| `INDUSTRY` | a group keyword | every member of that industry group, across markets |
+| `EVENT_TYPE` | neither matched | the event type's mapped assets and industry groups |
+| `NONE` | nothing matched | no assets, so no prediction is produced |
+
+```
+"Tesla acquired by rival"     -> COMPANY   -> TSLA_NASDAQ
+"Missile strikes hit airbase" -> INDUSTRY  -> LMT_NYSE, SAAB_B_STO, AM_EPA
+```
+
+A company keyword always beats an industry keyword in the same text: a Saab-specific story must not
+move every other defence listing. Single-token keywords match whole-word with English/Swedish plural
+tolerance (`missiles` fires the `missile` keyword); multi-word phrases match as substrings. Keywords
+live in the registry beside each asset's provider mapping, so adding a company is a registry edit; the
+registry rejects a keyword claimed by two assets, so a company match is never ambiguous.
+
+Fan-out is intentional and unbounded: one industry headline produces one independent prediction per
+member. Those outcomes are correlated but scored independently, which inflates apparent confidence —
+tracked as an open policy question.
+
+No LLM is involved: scope inference is keyword-deterministic.
 
 ## 4. Cluster state machine
 

@@ -6,6 +6,7 @@ from typing import Any, cast
 
 import pytest
 from shared.llm.gateway import LLMGateway, LLMResult
+from shared.reference import members_of
 from shared.schemas.messages import (
     AssetId,
     ConditionCode,
@@ -152,11 +153,13 @@ def test_build_local_event_context_tags_are_unioned() -> None:
 
 
 def test_build_local_event_asset_fallback_from_event_type() -> None:
-    # Geopolitical cluster whose actions named no asset still resolves to its graph assets.
+    # Geopolitical cluster whose actions named no asset still resolves to its graph assets: the
+    # safe-haven commodities plus the weapons makers a conflict moves, in every market.
     record = _record(EventType.MILITARY_CONFLICT)
     actions: list[Any] = [_action("USA", "attack", [])]
     event = build_local_event(ClusterInputs(record=record, articles=[], actions=actions))
-    assert set(event.affected_asset_ids) == {AssetId.GOLD, AssetId.BRENT_OIL}
+    assert {AssetId.GOLD, AssetId.BRENT_OIL} <= set(event.affected_asset_ids)
+    assert set(members_of("WEAPON_INDUSTRY")) <= set(event.affected_asset_ids)
 
 
 class _FakeGateway:

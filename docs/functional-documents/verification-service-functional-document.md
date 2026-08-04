@@ -25,7 +25,15 @@ For each new immutable prediction:
 5. Add one canonical `PriceRequested` containing both sessions to the outbox.
 6. Reconcile publication and retain pending state until both closes arrive.
 
-Session resolution uses the asset registry calendar and timezone, including holidays and non-trading days.
+Session resolution uses the asset registry's timezone and session-completion clock, so each asset
+settles on its own market calendar: a Stockholm listing resolves Stockholm sessions and completes at
+18:00 local, five hours before New York's 17:00. Daylight saving comes from the tz database, since the
+EU and US switch on different dates.
+
+Holidays are not modelled as calendar rules. A session is any weekday; a local holiday surfaces as a
+missing provider bar, so the request stays pending and retries — the same behaviour US holidays already
+had. On a market holiday the request therefore waits out its retry budget rather than skipping to the
+next real session.
 
 When a `PredictionMade` carries `supersedes_prediction_id` (a market-closed stance collapse from
 Prediction), withdraw the superseded prediction's evaluation so it is never scored. A `PriceObserved`

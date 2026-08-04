@@ -46,20 +46,24 @@ def estimate_edges(
     """Aggregate ``samples`` into conditioned-edge estimates.
 
     Groups by ``(factor, condition, asset)``; groups with fewer than ``min_samples`` observations
-    are dropped as insufficient evidence. Direction is UP/DOWN when the mean signed return clears
-    ``±deadband``, else NEUTRAL. ``alpha``/``beta`` are the agreeing/disagreeing counts plus the
-    Beta(1, 1) prior, and ``confidence`` is the agreeing fraction. Output is sorted for
-    determinism.
+    are dropped as insufficient evidence — unless any sample in the group is flagged
+    ``is_abnormal=True``, in which case a single observation is sufficient. Direction is UP/DOWN
+    when the mean signed return clears ``±deadband``, else NEUTRAL. ``alpha``/``beta`` are the
+    agreeing/disagreeing counts plus the Beta(1, 1) prior, and ``confidence`` is the agreeing
+    fraction. Output is sorted for determinism.
     """
-    grouped: dict[_GroupKey, list[float]] = defaultdict(list)
+    grouped: dict[_GroupKey, list[Sample]] = defaultdict(list)
     for sample in samples:
-        grouped[(sample.factor, sample.condition, sample.asset)].append(_signed_return(sample))
+        grouped[(sample.factor, sample.condition, sample.asset)].append(sample)
 
     estimates: list[EdgeEstimate] = []
-    for (factor, condition, asset), signed in grouped.items():
-        total = len(signed)
-        if total < min_samples:
+    for (factor, condition, asset), group_samples in grouped.items():
+        total = len(group_samples)
+        effective_min = 1 if any(s.is_abnormal for s in group_samples) else min_samples
+        if total < effective_min:
             continue
+
+        signed = [_signed_return(s) for s in group_samples]
 
         mean = sum(signed) / total
         positives = sum(1 for value in signed if value > 0.0)

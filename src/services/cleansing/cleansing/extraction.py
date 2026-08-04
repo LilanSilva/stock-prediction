@@ -18,12 +18,11 @@ from shared.schemas.messages import EventType
 
 from cleansing.models import ExtractedAction
 from cleansing.taxonomy import (
-    assets_for_event_type,
     classify_polarity,
     classify_text,
-    infer_assets,
     infer_conditions,
     map_action,
+    resolve_scope,
 )
 
 
@@ -47,17 +46,18 @@ def _build_action(
 ) -> ExtractedAction:
     """Assemble an ExtractedAction, enriching it with polarity, context tags, and assets.
 
-    Assets fall back to the event type's downstream graph assets when no asset keyword is present,
-    so geopolitical headlines that never name a commodity still resolve to their assets.
+    Asset selection is scope-aware (see ``taxonomy.resolve_scope``): a company-specific headline
+    moves only that company, an industry headline fans out to every listing in the group across
+    markets, and anything else falls back to the event type's graph assets.
     """
-    assets = infer_assets(text) or assets_for_event_type(event_type)
+    scope = resolve_scope(text, event_type)
     return ExtractedAction(
         actor=actor,
         action_lemma=action_lemma,
         object=obj,
         original_lemma=original_lemma,
         event_type=event_type,
-        affected_asset_ids=assets,
+        affected_asset_ids=scope.assets,
         polarity=classify_polarity(text),
         context_tags=tuple(infer_conditions(text, event_type)),
     )

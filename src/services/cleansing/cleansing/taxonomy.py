@@ -11,6 +11,10 @@ canonical taxonomy locally, never translated by an LLM (functional document sec 
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from enum import StrEnum
+
+from shared.reference import members_of, registry
 from shared.schemas.messages import AssetId, ConditionCode, EventPolarity, EventType
 
 # Keyword/lemma (lowercase) -> canonical event type. Swedish and English forms map to the same type.
@@ -91,44 +95,32 @@ ACTION_TAXONOMY: dict[str, EventType] = {
     "översvämning": EventType.NATURAL_DISASTER,  # sv
 }
 
-# Canonical asset inference keywords (lowercase). Commodities plus industry-sector bellwethers.
-# Keywords are distinctive whole words/phrases to avoid false positives (e.g. "artificial
-# intelligence" not the bare token "ai").
-ASSET_KEYWORDS: dict[AssetId, tuple[str, ...]] = {
-    AssetId.GOLD: ("gold", "bullion", "guld", "xau"),
-    AssetId.BRENT_OIL: (
-        "oil",
-        "crude",
-        "brent",
-        "opec",
-        "petroleum",
-        "olja",
-        "råolja",
-    ),
-    AssetId.PHARMA: ("pharmaceutical", "pharma", "medicine", "drugmaker", "insulin", "vaccine"),
-    AssetId.DEFENSE_AEROSPACE: (
-        "defense",
-        "defence",
-        "lockheed",
-        "fighter jet",
-        "aircraft",
-        "aerospace",
-        "missile",
-    ),
-    AssetId.AI_COMPUTE: ("artificial intelligence", "nvidia", "gpu", "machine learning"),
-    AssetId.SEMICONDUCTOR: ("semiconductor", "chipmaker", "microchip", "foundry", "wafer", "cpu"),
-    AssetId.SOFTWARE: ("microsoft", "windows", "operating system", "azure"),
-    AssetId.ENTERPRISE_SOFTWARE: ("oracle", "erp", "enterprise software"),
-    AssetId.INTERNET_SEARCH: ("google", "alphabet", "search engine", "android"),
-    AssetId.CONSUMER_ELECTRONICS: ("apple", "iphone", "smartphone"),
-    AssetId.BANKING: ("bank", "jpmorgan", "banking", "lender"),
-    AssetId.PAYMENTS_FINANCE: ("visa", "mastercard", "payments network", "asset manager"),
-    AssetId.AUTOMOTIVE: ("automaker", "carmaker", "electric vehicle", "automobile"),
-    AssetId.FOOD_BEVERAGE: ("coca-cola", "beverage", "packaged food", "soft drink"),
-    AssetId.REAL_ESTATE: ("real estate", "housing", "homebuilder", "property market"),
-    AssetId.INDUSTRIAL: ("industrial manufacturer", "factory output", "machinery maker"),
-    AssetId.APPAREL: ("apparel", "clothing", "sportswear", "footwear"),
-}
+def _asset_keywords() -> dict[AssetId, tuple[str, ...]]:
+    """Per-asset inference keywords, read from the JSON registry rather than hardcoded here.
+
+    Keeping these in the registry beside each asset's provider mapping is what lets a company be
+    added by editing ``assets.json`` alone. The registry rejects a keyword claimed by two assets, so
+    a match is never ambiguous.
+    """
+    return {
+        AssetId(entry.asset_id): entry.keywords
+        for entry in registry().assets.values()
+        if entry.keywords
+    }
+
+
+def _industry_keywords() -> dict[str, tuple[str, ...]]:
+    """Per-group keywords: an industry-scope match fans out to every member of the group."""
+    return {
+        group.group_id: group.industry_keywords
+        for group in registry().groups.values()
+        if group.industry_keywords
+    }
+
+
+# Resolved once at import, mirroring the registry's own load-once semantics.
+ASSET_KEYWORDS: dict[AssetId, tuple[str, ...]] = _asset_keywords()
+INDUSTRY_KEYWORDS: dict[str, tuple[str, ...]] = _industry_keywords()
 
 
 def map_action(lemma: str | None) -> EventType:
@@ -160,14 +152,111 @@ def classify_text(text: str) -> tuple[EventType, str | None]:
     return best_type, best_keyword
 
 
+class NewsScope(StrEnum):
+    """How broadly a headline applies, which decides how many assets it moves."""
+
+    COMPANY = "COMPANY"
+    INDUSTRY = "INDUSTRY"
+    EVENT_TYPE = "EVENT_TYPE"
+    NONE = "NONE"
+
+
+@dataclass(frozen=True)
+class AssetScope:
+    """The resolved assets for one article plus the scope that produced them.
+
+    ``matched`` records the keyword(s) that fired, so a prediction's provenance can explain why an
+    asset was selected.
+    """
+
+    scope: NewsScope
+    assets: tuple[AssetId, ...]
+    matched: tuple[str, ...] = ()
+
+
 def infer_assets(text: str) -> tuple[AssetId, ...]:
-    """Return the canonical assets referenced by the text, in canonical enum order."""
-    lowered = f" {text.lower()} "
+    """Return the assets named *specifically* by the text (company scope only).
+
+    Kept as the narrow, company-level lookup; use :func:`resolve_scope` for the full precedence
+    including industry fan-out.
+    """
+    return _company_matches(f" {text.lower()} ")[0]
+
+
+def _keyword_present(haystack: str, keyword: str) -> bool:
+    """Keyword match with simple English/Swedish plural tolerance.
+
+    Multi-word phrases match as substrings. A single token matches as a whole word, and also with a
+    trailing ``s``/``es``/``er``/``ar`` so "missiles" fires the "missile" keyword -- headlines
+    pluralise far more often than a registry can enumerate.
+    """
+    if " " in keyword:
+        return keyword in haystack
+    return any(f" {keyword}{suffix} " in haystack for suffix in ("", "s", "es", "er", "ar"))
+
+
+def _company_matches(haystack: str) -> tuple[tuple[AssetId, ...], tuple[str, ...]]:
+    """Assets whose own keywords appear in ``haystack`` (pre-lowercased and space-padded)."""
     found: list[AssetId] = []
+    matched: list[str] = []
     for asset, keywords in ASSET_KEYWORDS.items():
-        if any(kw in lowered for kw in keywords):
+        hits = [kw for kw in keywords if _keyword_present(haystack, kw)]
+        if hits:
             found.append(asset)
-    return tuple(found)
+            matched.extend(hits)
+    return tuple(found), tuple(matched)
+
+
+def _industry_matches(haystack: str) -> tuple[tuple[AssetId, ...], tuple[str, ...]]:
+    """Every member of each group whose industry keywords appear in ``haystack``.
+
+    This is the fan-out: an industry-wide event moves every listing in that industry, across
+    markets.
+    """
+    found: list[AssetId] = []
+    matched: list[str] = []
+    for group_id, keywords in INDUSTRY_KEYWORDS.items():
+        hits = [kw for kw in keywords if _keyword_present(haystack, kw)]
+        if not hits:
+            continue
+        matched.extend(hits)
+        for member in members_of(group_id):
+            asset = AssetId(member)
+            if asset not in found:
+                found.append(asset)
+    return tuple(found), tuple(matched)
+
+
+def resolve_scope(text: str, event_type: EventType) -> AssetScope:
+    """Resolve which assets an article affects, most specific match first.
+
+    Precedence, first match wins:
+
+      1. **Company** -- a company's own keyword appears ("Tesla acquired" moves Tesla alone). The
+         most specific signal available, so it is never widened to the whole industry.
+      2. **Industry** -- a group keyword appears ("war begins" moves every weapons maker in every
+         market). Fans out to all members of the group.
+      3. **Event type** -- neither named an asset, so fall back to the event type's graph assets, so
+         a geopolitical headline still reaches the commodities it moves.
+
+    Returns an empty ``NONE`` scope when nothing resolves; the caller decides whether that is worth
+    recording. Never raises.
+    """
+    haystack = f" {text.lower()} "
+
+    assets, matched = _company_matches(haystack)
+    if assets:
+        return AssetScope(NewsScope.COMPANY, assets, matched)
+
+    assets, matched = _industry_matches(haystack)
+    if assets:
+        return AssetScope(NewsScope.INDUSTRY, assets, matched)
+
+    fallback = assets_for_event_type(event_type)
+    if fallback:
+        return AssetScope(NewsScope.EVENT_TYPE, fallback, (event_type.value,))
+
+    return AssetScope(NewsScope.NONE, ())
 
 
 def gate2_compatible(left: EventType, right: EventType) -> bool:
@@ -178,9 +267,8 @@ def gate2_compatible(left: EventType, right: EventType) -> bool:
 
 
 # Downstream assets implied by each canonical event type, mirroring the seeded Neo4j CAUSES edges
-# (infra/neo4j/init/04+05). Used only as a fallback when title/body keywords name no asset, so a
-# geopolitical headline like "USA calls off Iran attack" still resolves to its graph assets. Assets
-# are listed in canonical enum order (GOLD, BRENT_OIL).
+# (infra/neo4j/init/04+05). Used only as a fallback when neither a company nor an industry keyword
+# named an asset, so a geopolitical headline like "USA calls off Iran attack" still resolves.
 EVENT_TYPE_ASSETS: dict[EventType, tuple[AssetId, ...]] = {
     EventType.MILITARY_CONFLICT: (AssetId.GOLD, AssetId.BRENT_OIL),
     EventType.STRAIT_CLOSURE: (AssetId.GOLD, AssetId.BRENT_OIL),
@@ -191,6 +279,17 @@ EVENT_TYPE_ASSETS: dict[EventType, tuple[AssetId, ...]] = {
     EventType.RECESSION_SIGNAL: (AssetId.GOLD, AssetId.BRENT_OIL),
     EventType.NATURAL_DISASTER: (AssetId.GOLD, AssetId.BRENT_OIL),
     EventType.POLITICAL_TRANSITION: (AssetId.GOLD,),
+}
+
+# Industry groups an event type moves in addition to the commodities above. This is what lets an
+# industry-wide event reach the listings it affects even when the headline names no company and no
+# industry keyword: a war moves weapons makers everywhere, not just gold and oil. Members are
+# expanded from the registry, so a new market listing is picked up without editing this table.
+EVENT_TYPE_GROUPS: dict[EventType, tuple[str, ...]] = {
+    EventType.MILITARY_CONFLICT: ("WEAPON_INDUSTRY",),
+    EventType.SANCTIONS: ("WEAPON_INDUSTRY",),
+    EventType.STRAIT_CLOSURE: ("OIL_GAS",),
+    EventType.SUPPLY_DISRUPTION: ("OIL_GAS",),
 }
 
 # Resolution/negation cues (lowercase). Presence of any flips event polarity to RESOLUTION, which
@@ -279,5 +378,15 @@ def infer_conditions(text: str, event_type: EventType) -> list[ConditionCode]:
 
 
 def assets_for_event_type(event_type: EventType) -> tuple[AssetId, ...]:
-    """Return the downstream assets a canonical event type maps to (empty when it has no edge)."""
-    return EVENT_TYPE_ASSETS.get(event_type, ())
+    """Return the downstream assets a canonical event type maps to (empty when it has no edge).
+
+    Combines the commodity mapping with the members of any industry group the event type moves, so a
+    war headline naming no company still reaches weapons makers in every market.
+    """
+    found: list[AssetId] = list(EVENT_TYPE_ASSETS.get(event_type, ()))
+    for group_id in EVENT_TYPE_GROUPS.get(event_type, ()):
+        for member in members_of(group_id):
+            asset = AssetId(member)
+            if asset not in found:
+                found.append(asset)
+    return tuple(found)

@@ -25,6 +25,11 @@ class LearningSettings(BaseSettings):
     min_samples: int = Field(default=5, ge=1)
     # Only events first seen within this many days are considered.
     lookback_days: int = Field(default=30, ge=1)
+    # Days of closes used to calculate per-asset historical daily volatility.
+    volatility_lookback_days: int = Field(default=30, ge=2)
+    # A move is abnormal when |actual_return| >= abnormal_threshold * historical_volatility.
+    # Abnormal samples bypass min_samples and are written to KG with a single observation.
+    abnormal_threshold: float = Field(default=2.0, gt=0.0)
 
     db_pool_min_size: int = Field(default=1, ge=1)
     db_pool_max_size: int = Field(default=5, ge=1)

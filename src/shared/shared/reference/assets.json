@@ -1,0 +1,863 @@
+{
+  "registry_version": "multi-market-v2",
+  "rollover_policy": "PROVIDER_MANAGED_CONTINUOUS_INCLUDE_ALL_V1",
+  "groups": [
+    {
+      "group_id": "WEAPON_INDUSTRY",
+      "display_name": "Weapon & defence industry",
+      "industry_keywords": [
+        "defense",
+        "defence",
+        "fighter jet",
+        "missile",
+        "aerospace",
+        "vapen",
+        "forsvar",
+        "stridsflygplan"
+      ],
+      "assets": [
+        {
+          "asset_id": "LMT_NYSE",
+          "name": "Lockheed Martin",
+          "code": "NYSE:LMT",
+          "provider": "biquote.io",
+          "provider_symbol": "LMT",
+          "economic_identity": "Lockheed Martin ordinary shares (NYSE)",
+          "expected_exchange": "NYSE",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "lockheed",
+            "lmt"
+          ]
+        },
+        {
+          "asset_id": "SAAB_B_STO",
+          "name": "Saab AB",
+          "code": "STO:SAAB-B",
+          "provider": "yahoo",
+          "provider_symbol": "SAAB-B.ST",
+          "economic_identity": "Saab AB ordinary shares (STO)",
+          "expected_exchange": "STO",
+          "currency": "SEK",
+          "timezone": "Europe/Stockholm",
+          "session_complete_at": "18:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "saab",
+            "saab-b"
+          ]
+        },
+        {
+          "asset_id": "AM_EPA",
+          "name": "Dassault Aviation",
+          "code": "EPA:AM",
+          "provider": "yahoo",
+          "provider_symbol": "AM.PA",
+          "economic_identity": "Dassault Aviation ordinary shares (PAR)",
+          "expected_exchange": "PAR",
+          "currency": "EUR",
+          "timezone": "Europe/Paris",
+          "session_complete_at": "18:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "dassault",
+            "rafale"
+          ]
+        }
+      ]
+    },
+    {
+      "group_id": "AEROSPACE_AVIATION",
+      "display_name": "Aerospace & aviation",
+      "industry_keywords": [
+        "airline",
+        "air travel",
+        "passenger jet",
+        "flygbolag",
+        "flygtrafik"
+      ],
+      "assets": [
+        {
+          "asset_id": "BA_NYSE",
+          "name": "Boeing",
+          "code": "NYSE:BA",
+          "provider": "biquote.io",
+          "provider_symbol": "BA",
+          "economic_identity": "Boeing ordinary shares (NYSE)",
+          "expected_exchange": "NYSE",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "boeing"
+          ]
+        },
+        {
+          "asset_id": "UAL_NASDAQ",
+          "name": "United Airlines",
+          "code": "NASDAQ:UAL",
+          "provider": "yahoo",
+          "provider_symbol": "UAL",
+          "economic_identity": "United Airlines ordinary shares (NASDAQ)",
+          "expected_exchange": "NASDAQ",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "united airlines",
+            "ual"
+          ]
+        }
+      ]
+    },
+    {
+      "group_id": "PHARMA_INDUSTRY",
+      "display_name": "Pharmaceutical industry",
+      "industry_keywords": [
+        "pharma",
+        "medicine",
+        "drugmaker",
+        "insulin",
+        "lakemedel",
+        "vaccin"
+      ],
+      "assets": [
+        {
+          "asset_id": "AZN_STO",
+          "name": "AstraZeneca",
+          "code": "STO:AZN",
+          "provider": "yahoo",
+          "provider_symbol": "AZN.ST",
+          "economic_identity": "AstraZeneca ordinary shares (STO)",
+          "expected_exchange": "STO",
+          "currency": "SEK",
+          "timezone": "Europe/Stockholm",
+          "session_complete_at": "18:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "astrazeneca",
+            "astra zeneca"
+          ]
+        },
+        {
+          "asset_id": "NOVO_B_CPH",
+          "name": "Novo Nordisk",
+          "code": "CPH:NOVO-B",
+          "provider": "yahoo",
+          "provider_symbol": "NOVO-B.CO",
+          "economic_identity": "Novo Nordisk ordinary shares (CPH)",
+          "expected_exchange": "CPH",
+          "currency": "DKK",
+          "timezone": "Europe/Copenhagen",
+          "session_complete_at": "18:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "novo nordisk",
+            "ozempic",
+            "wegovy"
+          ]
+        },
+        {
+          "asset_id": "BNTX_NASDAQ",
+          "name": "BioNTech",
+          "code": "NASDAQ:BNTX",
+          "provider": "yahoo",
+          "provider_symbol": "BNTX",
+          "economic_identity": "BioNTech ordinary shares (NASDAQ)",
+          "expected_exchange": "NASDAQ",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "biontech"
+          ]
+        },
+        {
+          "asset_id": "MRNA_NASDAQ",
+          "name": "Moderna",
+          "code": "NASDAQ:MRNA",
+          "provider": "yahoo",
+          "provider_symbol": "MRNA",
+          "economic_identity": "Moderna ordinary shares (NASDAQ)",
+          "expected_exchange": "NASDAQ",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "moderna"
+          ]
+        }
+      ]
+    },
+    {
+      "group_id": "SEMICONDUCTOR_INDUSTRY",
+      "display_name": "Semiconductor industry",
+      "industry_keywords": [
+        "semiconductor",
+        "chipmaker",
+        "microchip",
+        "foundry",
+        "wafer",
+        "cpu",
+        "halvledare"
+      ],
+      "assets": [
+        {
+          "asset_id": "NVDA_NASDAQ",
+          "name": "Nvidia",
+          "code": "NASDAQ:NVDA",
+          "provider": "biquote.io",
+          "provider_symbol": "NVDA",
+          "economic_identity": "Nvidia ordinary shares (NASDAQ)",
+          "expected_exchange": "NASDAQ",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "nvidia",
+            "nvda",
+            "gpu"
+          ]
+        },
+        {
+          "asset_id": "ASML_AMS",
+          "name": "ASML Holding",
+          "code": "AMS:ASML",
+          "provider": "yahoo",
+          "provider_symbol": "ASML.AS",
+          "economic_identity": "ASML Holding ordinary shares (AMS)",
+          "expected_exchange": "AMS",
+          "currency": "EUR",
+          "timezone": "Europe/Amsterdam",
+          "session_complete_at": "18:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "asml",
+            "lithography"
+          ]
+        }
+      ]
+    },
+    {
+      "group_id": "SOFTWARE_INDUSTRY",
+      "display_name": "Software & cloud",
+      "industry_keywords": [
+        "software",
+        "operating system",
+        "cloud computing",
+        "erp",
+        "mjukvara"
+      ],
+      "assets": [
+        {
+          "asset_id": "MSFT_NASDAQ",
+          "name": "Microsoft",
+          "code": "NASDAQ:MSFT",
+          "provider": "biquote.io",
+          "provider_symbol": "MSFT",
+          "economic_identity": "Microsoft ordinary shares (NASDAQ)",
+          "expected_exchange": "NASDAQ",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "microsoft",
+            "windows",
+            "azure",
+            "msft"
+          ]
+        },
+        {
+          "asset_id": "SAP_ETR",
+          "name": "SAP SE",
+          "code": "ETR:SAP",
+          "provider": "yahoo",
+          "provider_symbol": "SAP.DE",
+          "economic_identity": "SAP SE ordinary shares (ETR)",
+          "expected_exchange": "ETR",
+          "currency": "EUR",
+          "timezone": "Europe/Berlin",
+          "session_complete_at": "18:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "sap"
+          ]
+        },
+        {
+          "asset_id": "ZM_NASDAQ",
+          "name": "Zoom Communications",
+          "code": "NASDAQ:ZM",
+          "provider": "yahoo",
+          "provider_symbol": "ZM",
+          "economic_identity": "Zoom Communications ordinary shares (NASDAQ)",
+          "expected_exchange": "NASDAQ",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "zoom",
+            "video conferencing"
+          ]
+        }
+      ]
+    },
+    {
+      "group_id": "INTERNET_PLATFORMS",
+      "display_name": "Internet platforms & e-commerce",
+      "industry_keywords": [
+        "search engine",
+        "streaming",
+        "e-commerce",
+        "online retail",
+        "stromning",
+        "nathandel"
+      ],
+      "assets": [
+        {
+          "asset_id": "GOOGL_NASDAQ",
+          "name": "Alphabet",
+          "code": "NASDAQ:GOOGL",
+          "provider": "biquote.io",
+          "provider_symbol": "GOOGL",
+          "economic_identity": "Alphabet ordinary shares (NASDAQ)",
+          "expected_exchange": "NASDAQ",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "alphabet",
+            "android",
+            "googl"
+          ]
+        },
+        {
+          "asset_id": "AMZN_NASDAQ",
+          "name": "Amazon",
+          "code": "NASDAQ:AMZN",
+          "provider": "biquote.io",
+          "provider_symbol": "AMZN",
+          "economic_identity": "Amazon ordinary shares (NASDAQ)",
+          "expected_exchange": "NASDAQ",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "amazon",
+            "aws"
+          ]
+        },
+        {
+          "asset_id": "NFLX_NASDAQ",
+          "name": "Netflix",
+          "code": "NASDAQ:NFLX",
+          "provider": "biquote.io",
+          "provider_symbol": "NFLX",
+          "economic_identity": "Netflix ordinary shares (NASDAQ)",
+          "expected_exchange": "NASDAQ",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "netflix"
+          ]
+        }
+      ]
+    },
+    {
+      "group_id": "CONSUMER_ELECTRONICS",
+      "display_name": "Consumer electronics",
+      "industry_keywords": [
+        "smartphone",
+        "consumer electronics",
+        "hemelektronik"
+      ],
+      "assets": [
+        {
+          "asset_id": "AAPL_NASDAQ",
+          "name": "Apple",
+          "code": "NASDAQ:AAPL",
+          "provider": "biquote.io",
+          "provider_symbol": "AAPL",
+          "economic_identity": "Apple ordinary shares (NASDAQ)",
+          "expected_exchange": "NASDAQ",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "apple",
+            "iphone",
+            "aapl"
+          ]
+        }
+      ]
+    },
+    {
+      "group_id": "AUTOMOTIVE_INDUSTRY",
+      "display_name": "Automotive industry",
+      "industry_keywords": [
+        "automaker",
+        "carmaker",
+        "electric vehicle",
+        "automobile",
+        "bilindustri",
+        "biltillverkare"
+      ],
+      "assets": [
+        {
+          "asset_id": "TSLA_NASDAQ",
+          "name": "Tesla",
+          "code": "NASDAQ:TSLA",
+          "provider": "biquote.io",
+          "provider_symbol": "TSLA",
+          "economic_identity": "Tesla ordinary shares (NASDAQ)",
+          "expected_exchange": "NASDAQ",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "tesla",
+            "tsla",
+            "elon musk"
+          ]
+        }
+      ]
+    },
+    {
+      "group_id": "OIL_GAS",
+      "display_name": "Oil, gas & refining",
+      "industry_keywords": [
+        "opec",
+        "refinery",
+        "shale",
+        "raffinaderi"
+      ],
+      "assets": [
+        {
+          "asset_id": "BRENT_OIL",
+          "name": "Brent crude oil",
+          "code": "NYMEX:UKOIL",
+          "provider": "biquote.io",
+          "provider_symbol": "UKOIL",
+          "economic_identity": "Brent crude oil ordinary shares (NYMEX)",
+          "expected_exchange": "NYMEX",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "oil",
+            "crude",
+            "brent",
+            "olja",
+            "raolja",
+            "petroleum"
+          ]
+        },
+        {
+          "asset_id": "XOM_NYSE",
+          "name": "Exxon Mobil",
+          "code": "NYSE:XOM",
+          "provider": "biquote.io",
+          "provider_symbol": "XOM",
+          "economic_identity": "Exxon Mobil ordinary shares (NYSE)",
+          "expected_exchange": "NYSE",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "exxon",
+            "xom"
+          ]
+        },
+        {
+          "asset_id": "FANG_NASDAQ",
+          "name": "Diamondback Energy",
+          "code": "NASDAQ:FANG",
+          "provider": "yahoo",
+          "provider_symbol": "FANG",
+          "economic_identity": "Diamondback Energy ordinary shares (NASDAQ)",
+          "expected_exchange": "NASDAQ",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "diamondback"
+          ]
+        },
+        {
+          "asset_id": "VLO_NYSE",
+          "name": "Valero Energy",
+          "code": "NYSE:VLO",
+          "provider": "yahoo",
+          "provider_symbol": "VLO",
+          "economic_identity": "Valero Energy ordinary shares (NYSE)",
+          "expected_exchange": "NYSE",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "valero"
+          ]
+        }
+      ]
+    },
+    {
+      "group_id": "PRECIOUS_METALS",
+      "display_name": "Precious metals & mining",
+      "industry_keywords": [
+        "precious metal",
+        "safe haven",
+        "adelmetall",
+        "gruva"
+      ],
+      "assets": [
+        {
+          "asset_id": "GOLD",
+          "name": "Gold",
+          "code": "COMEX:XAUUSD",
+          "provider": "biquote.io",
+          "provider_symbol": "XAUUSD",
+          "economic_identity": "Gold ordinary shares (COMEX)",
+          "expected_exchange": "COMEX",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "gold",
+            "guld",
+            "bullion",
+            "xau"
+          ]
+        },
+        {
+          "asset_id": "LUG_STO",
+          "name": "Lundin Gold",
+          "code": "STO:LUG",
+          "provider": "yahoo",
+          "provider_symbol": "LUG.ST",
+          "economic_identity": "Lundin Gold ordinary shares (STO)",
+          "expected_exchange": "STO",
+          "currency": "SEK",
+          "timezone": "Europe/Stockholm",
+          "session_complete_at": "18:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "lundin gold"
+          ]
+        }
+      ]
+    },
+    {
+      "group_id": "BANKING_FINANCE",
+      "display_name": "Banking & investment",
+      "industry_keywords": [
+        "banking",
+        "lender",
+        "investment company",
+        "storbank",
+        "bankkris"
+      ],
+      "assets": [
+        {
+          "asset_id": "SWED_A_STO",
+          "name": "Swedbank",
+          "code": "STO:SWED-A",
+          "provider": "yahoo",
+          "provider_symbol": "SWED-A.ST",
+          "economic_identity": "Swedbank ordinary shares (STO)",
+          "expected_exchange": "STO",
+          "currency": "SEK",
+          "timezone": "Europe/Stockholm",
+          "session_complete_at": "18:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "swedbank"
+          ]
+        },
+        {
+          "asset_id": "INVE_B_STO",
+          "name": "Investor AB",
+          "code": "STO:INVE-B",
+          "provider": "yahoo",
+          "provider_symbol": "INVE-B.ST",
+          "economic_identity": "Investor AB ordinary shares (STO)",
+          "expected_exchange": "STO",
+          "currency": "SEK",
+          "timezone": "Europe/Stockholm",
+          "session_complete_at": "18:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "investor ab",
+            "wallenberg"
+          ]
+        }
+      ]
+    },
+    {
+      "group_id": "INDUSTRIAL_MANUFACTURING",
+      "display_name": "Industrial manufacturing",
+      "industry_keywords": [
+        "industrial manufacturer",
+        "factory output",
+        "machinery maker",
+        "automation",
+        "verkstadsindustri"
+      ],
+      "assets": [
+        {
+          "asset_id": "ATCO_A_STO",
+          "name": "Atlas Copco",
+          "code": "STO:ATCO-A",
+          "provider": "yahoo",
+          "provider_symbol": "ATCO-A.ST",
+          "economic_identity": "Atlas Copco ordinary shares (STO)",
+          "expected_exchange": "STO",
+          "currency": "SEK",
+          "timezone": "Europe/Stockholm",
+          "session_complete_at": "18:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "atlas copco"
+          ]
+        },
+        {
+          "asset_id": "ABB_STO",
+          "name": "ABB Ltd",
+          "code": "STO:ABB",
+          "provider": "yahoo",
+          "provider_symbol": "ABB.ST",
+          "economic_identity": "ABB Ltd ordinary shares (STO)",
+          "expected_exchange": "STO",
+          "currency": "SEK",
+          "timezone": "Europe/Stockholm",
+          "session_complete_at": "18:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "abb"
+          ]
+        },
+        {
+          "asset_id": "ADDT_B_STO",
+          "name": "Addtech",
+          "code": "STO:ADDT-B",
+          "provider": "yahoo",
+          "provider_symbol": "ADDT-B.ST",
+          "economic_identity": "Addtech ordinary shares (STO)",
+          "expected_exchange": "STO",
+          "currency": "SEK",
+          "timezone": "Europe/Stockholm",
+          "session_complete_at": "18:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "addtech"
+          ]
+        }
+      ]
+    },
+    {
+      "group_id": "TELECOM",
+      "display_name": "Telecom & network equipment",
+      "industry_keywords": [
+        "telecom",
+        "5g",
+        "base station",
+        "mobile network",
+        "telekom",
+        "mobilnat"
+      ],
+      "assets": [
+        {
+          "asset_id": "TELIA_STO",
+          "name": "Telia Company",
+          "code": "STO:TELIA",
+          "provider": "yahoo",
+          "provider_symbol": "TELIA.ST",
+          "economic_identity": "Telia Company ordinary shares (STO)",
+          "expected_exchange": "STO",
+          "currency": "SEK",
+          "timezone": "Europe/Stockholm",
+          "session_complete_at": "18:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "telia"
+          ]
+        }
+      ]
+    },
+    {
+      "group_id": "FOOD_INGREDIENTS",
+      "display_name": "Food & ingredients",
+      "industry_keywords": [
+        "food",
+        "beverage",
+        "ingredients",
+        "livsmedel",
+        "dryck"
+      ],
+      "assets": [
+        {
+          "asset_id": "AAK_STO",
+          "name": "AAK AB",
+          "code": "STO:AAK",
+          "provider": "yahoo",
+          "provider_symbol": "AAK.ST",
+          "economic_identity": "AAK AB ordinary shares (STO)",
+          "expected_exchange": "STO",
+          "currency": "SEK",
+          "timezone": "Europe/Stockholm",
+          "session_complete_at": "18:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "aak"
+          ]
+        }
+      ]
+    },
+    {
+      "group_id": "REAL_ESTATE",
+      "display_name": "Real estate",
+      "industry_keywords": [
+        "real estate",
+        "housing",
+        "homebuilder",
+        "property market",
+        "shopping mall",
+        "fastighet",
+        "bostad"
+      ],
+      "assets": [
+        {
+          "asset_id": "SPG_NYSE",
+          "name": "Simon Property Group",
+          "code": "NYSE:SPG",
+          "provider": "yahoo",
+          "provider_symbol": "SPG",
+          "economic_identity": "Simon Property Group ordinary shares (NYSE)",
+          "expected_exchange": "NYSE",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "simon property"
+          ]
+        }
+      ]
+    },
+    {
+      "group_id": "CONSUMER_FITNESS",
+      "display_name": "Consumer fitness & leisure",
+      "industry_keywords": [
+        "fitness",
+        "home exercise",
+        "sportswear",
+        "traning"
+      ],
+      "assets": [
+        {
+          "asset_id": "PTON_NASDAQ",
+          "name": "Peloton Interactive",
+          "code": "NASDAQ:PTON",
+          "provider": "yahoo",
+          "provider_symbol": "PTON",
+          "economic_identity": "Peloton Interactive ordinary shares (NASDAQ)",
+          "expected_exchange": "NASDAQ",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "peloton"
+          ]
+        }
+      ]
+    }
+  ]
+}

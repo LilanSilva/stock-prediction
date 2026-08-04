@@ -8,6 +8,7 @@ from decimal import Decimal
 
 import httpx
 import pytest
+from shared.reference import REGISTRY_VERSION
 from shared.schemas.messages import AssetId, PriceKind
 
 from market_data.adapters.biquote import BiquoteAdapter
@@ -35,7 +36,7 @@ async def test_get_close_returns_validated_observation() -> None:
     assert obs.price_kind == PriceKind.PROVIDER_DAILY_CLOSE
     assert obs.is_adjusted is False
     assert obs.source == "biquote.io"
-    assert obs.registry_version == "biquote-reference-v1"
+    assert obs.registry_version == REGISTRY_VERSION
 
 
 async def test_missing_session_raises_not_yet_available() -> None:

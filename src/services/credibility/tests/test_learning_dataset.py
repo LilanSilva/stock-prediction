@@ -22,7 +22,7 @@ from shared.schemas.messages import (
     ExtractionMethod,
 )
 
-from credibility.learning.dataset import build_samples
+from credibility.learning.dataset import _calculate_volatility, build_samples
 
 
 def _event_payload(
@@ -51,12 +51,22 @@ def _event_payload(
 
 
 class _FakeConnection:
-    def __init__(self, rows: list[dict[str, Any]], closes: dict[tuple[str, date], Decimal]) -> None:
+    def __init__(
+        self,
+        rows: list[dict[str, Any]],
+        closes: dict[tuple[str, date], Decimal],
+        volatility_closes: dict[str, list[Decimal]] | None = None,
+    ) -> None:
         self._rows = rows
         self._closes = closes
+        self._volatility_closes: dict[str, list[Decimal]] = volatility_closes or {}
         self.fetchval_calls = 0
 
-    async def fetch(self, _query: str, *_args: Any) -> list[dict[str, Any]]:
+    async def fetch(self, query: str, *args: Any) -> list[dict[str, Any]]:
+        # Events query returns the event rows; volatility query returns close rows per asset.
+        if "close_observations" in query and len(args) == 2:
+            asset_id = args[0]
+            return [{"close": c} for c in self._volatility_closes.get(asset_id, [])]
         return self._rows
 
     async def fetchval(self, _query: str, asset_id: str, session: date) -> Decimal | None:
@@ -130,3 +140,107 @@ async def test_skips_event_with_missing_price() -> None:
     )
     samples = await build_samples(_FakePool(conn), lookback_days=365)
     assert samples == []
+
+
+# --- _calculate_volatility unit tests ---
+
+
+def test_calculate_volatility_returns_zero_for_single_close() -> None:
+    from credibility.learning.dataset import _calculate_volatility
+    assert _calculate_volatility([100.0]) == 0.0
+
+
+def test_calculate_volatility_returns_zero_for_empty() -> None:
+    assert _calculate_volatility([]) == 0.0
+
+
+def test_calculate_volatility_known_sequence() -> None:
+    # Two closes: 100 -> 110, one daily return of +10%. Std dev of [0.1] = 0.0.
+    assert _calculate_volatility([100.0, 110.0]) == pytest.approx(0.0)
+
+
+def test_calculate_volatility_nonzero_for_varying_returns() -> None:
+    # 100 -> 110 -> 99: returns [+10%, -10%]. Should produce non-zero std dev.
+    vol = _calculate_volatility([100.0, 110.0, 99.0])
+    assert vol > 0.0
+
+
+# --- abnormal tagging tests ---
+
+
+@pytest.mark.asyncio
+async def test_sample_tagged_abnormal_when_return_exceeds_threshold() -> None:
+    # Daily closes showing ~1% volatility; event moves +10% -> abnormal at 2x threshold.
+    payload = _event_payload(
+        event_type=EventType.MILITARY_CONFLICT,
+        assets=[AssetId.BRENT_OIL],
+        polarity=EventPolarity.OCCURRENCE,
+        context_tags=[],
+        first_seen_at=_DECISION_AT,
+    )
+    vol_closes = [Decimal(str(100 + (i % 2))) for i in range(30)]  # alternates 100/101 -> ~1% vol
+    conn = _FakeConnection(
+        rows=[{"event_id": uuid.uuid4(), "payload": payload}],
+        closes={
+            ("BRENT_OIL", _BASELINE): Decimal("100"),
+            ("BRENT_OIL", _SETTLEMENT): Decimal("110"),  # +10% move
+        },
+        volatility_closes={"BRENT_OIL": vol_closes},
+    )
+    samples = await build_samples(
+        _FakePool(conn), lookback_days=365, volatility_lookback_days=30, abnormal_threshold=2.0
+    )
+    assert len(samples) == 1  # no context_tags so only unconditional sample
+    assert samples[0].is_abnormal is True
+    assert samples[0].asset_volatility > 0.0
+
+
+@pytest.mark.asyncio
+async def test_sample_tagged_normal_when_return_within_threshold() -> None:
+    payload = _event_payload(
+        event_type=EventType.MILITARY_CONFLICT,
+        assets=[AssetId.BRENT_OIL],
+        polarity=EventPolarity.OCCURRENCE,
+        context_tags=[],
+        first_seen_at=_DECISION_AT,
+    )
+    vol_closes = [Decimal(str(100 + (i % 2))) for i in range(30)]
+    conn = _FakeConnection(
+        rows=[{"event_id": uuid.uuid4(), "payload": payload}],
+        closes={
+            ("BRENT_OIL", _BASELINE): Decimal("100"),
+            ("BRENT_OIL", _SETTLEMENT): Decimal("100.5"),  # tiny move
+        },
+        volatility_closes={"BRENT_OIL": vol_closes},
+    )
+    samples = await build_samples(
+        _FakePool(conn), lookback_days=365, volatility_lookback_days=30, abnormal_threshold=2.0
+    )
+    assert len(samples) == 1
+    assert samples[0].is_abnormal is False
+
+
+@pytest.mark.asyncio
+async def test_sample_tagged_normal_when_no_volatility_history() -> None:
+    # No volatility closes available -> volatility=0.0 -> is_abnormal=False regardless of move.
+    payload = _event_payload(
+        event_type=EventType.MILITARY_CONFLICT,
+        assets=[AssetId.BRENT_OIL],
+        polarity=EventPolarity.OCCURRENCE,
+        context_tags=[],
+        first_seen_at=_DECISION_AT,
+    )
+    conn = _FakeConnection(
+        rows=[{"event_id": uuid.uuid4(), "payload": payload}],
+        closes={
+            ("BRENT_OIL", _BASELINE): Decimal("100"),
+            ("BRENT_OIL", _SETTLEMENT): Decimal("120"),
+        },
+        volatility_closes={},  # no history
+    )
+    samples = await build_samples(
+        _FakePool(conn), lookback_days=365, volatility_lookback_days=30, abnormal_threshold=2.0
+    )
+    assert len(samples) == 1
+    assert samples[0].is_abnormal is False
+    assert samples[0].asset_volatility == 0.0

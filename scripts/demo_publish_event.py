@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 
 import aio_pika
 from shared.schemas.messages import (
+    AssetId,
     ConditionCode,
     EventDetected,
     EventPolarity,
@@ -20,7 +21,6 @@ from shared.schemas.messages import (
     ExtractionMethod,
     RoutingKey,
 )
-from shared.schemas.messages import AssetId
 
 EXCHANGE = "feed.events"
 

@@ -16,6 +16,11 @@ class Sample:
 
     ``condition`` is ``None`` for the unconditional (factor-only) observation; ``polarity`` is
     applied to ``actual_return`` by the estimator, not here, so the raw market return is preserved.
+
+    ``is_abnormal`` is True when the absolute return exceeds ``abnormal_threshold`` multiples of
+    the asset's historical daily volatility, indicating the move is unlikely to be random noise.
+    ``asset_volatility`` is the standard deviation of daily returns over the volatility lookback
+    window; 0.0 when fewer than two closes were available (treated as normal by the estimator).
     """
 
     factor: EventType
@@ -23,6 +28,8 @@ class Sample:
     polarity: EventPolarity
     asset: AssetId
     actual_return: float
+    is_abnormal: bool = False
+    asset_volatility: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)

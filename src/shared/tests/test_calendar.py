@@ -70,6 +70,18 @@ def test_resolve_on_weekend_uses_prior_friday() -> None:
     assert settlement == date(2026, 7, 27)  # Monday
 
 
-def test_unsupported_timezone_rejected() -> None:
+def test_european_market_timezone_is_supported() -> None:
+    # Non-US markets are first-class now: Stockholm resolves on Stockholm's calendar and clock.
+    baseline, settlement = resolve_baseline_settlement(
+        datetime(2026, 7, 27, 20, 0, tzinfo=UTC), "Europe/Stockholm"
+    )
+    assert baseline == date(2026, 7, 27)  # Monday, closed by 20:00 UTC (22:00 CEST)
+    assert settlement == date(2026, 7, 28)
+
+
+def test_unknown_timezone_rejected() -> None:
+    # An unrecognised zone must fail loudly rather than silently defaulting to a market calendar.
     with pytest.raises(UnsupportedTimezoneError):
-        resolve_baseline_settlement(datetime(2026, 7, 27, 22, 0, tzinfo=UTC), "Europe/Stockholm")
+        resolve_baseline_settlement(
+            datetime(2026, 7, 27, 22, 0, tzinfo=UTC), "Mars/Olympus_Mons"
+        )

@@ -7,9 +7,10 @@ from datetime import UTC, datetime
 from typing import Protocol
 
 import structlog
-from shared.calendar import is_trading_day, new_york_offset
+from shared.calendar import is_trading_day, local_date_in
 from shared.graph import FiringEdge
 from shared.graph.exceptions import GraphError
+from shared.reference import UnknownAssetError, resolve
 from shared.schemas.messages import (
     AssetId,
     ConditionCode,
@@ -170,11 +171,17 @@ class PredictionPipeline:
         }
 
     async def _is_market_open(self, asset_id: AssetId, now: datetime) -> bool:
-        # The market is "open" for stance purposes when today is a trading day AND Market Data can
-        # currently serve a price. A non-trading day (weekend/holiday) or an unreachable price feed
-        # selects the collapse-to-one path.
-        ny_date = (now + new_york_offset(now.date())).date()
-        if not is_trading_day(ny_date):
+        # The market is "open" for stance purposes when today is a trading day on THAT asset's own
+        # market calendar AND Market Data can currently serve a price. A non-trading day
+        # (weekend/holiday) or an unreachable price feed selects the collapse-to-one path.
+        try:
+            timezone_name = resolve(asset_id).timezone
+        except UnknownAssetError:
+            # An unregistered asset cannot have a calendar; treat it as closed (the conservative
+            # collapse-to-one path) rather than guessing a market.
+            logger.warning("market_open_unknown_asset", asset_id=str(asset_id))
+            return False
+        if not is_trading_day(local_date_in(now, timezone_name)):
             return False
         return await self._price_reader.is_price_available(asset_id)
 

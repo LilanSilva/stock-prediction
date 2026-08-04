@@ -20,7 +20,7 @@ import structlog
 from shared.reference import resolve
 from shared.schemas.messages import CloseObservation
 
-from market_data.adapters.biquote import BiquoteAdapter
+from market_data.adapters.router import PriceAdapter
 from market_data.exceptions import PriceNotYetAvailableError
 from market_data.sessions import is_session_complete
 from market_data.storage import (
@@ -48,7 +48,7 @@ class PriceRequestProcessor:
     def __init__(
         self,
         repository: PriceRequestRepository,
-        adapter: BiquoteAdapter,
+        adapter: PriceAdapter,
         *,
         retry_backoff_base_seconds: float = 2.0,
         retry_backoff_max_seconds: float = 8.0,
@@ -71,7 +71,15 @@ class PriceRequestProcessor:
             await self._defer(request, f"baseline pending: {exc}")
             return ProcessOutcome(completed=False, published=False, pending_reason="baseline")
 
-        if not is_session_complete(request.settlement_session, series.timezone, now=current_time):
+        # Completion is judged on the asset's own market clock: Stockholm closes hours before
+        # New York, so waiting for 17:00 ET would delay every European close.
+        if not is_session_complete(
+            request.settlement_session,
+            series.timezone,
+            now=current_time,
+            hour=series.session_completion_hour,
+            minute=series.session_completion_minute,
+        ):
             await self._defer(request, "settlement session not yet complete")
             return ProcessOutcome(
                 completed=False, published=False, pending_reason="settlement_not_complete"

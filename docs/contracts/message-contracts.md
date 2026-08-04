@@ -95,7 +95,8 @@ Routing key: `prediction.made`.
 
 ```text
 ContributingEdge:
-  edge_id: string  # "FACTOR->ASSET" (unconditional) or "FACTOR|CONDITION->ASSET" (conditioned)
+  edge_id: string  # "FACTOR->TARGET" (unconditional) or "FACTOR|CONDITION->TARGET" (conditioned);
+                   # TARGET is the asset id, or the group id when the edge was inherited
   direction: UP | DOWN | NEUTRAL
   current_weight: float [0,1]
   influence_weight: float [0,1]
@@ -195,6 +196,25 @@ Routing key: `prediction.scored`.
 | `settlement` | CloseObservation | Yes |
 | `scored_at` | UTC datetime | Yes |
 
+## AssetId
+
+`AssetId` is a **registry-validated string**, not a closed enum. Canonical asset ids are declared in
+the JSON asset registry (`assets.json`, overridable by `ASSET_REGISTRY_PATH`), so a company or market
+can be added without a code change or a database migration — ids are already `TEXT` in Postgres and
+`Asset.id` in Neo4j.
+
+- Wire format is a plain string (`"SAAB_B_STO"`); nothing about serialisation changed.
+- An id not present in the loaded registry is **rejected at every message boundary**, so an
+  unrecognised asset is never silently accepted.
+- Ids are `UPPER_SNAKE_CASE` and must not contain `:`. The exchange-qualified form (`STO:SAAB-B`) is
+  registry documentation only and never appears in a message.
+- Provider symbols (`XAUUSD`, `SAAB-B.ST`) are never business identifiers; they live only in the
+  registry and inside Market Data adapters.
+
+Adding an asset is therefore **not** a contract change, but changing or removing an existing id is:
+predictions, scores, and graph nodes reference ids by value. See
+[asset-registry.md](../reference/asset-registry.md).
+
 ## Conditional causality
 
 `EventDetected.polarity` and `EventDetected.context_tags` qualify how an event maps to the causal
@@ -211,19 +231,32 @@ producers/consumers stay valid within major version 1.
 ### Causal graph schema
 
 The condition is a property on the `CAUSES` edge, so each `(factor, asset, condition)` is a distinct
-edge with its own weight and Beta-Bernoulli reliability:
+edge with its own weight and Beta-Bernoulli reliability. An edge may target either a single asset or
+an industry group:
 
 ```text
 (:CausalFactor {id})-[:CAUSES {condition, direction, weight, confidence, alpha, beta,
                                last_updated}]->(:Asset {id})
+(:CausalFactor {id})-[:CAUSES {...}]->(:AssetGroup {id})    -- industry-level, inherited
+(:Asset {id})-[:MEMBER_OF]->(:AssetGroup {id})
 ```
 
 An edge with no `condition` property is unconditional and always fires. The condition is a plain
 edge property whose values are the canonical `ConditionCode` enum, so no separate node type is
-needed. The `ContributingEdge.edge_id` business key is `FACTOR->ASSET` for
-unconditional edges and `FACTOR|CONDITION->ASSET` for conditioned edges. Edge weights are refined
-online by Credibility (per scored prediction) and offline by the structure learner
-(`python -m credibility.learning.run`) which mines historical events against realized price moves.
+needed. The `ContributingEdge.edge_id` business key is `FACTOR->TARGET` for unconditional edges and
+`FACTOR|CONDITION->TARGET` for conditioned ones, where `TARGET` is the asset id, or the **group id**
+when the edge was inherited.
+
+Every asset belongs to exactly one group (commodities included: `GOLD` is in `PRECIOUS_METALS`).
+When an asset has no edge of its own for a `(factor, condition)` pair, it inherits its group's edge,
+so a newly listed company predicts before it has company-specific evidence. An asset-level edge
+always overrides the group's rather than adding to it. Because an inherited `edge_id` names the group
+edge, Credibility updates the industry prior that actually fired instead of creating a per-asset edge
+that was never seeded.
+
+Edge weights are refined online by Credibility (per scored prediction) and offline by the structure
+learner (`python -m credibility.learning.run`) which mines historical events against realized price
+moves.
 
 ## Compatibility
 

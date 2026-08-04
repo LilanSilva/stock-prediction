@@ -59,8 +59,14 @@ Predictions are managed as a per-asset stance, keyed on the market state:
   prediction (no supersede) — an asset may hold several active predictions, each scored on its own.
 - **Market closed / price unavailable (weekend, holiday, fetch failure):** collapse to one active
   prediction per asset — the new prediction sets `supersedes_prediction_id` to the prior stance,
-  which Verification withdraws (unscored). Market state is `shared.calendar.is_trading_day` in
-  America/New_York AND a reachable Market Data price.
+  which Verification withdraws (unscored). Market state is `shared.calendar.is_trading_day` **on that
+  asset's own market calendar** AND a reachable Market Data price.
+
+Market state is therefore per asset, not global: at 23:00 UTC on a Friday a Stockholm listing is
+already closed (Saturday locally) while a New York listing is still in its trading day, so the same
+sweep can add an independent prediction for one and collapse the stance for the other. An asset with
+no registry entry has no calendar and is treated as closed — the conservative collapse path rather
+than guessing a market.
 
 ### Conflict path
 

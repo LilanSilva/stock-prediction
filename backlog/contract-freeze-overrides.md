@@ -34,8 +34,9 @@ After the contract freeze and POC-6 updates are propagated, affected tasks will 
   `(factor, asset, condition)` is a distinct edge. Unconditional edges omit `condition` and always
   fire. The blanket `MILITARY_CONFLICT -> BRENT_OIL` edge is superseded by conditioned edges
   (`TRANSPORT_AFFECTED` fires oil; `SAFE_HAVEN_ONLY` fires gold only).
-- `ContributingEdge.edge_id` is `FACTOR->ASSET` (unconditional) or `FACTOR|CONDITION->ASSET`
-  (conditioned). Credibility parses both forms.
+- `ContributingEdge.edge_id` is `FACTOR->TARGET` (unconditional) or `FACTOR|CONDITION->TARGET`
+  (conditioned), where `TARGET` is an asset id or an `AssetGroup` id for an inherited industry edge.
+  Credibility parses all forms.
 - Prediction: conditions gate which edges fire; a `RESOLUTION` event inverts the edge sign; a
   `RESOLUTION`-driven DOWN on an asset is suppressed unless `RISK_PREMIUM_ELEVATED` is active
   (derived from Market Data `GET /prices/recent`). Still graph-only and zero prediction-time LLM
@@ -44,6 +45,33 @@ After the contract freeze and POC-6 updates are propagated, affected tasks will 
   (`python -m credibility.learning.run`) that mines historical `EventDetected` payloads against
   realized price moves and upserts conditioned edges. It is a batch job, not an always-on service,
   and reads `cleansing.*`/`market_data.*` read-only as an offline-analytics exception.
+
+### Multi-market asset coverage (delivered 2026-08-04, ADR-007)
+
+- `AssetId` is a registry-validated string loaded from `assets.json` (`ASSET_REGISTRY_PATH`), not a
+  closed enum. Adding an asset is not a contract change; changing or removing an existing id is.
+  Unknown ids are still rejected at every message boundary.
+- Assets are per-company listings grouped by industry. Every asset belongs to exactly one
+  `AssetGroup` (commodities included). A group is a fan-out target, never tradeable: one asset maps to
+  exactly one price series.
+- Cleansing resolves `affected_asset_ids` by news scope: a company keyword moves that asset alone, an
+  industry keyword fans out to every group member across markets, otherwise the event type's mapped
+  assets and groups apply.
+- `CAUSES` edges may target an `Asset` or an `AssetGroup`; `(:Asset)-[:MEMBER_OF]->(:AssetGroup)`.
+  An asset's own edge always overrides its group's; otherwise the group edge is inherited.
+- Market Data routes per asset on the registry's `provider` field. `biquote.io` serves a curated list
+  of US mega-caps; `yahoo` serves Stockholm/Copenhagen/Amsterdam/Paris/Xetra plus US names biquote
+  lacks. The Yahoo adapter must send a browser User-Agent (the POC-7 `HTTP 429`s were a User-Agent
+  problem, not IP rate limiting). Superseded: "Yahoo daily bars" as the single provider policy —
+  the semantics are provider-independent.
+- `shared.calendar` supports any IANA timezone via stdlib `zoneinfo`; each asset's `timezone` and
+  `session_complete_at` drive baseline/settlement, session completion, and Prediction's market-open
+  stance. Supersedes the America/New_York-only restriction. Holidays remain unmodelled (a weekday is a
+  session; a local holiday surfaces as a missing provider bar).
+- Industry-level priors are seeded at group level (`06-seed-group-edges.cypher`) so every listing
+  has reachable causal knowledge; `CORPORATE_EARNINGS` carries a prior for every group, since
+  company-specific news is the case this feature exists for.
+- The Neo4j asset seed is generated from the registry (`python scripts/generate-asset-seed.py`).
 
 ## Epic overrides
 

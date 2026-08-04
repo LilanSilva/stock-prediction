@@ -6,6 +6,7 @@ import uuid
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
+from shared.reference import REGISTRY_VERSION
 from shared.schemas.messages import (
     ArticleIngested,
     CloseObservation,
@@ -133,7 +134,7 @@ def _close(session: date, close: str) -> CloseObservation:
         provider_symbol="XAUUSD",
         price_kind=PriceKind.PROVIDER_DAILY_CLOSE,
         is_adjusted=False,
-        registry_version="biquote-reference-v1",
+        registry_version=REGISTRY_VERSION,
     )
 
 

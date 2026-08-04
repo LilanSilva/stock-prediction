@@ -5,6 +5,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
+from shared.reference import REGISTRY_VERSION
 from shared.schemas.messages import (
     AssetId,
     CloseObservation,
@@ -25,7 +26,7 @@ from verification.exceptions import PriceValidationError
 from verification.models import EvaluationRecord, EvaluationStatus
 from verification.pipeline import VerificationPipeline
 
-_REGISTRY = "biquote-reference-v1"
+_REGISTRY = REGISTRY_VERSION
 _DECISION_AT = datetime(2026, 7, 27, 22, 46, tzinfo=UTC)  # Monday after the 17:00 NY close
 
 

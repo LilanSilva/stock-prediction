@@ -27,13 +27,36 @@ On startup, reload all pending or publish-pending requests. In-memory scheduling
 ## 4. Adapter rules
 
 - Accept canonical `asset_id`, not a provider symbol.
-- Resolve provider symbol, timezone, currency, and calendar from the registry.
+- Resolve provider, provider symbol, timezone, currency, session clock, and calendar from the registry.
+- **Dispatch per asset.** Each asset declares its `provider`; the router selects the matching adapter.
+  An unknown asset or a provider with no configured adapter is terminal data (dead-lettered), not a
+  transient failure — retrying forever against a vendor that cannot serve the symbol never succeeds.
 - Validate the returned session date, currency, instrument, and positive finite close.
 - Preserve provider source/symbol, session, provider bar time, fetch time, price kind, adjustment flag, and registry version.
 - Apply the registry's pre-declared continuous-futures rollover policy before accepting an observation.
 - A fallback may be used only when the registry maps an economically equivalent instrument. No silent substitution is allowed.
 
-P06/T03 approved a POC-only Yahoo reference-close policy for `GOLD` and `BRENT_OIL`: raw provider daily closes, provider-managed continuous-futures include-all rollover, and no validated fallback. The service must preserve these semantics and must not describe those closes as official exchange settlements.
+Policy semantics are provider-independent: raw provider daily closes, provider-managed
+continuous-futures include-all rollover, and no validated fallback. The service must preserve these
+and must not describe provider closes as official exchange settlements. Raw (unadjusted) closes only —
+a back-adjusted series would silently change historical values between fetches, breaking immutable
+observations.
+
+### 4a. Providers
+
+| Provider | Serves | Notes |
+|---|---|---|
+| `biquote.io` | a curated list of US mega-caps | Response is a flat `bars[]` with an `isOpen` flag marking the still-forming bar. |
+| `yahoo` | Stockholm, Copenhagen, Amsterdam, Paris, Xetra, and US names biquote lacks | Parallel `timestamp[]`/`close[]` arrays; `null` closes are provider gaps and are skipped, never zero-filled. **No `isOpen` flag** — the unsettled bar is excluded using the market's own closing clock. Requires a **browser User-Agent**: Yahoo answers non-browser agents with `HTTP 429`. |
+
+biquote is limited by its symbol list, not by exchange: every European listing returns 0 bars,
+including EU giants on US exchanges. Adapters validate the provider's reported currency and exchange
+timezone against the registry, so a vendor returning a different listing for a symbol is caught rather
+than trusted. `429` and transport errors are transient (retry with backoff); malformed payloads and
+in-band provider errors are terminal.
+
+Adding a market is a registry edit; adding a vendor is one adapter plus a router entry. See
+[asset-registry.md](../reference/asset-registry.md) and ADR-007.
 
 ## 5. Persistence
 

@@ -64,8 +64,13 @@ class VerificationPipeline:
         except UnknownAssetError as exc:
             raise InvalidPredictionError(f"unknown asset {message.asset_id}: {exc}") from exc
 
+        # Sessions resolve on the asset's own market calendar and closing clock: a Stockholm listing
+        # settles against Stockholm sessions, not New York's.
         baseline_session, settlement_session = resolve_baseline_settlement(
-            message.decision_at, series.timezone
+            message.decision_at,
+            series.timezone,
+            hour=series.session_completion_hour,
+            minute=series.session_completion_minute,
         )
         request_id = _deterministic_request_id(message.prediction_id, series.registry_version)
         now = datetime.now(UTC)
