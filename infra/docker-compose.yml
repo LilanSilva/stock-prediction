@@ -353,6 +353,44 @@ services:
     volumes:
       - ./assets/:/config/:ro
 
+  feed-notification:
+    build:
+      context: ..
+      dockerfile: src/services/notification/Dockerfile
+    image: feed-analyzer/notification:0.1
+    container_name: feed-notification
+    depends_on:
+      feed-rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-feed_user}:${RABBITMQ_DEFAULT_PASS:?set in .env}@feed-rabbitmq:5672/
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # Editable asset registry (mounted read-only below): add companies/markets without
+      # a rebuild. Falls back to the wheel-packaged assets.json when unset.
+      ASSET_REGISTRY_PATH: /config/assets.json
+      # Confidence gate: predictions below this value are silently discarded.
+      NOTIFICATION_MIN_CONFIDENCE: ${NOTIFICATION_MIN_CONFIDENCE:-0.6}
+      # Brevo email channel — leave empty to disable.
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
+      BREVO_SENDER_EMAIL: ${BREVO_SENDER_EMAIL:-}
+      BREVO_SENDER_NAME: ${BREVO_SENDER_NAME:-Feed Analyzer}
+      # Meta Cloud API WhatsApp channel — leave empty to disable.
+      META_ACCESS_TOKEN: ${META_ACCESS_TOKEN:-}
+      META_PHONE_NUMBER_ID: ${META_PHONE_NUMBER_ID:-}
+    ports:
+      - "8010:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    networks:
+      - feed-net
+    volumes:
+      - ./assets/:/config/:ro
+      - ../src/services/notification/config/recipients/:/app/config/recipients/:ro
+
 volumes:
   feed-postgres-data:
   feed-neo4j-data:

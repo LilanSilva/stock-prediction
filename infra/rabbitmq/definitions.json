@@ -137,6 +137,24 @@
       "arguments": { "x-queue-type": "classic" }
     },
     {
+      "name": "notification.predictions",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic",
+        "x-dead-letter-exchange": "feed.dlx",
+        "x-dead-letter-routing-key": "prediction.made"
+      }
+    },
+    {
+      "name": "notification.predictions.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": { "x-queue-type": "classic" }
+    },
+    {
       "name": "gateway.predictions.live",
       "vhost": "/",
       "durable": false,
@@ -172,6 +190,14 @@
       "source": "feed.events",
       "vhost": "/",
       "destination": "verification.predictions",
+      "destination_type": "queue",
+      "routing_key": "prediction.made",
+      "arguments": {}
+    },
+    {
+      "source": "feed.events",
+      "vhost": "/",
+      "destination": "notification.predictions",
       "destination_type": "queue",
       "routing_key": "prediction.made",
       "arguments": {}
@@ -236,6 +262,14 @@
       "source": "feed.dlx",
       "vhost": "/",
       "destination": "verification.predictions.dlq",
+      "destination_type": "queue",
+      "routing_key": "prediction.made",
+      "arguments": {}
+    },
+    {
+      "source": "feed.dlx",
+      "vhost": "/",
+      "destination": "notification.predictions.dlq",
       "destination_type": "queue",
       "routing_key": "prediction.made",
       "arguments": {}

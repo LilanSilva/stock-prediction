@@ -77,10 +77,10 @@ function Invoke-CypherCsv {
     if (-not $result -or @($result).Count -eq 0) { return @() }
     $lines = @($result) | Where-Object { $_ -ne "" }
     if ($lines.Count -lt 2) { return @() }
-    $header = $lines[0] -split '",?"' | ForEach-Object { $_.Trim('"') }
+    $header = $lines[0] -split ',\s*' | ForEach-Object { $_.Trim('"').Trim() }
     $rows = @()
     foreach ($line in $lines[1..($lines.Count - 1)]) {
-        $vals = $line -split '",?"' | ForEach-Object { $_.Trim('"') }
+        $vals = $line -split ',\s*' | ForEach-Object { $_.Trim('"').Trim() }
         $obj = [ordered]@{}
         for ($i = 0; $i -lt $header.Count; $i++) {
             $obj[$header[$i]] = if ($i -lt $vals.Count) { $vals[$i] } else { "" }
