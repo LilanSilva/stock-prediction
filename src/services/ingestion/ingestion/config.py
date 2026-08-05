@@ -38,7 +38,6 @@ class IngestionSettings(BaseSettings):
     # the source so the four RSS feeds still run.
     freenewsapi_key: str = Field(default="", validation_alias="FREENEWSAPI_KEY")
     freenewsapi_base_url: str = "https://api.freenewsapi.io/v1"
-    freenewsapi_keywords: tuple[str, ...] = ("oil", "gold", "OPEC", "sanctions", "inflation")
     freenewsapi_language: str = "en"
     freenewsapi_page_size: int = Field(
         default=5, gt=0, le=100, validation_alias="FREENEWSAPI_PAGE_SIZE"

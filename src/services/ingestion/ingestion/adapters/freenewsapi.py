@@ -55,7 +55,12 @@ def _first_iso2(values: Any, *, upper: bool) -> str | None:
 
 
 class FreeNewsApiAdapter:
-    """Fetches finance-relevant news from FreeNewsApi.io (list + per-article details)."""
+    """Fetches recent news from FreeNewsApi.io (list + per-article details).
+
+    No keyword pre-filtering: fetching all recent articles and letting the Cleansing service
+    classify relevance downstream is more reliable than `in_title` queries, which return HTTP 500
+    from the provider.
+    """
 
     def __init__(
         self,
@@ -63,7 +68,6 @@ class FreeNewsApiAdapter:
         *,
         api_key: str,
         base_url: str = "https://api.freenewsapi.io/v1",
-        keywords: tuple[str, ...] = ("oil", "gold", "OPEC", "sanctions", "inflation"),
         language: str = "en",
         page_size: int = 5,
         default_country: str = "US",
@@ -72,7 +76,6 @@ class FreeNewsApiAdapter:
         self._client = client
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
-        self._keywords = keywords
         self._language = language
         self._page_size = page_size
         self._default_country = default_country
@@ -88,31 +91,22 @@ class FreeNewsApiAdapter:
             await asyncio.sleep(self._min_interval)
 
     async def fetch(self) -> list[RawArticle]:
-        """Return recent finance-relevant articles (deduped by uuid, with bodies from /details)."""
-        seen: set[str] = set()
+        """Return recent articles (with bodies from /details). No keyword pre-filtering."""
+        items = await self._search()
         articles: list[RawArticle] = []
-        first_request = True
-
-        for keyword in self._keywords:
-            if not first_request:
-                await self._pace()
-            first_request = False
-            items = await self._search(keyword)
-            for item in items:
-                uuid_value = str(item.get("uuid") or "").strip()
-                if not uuid_value or uuid_value in seen:
-                    continue
-                seen.add(uuid_value)
-                await self._pace()
-                detail = await self._details(uuid_value)
-                article = self._to_article(item, detail)
-                if article is not None:
-                    articles.append(article)
+        for item in items:
+            uuid_value = str(item.get("uuid") or "").strip()
+            if not uuid_value:
+                continue
+            await self._pace()
+            detail = await self._details(uuid_value)
+            article = self._to_article(item, detail)
+            if article is not None:
+                articles.append(article)
         return articles
 
-    async def _search(self, keyword: str) -> list[dict[str, Any]]:
+    async def _search(self) -> list[dict[str, Any]]:
         params = {
-            "in_title": keyword,
             "language": self._language,
             "order_by": "recent",
             "page_size": str(self._page_size),
@@ -121,13 +115,12 @@ class FreeNewsApiAdapter:
         items = data.get("data")
         if not isinstance(items, list):
             return []
-        remaining = data.get("meta", {})
-        if isinstance(remaining, dict):
+        meta = data.get("meta", {})
+        if isinstance(meta, dict):
             logger.debug(
                 "freenewsapi_search",
-                keyword=keyword,
                 returned=len(items),
-                daily_remaining=remaining.get("daily_remaining"),
+                daily_remaining=meta.get("daily_remaining"),
             )
         return [item for item in items if isinstance(item, dict)]
 

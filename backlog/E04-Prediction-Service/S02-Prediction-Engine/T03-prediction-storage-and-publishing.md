@@ -47,6 +47,27 @@ Verification is the sole owner of evaluation scheduling and `price.requested` pu
 - Store `llm_metadata=null` for M1 graph-only predictions.
 - A future LLM arbitration experiment may populate LLM metadata only after a new controlled hypothesis is approved.
 
+### Stance deduplication (no-noise rule)
+
+Before persisting a new prediction, the service must check the asset's latest **active prediction**
+— defined as the most recent row with `status = 'PENDING'`. The check and the insert must be
+performed inside the context-close sweep, after the decision policy returns a result:
+
+| Market state | Prior PENDING exists | New matches prior `(direction, magnitude)` | Action |
+|---|---|---|---|
+| Trading day | Yes | Yes — same direction AND same magnitude | **Skip**: mark context PREDICTED, produce no row, publish nothing |
+| Trading day | Yes | No — direction or magnitude differs | **Create** new independent prediction; `supersedes_prediction_id = NULL` |
+| Trading day | No | n/a | **Create** new prediction; `supersedes_prediction_id = NULL` |
+| Market closed | Yes | Either | **Supersede**: new prediction sets `supersedes_prediction_id`, prior is marked WITHDRAWN in same transaction |
+| Market closed | No | n/a | **Create** new prediction; `supersedes_prediction_id = NULL` |
+
+The intent is to prevent the prediction table from accumulating duplicate signals that would create
+confusion in Verification and Credibility. Different direction or magnitude always represents new
+information and must not be suppressed.
+
+Once a prior prediction is scored (status no longer PENDING), it no longer participates in stance
+checks: the asset effectively has no active prediction and a new one is created freely.
+
 ## Acceptance Criteria
 
 1. One ready asset/context version creates at most one prediction row.
@@ -57,3 +78,11 @@ Verification is the sole owner of evaluation scheduling and `price.requested` pu
 6. `decision_method=GRAPH_ONLY` for M1 predictions.
 7. `llm_metadata` is null for M1 predictions.
 8. Outbox recovery republishes unpublished predictions without creating duplicate rows.
+9. On a trading day, a new decision with `(direction, magnitude)` identical to the latest PENDING
+   prediction produces no new row and no published message.
+10. On a trading day, a new decision with a different direction or magnitude creates an independent
+    new prediction row; the prior PENDING prediction is unaffected.
+11. On a market-closed day, a new prediction supersedes the prior PENDING prediction, which is
+    marked WITHDRAWN in the same DB transaction; only one PENDING prediction per asset remains.
+12. After the prior prediction is scored (no longer PENDING), a new prediction with the same
+    direction and magnitude is created normally — the stance check only applies to PENDING rows.

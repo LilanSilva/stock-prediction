@@ -193,6 +193,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         id="settlement_poll",
         max_instances=1,
         coalesce=True,
+        misfire_grace_time=300,  # tolerate up to 5 min event-loop lag (e.g. host display-off throttle)
         next_run_time=datetime.now(UTC),  # reconcile pending work shortly after startup
     )
     scheduler.start()

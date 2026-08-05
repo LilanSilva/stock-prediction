@@ -52,3 +52,10 @@ The service writes predictions to Postgres and publishes `PredictionMade`. Verif
 7. Graph/query failures are caught, logged, and do not crash the service.
 8. The Neo4j seed populates at least 15 canonical `CAUSES` edges over the POC assets GOLD and BRENT_OIL (USD/OMXS30/SP500 are deferred assets; provider symbols like `GC=F` live only in Market Data adapters).
 9. All unit tests pass under `pytest`; ruff and mypy report zero errors.
+
+### Stance deduplication (no-noise rule)
+
+10. On a trading day, if the new decision `(direction, magnitude)` matches the asset's latest PENDING prediction exactly, no new prediction row is created and no message is published. This prevents duplicate signals from creating noise in Verification and Credibility.
+11. On a trading day, if the direction or magnitude differs from the latest PENDING prediction, a new independent prediction is created alongside it. Multiple concurrent PENDING predictions per asset are allowed when they carry distinct signals.
+12. On a market-closed day (weekend, public holiday, or Market Data unreachable), the new prediction supersedes the prior PENDING prediction — setting `supersedes_prediction_id` and marking the prior WITHDRAWN in the same DB transaction — so only one active prediction per asset remains.
+13. `EventType.OTHER` events never produce a prediction: `OTHER` has no `CausalFactor` node in Neo4j, graph inference returns zero firing edges, and the decision policy returns no result.

@@ -101,7 +101,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 http,
                 api_key=settings.freenewsapi_key,
                 base_url=settings.freenewsapi_base_url,
-                keywords=settings.freenewsapi_keywords,
                 language=settings.freenewsapi_language,
                 page_size=settings.freenewsapi_page_size,
             )
@@ -151,6 +150,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         id="hourly_poll",
         max_instances=1,
         coalesce=True,
+        misfire_grace_time=300,  # tolerate up to 5 min event-loop lag (e.g. host display-off throttle)
         next_run_time=datetime.now(UTC),  # poll once shortly after startup, then on the interval
     )
     if settings.retention_enabled:
@@ -162,6 +162,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             id="retention_cleanup",
             max_instances=1,
             coalesce=True,
+            misfire_grace_time=300,
         )
     scheduler.start()
 

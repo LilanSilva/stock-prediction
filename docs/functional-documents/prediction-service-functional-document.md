@@ -52,21 +52,42 @@ When all material retained forces agree, compute direction, confidence, and magn
 
 ### Stance management
 
+An **active prediction** is any prediction row with `status = 'PENDING'` — meaning it has not yet
+been scored by Verification. The service always checks against the most recent PENDING prediction
+for the asset (`ORDER BY decision_at DESC LIMIT 1`) before creating a new one. Once a prediction is
+scored its status changes away from PENDING and it no longer participates in stance checks; a new
+prediction for the same asset with the same direction and magnitude can then be created freely.
+
 Predictions are managed as a per-asset stance, keyed on the market state:
 
-- **Trading day (price available):** if the new decision matches the asset's latest active
-  prediction on `(direction, magnitude)`, produce nothing; if it differs, publish a new independent
-  prediction (no supersede) — an asset may hold several active predictions, each scored on its own.
+- **Trading day (price available):** compare the new decision `(direction, magnitude)` against the
+  asset's latest active (PENDING) prediction.
+  - If they match exactly → **skip silently**: no new prediction row, no message published. The
+    context is marked PREDICTED. This prevents duplicate noise when the same signal fires again
+    without any new information.
+  - If they differ (direction changed, magnitude changed, or no prior PENDING prediction exists) →
+    **create a new independent prediction** with no `supersedes_prediction_id`. The prior prediction
+    remains active and will be scored on its own. An asset may therefore hold multiple concurrent
+    active predictions, each scored independently.
 - **Market closed / price unavailable (weekend, holiday, fetch failure):** collapse to one active
-  prediction per asset — the new prediction sets `supersedes_prediction_id` to the prior stance,
-  which Verification withdraws (unscored). Market state is `shared.calendar.is_trading_day` **on that
-  asset's own market calendar** AND a reachable Market Data price.
+  prediction per asset. The new prediction sets `supersedes_prediction_id` to the prior PENDING
+  prediction's ID, and Verification withdraws that prior prediction (marks it WITHDRAWN, unscored)
+  in the same transaction. This prevents an unbounded backlog of unscored stances accumulating over
+  a weekend.
 
-Market state is therefore per asset, not global: at 23:00 UTC on a Friday a Stockholm listing is
-already closed (Saturday locally) while a New York listing is still in its trading day, so the same
-sweep can add an independent prediction for one and collapse the stance for the other. An asset with
-no registry entry has no calendar and is treated as closed — the conservative collapse path rather
-than guessing a market.
+Market state is per asset, not global. `shared.calendar.is_trading_day` is evaluated on **that
+asset's own market calendar** AND requires a reachable Market Data price. At 23:00 UTC on a Friday
+a Stockholm listing is already closed (Saturday locally) while a New York listing is still in its
+trading day, so the same sweep can add an independent prediction for one asset and collapse the
+stance for another. An asset with no registry entry has no calendar and is treated as closed — the
+conservative collapse path rather than guessing a market.
+
+### OTHER event type
+
+Articles classified as `EventType.OTHER` by Cleansing produce an `EventDetected` and enter a
+context window, but `OTHER` has no `CausalFactor` node in Neo4j. The graph query returns zero
+firing edges, the decision policy returns `None`, and no prediction is ever produced. This is
+intentional: `OTHER` is a catch-all for events with no modelled causal path.
 
 ### Conflict path
 
@@ -117,3 +138,7 @@ Configuration includes model, prompt version, maximum compact-input size, low ou
 6. Every output matches `PredictionMade` and uses canonical IDs.
 7. The service never publishes `PriceRequested`.
 8. Outbox and context recovery survive a simulated restart.
+9. On a trading day, a new decision with the same `(direction, magnitude)` as the asset's latest PENDING prediction produces no new row and no new message.
+10. On a trading day, a new decision with a different direction or magnitude creates an independent prediction alongside any existing active predictions.
+11. On a market-closed day, a new prediction supersedes and withdraws the prior PENDING prediction so only one active prediction remains per asset.
+12. An `EventType.OTHER` event never produces a prediction (no CausalFactor node exists; zero firing edges → no decision).
