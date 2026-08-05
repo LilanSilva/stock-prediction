@@ -581,7 +581,7 @@ accepted content types `text/html`, `application/xhtml+xml`, `text/plain`.
 | `FREENEWSAPI_KEY` | empty | **Secret.** Empty disables the source; the RSS feeds still run |
 | `FREENEWSAPI_BASE_URL` | `https://api.freenewsapi.io/v1` | API base |
 | `FREENEWSAPI_LANGUAGE` | `en` | Search language |
-| `FREENEWSAPI_PAGE_SIZE` | `5` | Items per search, 1 to 100 |
+| `FREENEWSAPI_PAGE_SIZE` | `40` | Items per search, 1 to 100 |
 
 ### 10.7 Database pool
 

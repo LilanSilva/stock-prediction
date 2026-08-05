@@ -27,19 +27,28 @@ ACTION_TAXONOMY: dict[str, EventType] = {
     "bombard": EventType.MILITARY_CONFLICT,
     "airstrike": EventType.MILITARY_CONFLICT,
     "war": EventType.MILITARY_CONFLICT,
+    "conflict": EventType.MILITARY_CONFLICT,
     "anfall": EventType.MILITARY_CONFLICT,  # sv
     "attackera": EventType.MILITARY_CONFLICT,  # sv
     "invadera": EventType.MILITARY_CONFLICT,  # sv
-    "krig": EventType.MILITARY_CONFLICT,  # sv
+    "krig": EventType.MILITARY_CONFLICT,       # sv: also matches kriget/krigens (suffix)
+    "krigsplan": EventType.MILITARY_CONFLICT,  # sv: war plan
+    "iranattack": EventType.MILITARY_CONFLICT, # sv: compound "Iran attack"
+    "stridighet": EventType.MILITARY_CONFLICT, # sv: conflict/fighting
     # STRAIT_CLOSURE
     "close": EventType.STRAIT_CLOSURE,
     "closure": EventType.STRAIT_CLOSURE,
     "block": EventType.STRAIT_CLOSURE,
     "blockade": EventType.STRAIT_CLOSURE,
     "strait": EventType.STRAIT_CLOSURE,
-    "stänga": EventType.STRAIT_CLOSURE,  # sv
-    "blockera": EventType.STRAIT_CLOSURE,  # sv
-    "sund": EventType.STRAIT_CLOSURE,  # sv
+    "hormuz": EventType.STRAIT_CLOSURE,      # en+sv: standalone "Hormuz"
+    "hormuzsundet": EventType.STRAIT_CLOSURE,  # sv: compound "Hormuzsundet" (the Strait of Hormuz)
+    "stänga": EventType.STRAIT_CLOSURE,      # sv
+    "blockera": EventType.STRAIT_CLOSURE,    # sv
+    "sund": EventType.STRAIT_CLOSURE,        # sv: strait/sound; suffix match catches "sundet"
+    "öppna hormuz": EventType.STRAIT_CLOSURE,   # sv: open Hormuz (multi-word, avoids generic "öppna")
+    "återöppna": EventType.STRAIT_CLOSURE,   # sv: reopen
+    "rutt i hormuz": EventType.STRAIT_CLOSURE,  # sv: route through Hormuz
     # SUPPLY_DISRUPTION
     "halt": EventType.SUPPLY_DISRUPTION,
     "disrupt": EventType.SUPPLY_DISRUPTION,
@@ -261,8 +270,12 @@ ACTION_TAXONOMY: dict[str, EventType] = {
     "oil production cut": EventType.COMMODITY_PRICE_SHOCK,
     "commodity price": EventType.COMMODITY_PRICE_SHOCK,
     "grain price": EventType.COMMODITY_PRICE_SHOCK,
+    "gold price": EventType.COMMODITY_PRICE_SHOCK,
+    "oil price": EventType.COMMODITY_PRICE_SHOCK,
+    "gold": EventType.COMMODITY_PRICE_SHOCK,        # en: standalone "gold" (buy gold, gold rises)
     "råvarupris": EventType.COMMODITY_PRICE_SHOCK,  # sv: commodity price
-    "oljepris": EventType.COMMODITY_PRICE_SHOCK,    # sv: oil price
+    "oljepris": EventType.COMMODITY_PRICE_SHOCK,    # sv: oil price; suffix match → oljepriset
+    "guldpris": EventType.COMMODITY_PRICE_SHOCK,    # sv: gold price; suffix match → guldpriset
     # ECONOMIC_DATA_RELEASE
     "gdp": EventType.ECONOMIC_DATA_RELEASE,
     "jobs report": EventType.ECONOMIC_DATA_RELEASE,
@@ -330,21 +343,34 @@ def classify_text(text: str) -> tuple[EventType, str | None]:
     """Deterministically classify free text by scanning for the earliest taxonomy keyword.
 
     Returns the mapped event type and the matched keyword (the "action" evidence). Multi-word keys
-    are checked so phrases like "interest rate" win over the bare token. Returns (OTHER, None) when
-    nothing matches.
+    are checked so phrases like "interest rate" win over the bare token. Single-token keys use
+    ``_keyword_present`` so Swedish definite/inflected forms (e.g. "kriget", "oljepriset") and
+    English plurals are matched without enumerating every form. Returns (OTHER, None) when nothing
+    matches.
+
+    The haystack is punctuation-normalised before matching so symbols attached to words
+    (e.g. "opec+" or "anfall:") do not defeat word-boundary detection.
     """
-    haystack = f" {text.lower()} "
+    haystack = f" {_normalise(text.lower())} "
     best_type = EventType.OTHER
     best_keyword: str | None = None
     best_pos = len(haystack) + 1
     for keyword, event_type in ACTION_TAXONOMY.items():
-        # Whole-word match for single tokens; substring match for multi-word phrases.
-        needle = keyword if " " in keyword else f" {keyword} "
-        pos = haystack.find(needle)
-        if pos != -1 and pos < best_pos:
-            best_pos = pos
-            best_type = event_type
-            best_keyword = keyword
+        if " " in keyword:
+            # Multi-word phrase: find position for earliest-match tie-breaking.
+            pos = haystack.find(keyword)
+            if pos != -1 and pos < best_pos:
+                best_pos = pos
+                best_type = event_type
+                best_keyword = keyword
+        else:
+            # Single token: use suffix-tolerant match; position is the bare-token index.
+            if _keyword_present(haystack, keyword):
+                pos = haystack.find(f" {keyword}")
+                if pos < best_pos:
+                    best_pos = pos
+                    best_type = event_type
+                    best_keyword = keyword
     return best_type, best_keyword
 
 
@@ -379,16 +405,30 @@ def infer_assets(text: str) -> tuple[AssetId, ...]:
     return _company_matches(f" {text.lower()} ")[0]
 
 
-def _keyword_present(haystack: str, keyword: str) -> bool:
-    """Keyword match with simple English/Swedish plural tolerance.
+def _normalise(text: str) -> str:
+    """Replace non-alphanumeric, non-space characters with spaces for word-boundary matching.
 
-    Multi-word phrases match as substrings. A single token matches as a whole word, and also with a
-    trailing ``s``/``es``/``er``/``ar`` so "missiles" fires the "missile" keyword -- headlines
-    pluralise far more often than a registry can enumerate.
+    This lets "opec+" match the "opec" keyword and "anfall:" match "anfall". Swedish letters
+    (åäö) are preserved because they are part of valid keywords.
+    """
+    import re
+    return re.sub(r"[^\w\s]", " ", text, flags=re.UNICODE)
+
+
+def _keyword_present(haystack: str, keyword: str) -> bool:
+    """Keyword match with English/Swedish suffix tolerance.
+
+    Haystack is expected to already be lowercased and punctuation-normalised (see
+    ``classify_text``). Multi-word phrases match as substrings. A single token matches as a whole
+    word and also with a trailing suffix so "missiles" fires "missile" and "kriget" fires "krig"
+    (Swedish definite form). Suffixes: English plurals (s/es/er) and Swedish inflections (et/en/ar/ing).
     """
     if " " in keyword:
         return keyword in haystack
-    return any(f" {keyword}{suffix} " in haystack for suffix in ("", "s", "es", "er", "ar"))
+    return any(
+        f" {keyword}{suffix} " in haystack
+        for suffix in ("", "s", "es", "er", "ar", "et", "en", "ing")
+    )
 
 
 def _company_matches(haystack: str) -> tuple[tuple[AssetId, ...], tuple[str, ...]]:
@@ -514,13 +554,19 @@ RESOLUTION_CUES: tuple[str, ...] = (
     "ställer in",  # sv: calls off
     "blåser av",  # sv: calls off
     "drar tillbaka",  # sv: withdraws
+    "vapenvila",  # sv: ceasefire
+    "eldupphör",  # sv: ceasefire (lit. fire stop)
+    "eld upphör",  # sv: ceasefire variant
+    "fredsavtal",  # sv: peace agreement (not bare "fred" — too generic: "fred" means peace but appears in names)
+    "pausa anfall",  # sv: pause attack / stand down
+    "ger andrum",  # sv: gives respite / stands down
 )
 
 # Transport/supply cues (lowercase) that qualify a factor as physically threatening oil logistics,
 # selecting the TRANSPORT_AFFECTED conditioned edge over the SAFE_HAVEN_ONLY one.
 TRANSPORT_CUES: tuple[str, ...] = (
     "strait",
-    "hormuz",
+    "hormuz",   # also catches "hormuzsundet" via punctuation normalisation splitting compound
     "shipping",
     "tanker",
     "pipeline",
@@ -544,14 +590,17 @@ GEOPOLITICAL_EVENT_TYPES: frozenset[EventType] = frozenset(
 
 
 def _cue_present(haystack: str, cue: str) -> bool:
-    """Whole-word match for single tokens; substring match for multi-word phrases."""
+    """Whole-word match for single tokens; substring match for multi-word phrases.
+
+    Expects a punctuation-normalised, space-padded, lowercased haystack.
+    """
     needle = cue if " " in cue else f" {cue} "
     return needle in haystack
 
 
 def classify_polarity(text: str) -> EventPolarity:
     """Return RESOLUTION when a de-escalation/negation cue is present, else OCCURRENCE."""
-    haystack = f" {text.lower()} "
+    haystack = f" {_normalise(text.lower())} "
     for cue in RESOLUTION_CUES:
         if _cue_present(haystack, cue):
             return EventPolarity.RESOLUTION
@@ -565,7 +614,7 @@ def infer_conditions(text: str, event_type: EventType) -> list[ConditionCode]:
     SAFE_HAVEN_ONLY. RISK_PREMIUM_ELEVATED is never inferred here; it is price-derived and added
     later by Prediction.
     """
-    haystack = f" {text.lower()} "
+    haystack = f" {_normalise(text.lower())} "
     if any(_cue_present(haystack, cue) for cue in TRANSPORT_CUES):
         return [ConditionCode.TRANSPORT_AFFECTED]
     if event_type in GEOPOLITICAL_EVENT_TYPES:
