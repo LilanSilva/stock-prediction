@@ -111,13 +111,13 @@ approved, the implementation task is:
    `isOpen=false` filter); remove the Yahoo adapter + its tests.
 3. Update `market_data` config/DI and docker-compose env (base URL, symbols).
 4. Purge the 7 stale `poc6-yahoo` evaluations + their DLQ requests.
-5. Update E05 backlog docs to the new provider (mark Yahoo lines superseded, do not delete).
+5. ~~Update E05 backlog docs~~ — E05 backlog folder removed; see [SRS-05](../../requirements/SRS-05-market-data.md) for as-built biquote adapter documentation.
 
 **Not started** — awaiting explicit go/no-go based on this POC.
 
 ---
 
 ## Relevant Tasks
-- [E05 — Market Data Service](../E05-Market-Data-Service/README.md)
+- [SRS-05 — Market Data Service](../../requirements/SRS-05-market-data.md)
 - Supersedes the provider-selection portion of [POC-4](poc-4-market-data-verification.md) (yfinance)
   and the Yahoo confirmation in [POC-6](poc-6-end-to-end-prediction-validation.md) if adopted.

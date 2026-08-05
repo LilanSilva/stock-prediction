@@ -121,7 +121,6 @@ This is proportional, not equal. Equal split would incorrectly blame a low-influ
 ---
 
 ## Relevant Tasks
-- [E05/S01/T01 — yfinance adapter](../E05-Market-Data-Service/S01-Price-Data-Adapters/T01-yfinance-adapter.md)
-- [E05/S01/T02 — Stooq fallback adapter](../E05-Market-Data-Service/S01-Price-Data-Adapters/T02-stooq-fallback-adapter.md)
-- [E06/S02/T01 — Close-to-close scoring with deadband](../E06-Verification-Service/S02-Scoring-Engine/T01-close-to-close-scoring-deadband.md)
-- [E07/S01/T01 — Beta-Bernoulli edge weight updater](../E07-Credibility-Service/S01-Bayesian-Weight-Update-Engine/T01-beta-bernoulli-edge-weight-updater.md)
+- [SRS-05 — Market Data Service](../../requirements/SRS-05-market-data.md) (price adapters; yfinance superseded by biquote — see POC-7)
+- [SRS-06 — Verification Service](../../requirements/SRS-06-verification.md) (close-to-close scoring with deadband)
+- [SRS-07 — Credibility Service](../../requirements/SRS-07-credibility.md) (Beta-Bernoulli edge weight updater)

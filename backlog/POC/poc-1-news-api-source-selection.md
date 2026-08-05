@@ -97,5 +97,4 @@ DI RSS returned garbled characters in the live test (`g\xf6r stork\xf6p` instead
 ---
 
 ## Relevant Tasks
-- [E02/S01/T01 — GDELT adapter](../E02-Ingestion-Service/S01-News-Source-Adapters/T01-gdelt-doc-adapter.md)
-- [E02/S01/T02 — Swedish RSS adapters](../E02-Ingestion-Service/S01-News-Source-Adapters/T02-swedish-rss-adapters.md)
+- [SRS-02 — Ingestion Service](../../requirements/SRS-02-ingestion.md) (news source adapters: GDELT, Swedish RSS, FreeNewsApi)

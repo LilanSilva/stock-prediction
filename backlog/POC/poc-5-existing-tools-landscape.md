@@ -111,5 +111,5 @@ Five compounding barriers:
 
 ## Relevant Tasks
 This POC informs the overall architecture rather than specific tasks. Most directly relevant:
-- [E04/S01/T02 — Seed initial commodity KG](../E04-Prediction-Service/S01-Knowledge-Graph-Setup-Seeding/T02-seed-initial-commodity-knowledge-graph.md) — commodity focus validated here
-- [E07 — Credibility Service](../E07-Credibility-Service/README.md) — the self-improving loop confirmed as a gap
+- [SRS-04 — Prediction Service](../../requirements/SRS-04-prediction.md) (commodity KG seeding — commodity focus validated here)
+- [SRS-07 — Credibility Service](../../requirements/SRS-07-credibility.md) — the self-improving loop confirmed as a gap

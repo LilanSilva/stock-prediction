@@ -99,8 +99,4 @@ Build a labeled test set of ~100 articles from real hours, hand-grouped by true 
 ---
 
 ## Relevant Tasks
-- [E03/S01/T01 — SimHash near-duplicate detector](../E03-Cleansing-Service/S01-Deduplication-Pipeline/T01-simhash-near-duplicate-detector.md)
-- [E03/S01/T02 — Action signature extractor](../E03-Cleansing-Service/S01-Deduplication-Pipeline/T02-action-signature-extractor.md)
-- [E03/S02/T01 — BGE-m3 embedding pipeline](../E03-Cleansing-Service/S02-Embedding-Event-Clustering/T01-bge-m3-embedding-pipeline.md)
-- [E03/S02/T02 — Conservative dual-gate clustering](../E03-Cleansing-Service/S02-Embedding-Event-Clustering/T02-conservative-dual-gate-incremental-clustering.md)
-- [E03/S02/T03 — LLM event merge](../E03-Cleansing-Service/S02-Embedding-Event-Clustering/T03-llm-event-merge-structured-extraction.md)
+- [SRS-03 — Cleansing Service](../../requirements/SRS-03-cleansing.md) (SimHash dedup, action signature extractor, BGE-m3 embedding, dual-gate clustering, LLM event merge)

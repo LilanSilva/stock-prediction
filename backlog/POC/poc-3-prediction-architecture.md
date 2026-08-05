@@ -47,7 +47,5 @@ LLM arbitration may be reopened only if a new controlled hypothesis is approved.
 
 ## Relevant Tasks
 
-- [E04/S01/T01 - KG schema and Cypher queries](../E04-Prediction-Service/S01-Knowledge-Graph-Setup-Seeding/T01-knowledge-graph-schema-and-cypher-queries.md)
-- [E04/S01/T02 - Seed initial commodity KG](../E04-Prediction-Service/S01-Knowledge-Graph-Setup-Seeding/T02-seed-initial-commodity-knowledge-graph.md)
-- [E04/S02/T01 - Event-to-graph matcher](../E04-Prediction-Service/S02-Prediction-Engine/T01-event-to-graph-matcher.md)
-- [E04/S02/T02 - Deferred LLM conflict arbiter](../E04-Prediction-Service/S02-Prediction-Engine/T02-llm-conflict-arbiter.md)
+- [SRS-04 — Prediction Service](../../requirements/SRS-04-prediction.md) (KG schema, Cypher queries, commodity seeding, event-to-graph matcher)
+- Deferred: LLM conflict arbiter — see [SRS-04 §13](../../requirements/SRS-04-prediction.md#13-assumptions-and-limitations) (blocked by POC-6 STOP result)

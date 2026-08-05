@@ -99,5 +99,5 @@ approach. If approved, the implementation task would:
 ---
 
 ## Relevant Tasks
-- [E02 — Ingestion Service](../E02-Ingestion-Service/README.md) (GDELT source lives here)
+- [SRS-02 — Ingestion Service](../../requirements/SRS-02-ingestion.md) (news source adapters)
 - Related provider-migration precedent: [POC-7 biquote](poc-7-biquote-price-source.md).
