@@ -260,7 +260,7 @@ This runs once per incoming `ArticleIngested` message from the `cleansing.articl
 
 **Step 4 — Action extraction**
 - Call the configured NLP backend with `(text, language)`:
-  - `keyword` backend: scan the lowercased text for taxonomy keywords; take the earliest match; unmapped → `OTHER`
+  - `keyword` backend: punctuation-normalise and lowercase the text; scan for taxonomy keywords using suffix-tolerant word-boundary matching; take the earliest positional match; unmapped → `OTHER`
   - `spacy` backend: load `en_core_web_sm` or `sv_core_news_sm`; extract subject/verb/object via dependency tags; map verb lemma to event type; fall back to keyword scan if unmapped
 - After extraction, call `resolve_scope`, `classify_polarity`, and `infer_conditions` to complete the `ExtractedAction`
 
@@ -365,8 +365,9 @@ Determines which assets an article affects. Uses a strict precedence, first matc
 
 **Level 1 — COMPANY scope**
 - For each asset in the registry that has `keywords`: scan the lowercased text for those keywords
-- Single-token keywords: matched as whole words (with `s`/`es`/`er`/`ar` suffix tolerance for plurals)
+- Single-token keywords: matched as whole words with suffix tolerance (`s`/`es`/`er`/`ar`/`et`/`en`/`ing`) covering English plurals and Swedish inflected/definite forms (e.g. `kriget`, `oljepriset`)
 - Multi-word keywords: matched as substrings
+- Before matching, punctuation is normalised to spaces so attached symbols (e.g. `opec+`, `anfall:`) do not defeat word-boundary detection
 - If any asset keywords match → return those asset IDs with `scope=COMPANY`
 - This is the most specific signal; a company headline never fans out to the whole industry
 
@@ -387,9 +388,10 @@ Determines which assets an article affects. Uses a strict precedence, first matc
 
 ### 7.6 Polarity classification (classify_polarity)
 
-- Scan lowercased text for de-escalation/negation cue words
+- Haystack is punctuation-normalised (same as `classify_text`) before scanning
+- Scan for de-escalation/negation cue words
 - Examples (English): `calls off`, `cancel`, `ceasefire`, `truce`, `resolved`, `agreement`
-- Examples (Swedish): `avbryter`, `ställer in`, `blåser av`, `drar tillbaka`
+- Examples (Swedish): `avbryter`, `ställer in`, `blåser av`, `drar tillbaka`, `vapenvila`, `eldupphör`, `fredsavtal`, `pausa anfall`, `ger andrum`
 - If any cue present → `RESOLUTION`
 - Otherwise → `OCCURRENCE` (default)
 
@@ -397,6 +399,7 @@ Determines which assets an article affects. Uses a strict precedence, first matc
 
 Determines which causal edge is activated at prediction time.
 
+- Haystack is punctuation-normalised before scanning
 - First check transport cues: `strait`, `hormuz`, `shipping`, `tanker`, `pipeline`, `refinery`, `blockade`, `port`, etc.
   - If present → `[TRANSPORT_AFFECTED]`
 - Else check if event type is geopolitical (`MILITARY_CONFLICT`, `SANCTIONS`, `POLITICAL_TRANSITION`)

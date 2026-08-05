@@ -542,9 +542,7 @@ strings use their conventional unprefixed names.
 | `INGESTION_POLL_INTERVAL_SECONDS` | `3600` | Seconds between polls. Must be `> 0` |
 | `FEED_FETCH_TIMEOUT_SECONDS` | `30.0` | Timeout for retrieving a feed |
 
-**Rate-budget guidance:** only FreeNewsApi counts against its 5000 requests/day cap. Worst case is
-`(86400 / interval) × (keywords + keywords × page_size)`. At 900 s that is roughly 2880/day, about
-58% of budget. **Do not go below about 600 s** (roughly 86%) without trimming keywords or page size.
+**Rate-budget guidance:** only FreeNewsApi counts against its 5,000 requests/day free-tier cap. The adapter makes `1 + PAGE_SIZE` requests per poll (one `/news` list call plus one `/details` call per article). At `INGESTION_POLL_INTERVAL_SECONDS=900` there are 96 polls/day, giving `(1 + PAGE_SIZE) × 96` requests/day. At the default `PAGE_SIZE=40` that is **3,936 requests/day (79% of budget)**. The maximum safe page size on the free tier is 50 (4,896/day, 98%); do not exceed it. Do not reduce the poll interval below 600 s without also reducing page size.
 
 ### 10.3 Body fetching
 
