@@ -5,14 +5,16 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
+import asyncpg
 import structlog
 from shared.reference.asset_registry import resolve
 from shared.reference.exceptions import UnknownAssetError
-from shared.messaging.exceptions import MessageProcessingError, MessagePoisonError
+from shared.messaging.exceptions import MessageProcessingError
 from shared.schemas.messages import Magnitude, PredictionMade
 
 from notification.channels.base import NotificationChannel
-from notification.models import NotificationMessage
+from notification.db import fetch_headlines
+from notification.models import Headline, NotificationMessage
 
 if TYPE_CHECKING:
     pass
@@ -34,10 +36,12 @@ class NotificationEngine:
         channels: list[NotificationChannel],
         min_confidence: float,
         channel_timeout_seconds: float,
+        db_pool: asyncpg.Pool | None = None,
     ) -> None:
         self._channels = channels
         self._min_confidence = min_confidence
         self._channel_timeout = channel_timeout_seconds
+        self._db_pool = db_pool
 
     async def handle(self, prediction: PredictionMade) -> None:
         log = logger.bind(
@@ -61,6 +65,14 @@ class NotificationEngine:
 
         signal_strength = _MAGNITUDE_TO_SIGNAL.get(prediction.magnitude.value, prediction.magnitude.value)
 
+        headlines: list[Headline] = []
+        if self._db_pool is not None:
+            try:
+                rows = await fetch_headlines(self._db_pool, list(prediction.event_ids))
+                headlines = [Headline(title=t, source_id=s) for t, s in rows]
+            except Exception as exc:  # noqa: BLE001
+                log.warning("headlines_fetch_failed", error=str(exc))
+
         message = NotificationMessage(
             company_name=asset.display_name,
             exchange=asset.expected_exchange,
@@ -69,6 +81,7 @@ class NotificationEngine:
             signal_strength=signal_strength,
             confidence=prediction.confidence,
             decided_at=prediction.decision_at,
+            headlines=headlines,
         )
 
         await self._dispatch(message, log)

@@ -11,6 +11,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 
+import asyncpg
 import structlog
 from aio_pika.abc import AbstractIncomingMessage
 from fastapi import FastAPI
@@ -27,6 +28,7 @@ from notification.channels.email_channel import EmailChannel
 from notification.channels.recipients import load_email_recipients, load_whatsapp_recipients
 from notification.channels.whatsapp_channel import WhatsAppChannel
 from notification.config import NotificationSettings
+from notification.db import create_pool
 from notification.engine import NotificationEngine
 
 logger = structlog.get_logger(__name__)
@@ -48,6 +50,7 @@ class AppContext:
     engine: NotificationEngine
     consumer_task: asyncio.Task[None]
     state: ServiceState
+    db_pool: asyncpg.Pool | None = None
 
 
 def _build_channels(
@@ -124,12 +127,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     http_client = AsyncClient(timeout=settings.channel_timeout_seconds)
 
+    db_pool: asyncpg.Pool | None = None
+    if settings.database_url:
+        try:
+            db_pool = await create_pool(settings.database_url)
+            logger.info("notification_db_connected")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("notification_db_unavailable", error=str(exc))
+
     channels = _build_channels(settings, http_client)
 
     engine = NotificationEngine(
         channels=channels,
         min_confidence=settings.min_confidence,
         channel_timeout_seconds=settings.channel_timeout_seconds,
+        db_pool=db_pool,
     )
 
     state = ServiceState(active_channels=[ch.channel_id for ch in channels])
@@ -145,6 +157,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         engine=engine,
         consumer_task=consumer_task,
         state=state,
+        db_pool=db_pool,
     )
     logger.info(
         "notification_started",
@@ -162,6 +175,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             pass
         await http_client.aclose()
         await rabbit.close()
+        if db_pool is not None:
+            await db_pool.close()
         logger.info("notification_stopped")
 
 

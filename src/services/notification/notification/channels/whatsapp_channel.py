@@ -61,7 +61,7 @@ class WhatsAppChannel:
 def _build_text(msg: NotificationMessage) -> str:
     confidence_pct = round(msg.confidence * 100, 1)
     decided_str = msg.decided_at.strftime("%Y-%m-%d %H:%M:%S")
-    return (
+    text = (
         "Feed Analyzer Alert\n"
         f"{msg.company_name} ({msg.exchange}: {msg.ticker})\n"
         f"Direction : {msg.direction}\n"
@@ -69,3 +69,7 @@ def _build_text(msg: NotificationMessage) -> str:
         f"Confidence: {confidence_pct}%\n"
         f"Decided   : {decided_str} UTC"
     )
+    if msg.headlines:
+        lines = "\n".join(f"• {h.title} [{h.source_id}]" for h in msg.headlines)
+        text += f"\n\nTop News:\n{lines}"
+    return text

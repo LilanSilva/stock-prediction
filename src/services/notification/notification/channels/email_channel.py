@@ -65,7 +65,7 @@ def _build_subject(msg: NotificationMessage) -> str:
 def _build_body(msg: NotificationMessage) -> str:
     confidence_pct = round(msg.confidence * 100, 1)
     decided_str = msg.decided_at.strftime("%Y-%m-%d %H:%M:%S")
-    return (
+    body = (
         "Feed Analyzer — Prediction Alert\n"
         "\n"
         f"Company   : {msg.company_name} ({msg.exchange}: {msg.ticker})\n"
@@ -74,3 +74,7 @@ def _build_body(msg: NotificationMessage) -> str:
         f"Confidence: {confidence_pct}%\n"
         f"Decided   : {decided_str} UTC\n"
     )
+    if msg.headlines:
+        lines = "\n".join(f"  • {h.title} [{h.source_id}]" for h in msg.headlines)
+        body += f"\nTop News:\n{lines}\n"
+    return body

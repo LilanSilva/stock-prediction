@@ -362,8 +362,11 @@ services:
     depends_on:
       feed-rabbitmq:
         condition: service_healthy
+      feed-postgres:
+        condition: service_healthy
     environment:
       RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-feed_user}:${RABBITMQ_DEFAULT_PASS:?set in .env}@feed-rabbitmq:5672/
+      DATABASE_URL: postgresql://${POSTGRES_USER:-feed_user}:${POSTGRES_PASSWORD:?set in .env}@feed-postgres:5432/${POSTGRES_DB:-feed}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       # Editable asset registry (mounted read-only below): add companies/markets without
       # a rebuild. Falls back to the wheel-packaged assets.json when unset.

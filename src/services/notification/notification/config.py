@@ -12,6 +12,7 @@ class NotificationSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="NOTIFICATION_", extra="ignore")
 
     rabbitmq_url: str = Field(validation_alias="RABBITMQ_URL")
+    database_url: str = Field(default="", validation_alias="DATABASE_URL")
     log_level: str = Field(default="INFO", validation_alias="LOG_LEVEL")
 
     predictions_queue: str = Field(default="notification.predictions")

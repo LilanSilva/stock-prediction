@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
+
+
+@dataclass(frozen=True)
+class Headline:
+    title: str
+    source_id: str
 
 
 @dataclass(frozen=True)
@@ -11,9 +17,10 @@ class NotificationMessage:
     """Neutral representation of a prediction alert, passed to every channel."""
 
     company_name: str
-    exchange: str       # e.g. "NYSE"
-    ticker: str         # e.g. "LMT"
-    direction: str      # "UP" | "DOWN" | "NEUTRAL"
-    signal_strength: str  # "HIGH" | "MEDIUM" | "LOW"
-    confidence: float   # 0.0 – 1.0
+    exchange: str
+    ticker: str
+    direction: str
+    signal_strength: str
+    confidence: float
     decided_at: datetime
+    headlines: list[Headline] = field(default_factory=list)
