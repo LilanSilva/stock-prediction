@@ -1,4 +1,4 @@
-// Seed causal factors using canonical EventType taxonomy values (docs/reference/event-taxonomy.md).
+// Seed causal factors using canonical EventType taxonomy values (requirements/REF-01-event-taxonomy.md).
 //
 // CausalFactor.id MUST equal a taxonomy EventType so Cleansing output and Prediction matching share
 // one vocabulary. OTHER is a catch-all event type and is intentionally not seeded as a causal factor.

@@ -29,11 +29,27 @@
           "session_complete_at": "17:00",
           "price_kind": "PROVIDER_DAILY_CLOSE",
           "is_adjusted": false,
-          "fallback": null,
+          "fallback": "LMT_NYSE_YH",
           "keywords": [
             "lockheed",
             "lmt"
           ]
+        },
+        {
+          "asset_id": "LMT_NYSE_YH",
+          "name": "Lockheed Martin (Yahoo fallback)",
+          "code": "NYSE:LMT",
+          "provider": "yahoo",
+          "provider_symbol": "LMT",
+          "economic_identity": "Lockheed Martin ordinary shares (NYSE)",
+          "expected_exchange": "NYSE",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": []
         },
         {
           "asset_id": "SAAB_B_STO",
@@ -364,12 +380,28 @@
           "session_complete_at": "17:00",
           "price_kind": "PROVIDER_DAILY_CLOSE",
           "is_adjusted": false,
-          "fallback": null,
+          "fallback": "GOOGL_NASDAQ_YH",
           "keywords": [
             "alphabet",
             "android",
             "googl"
           ]
+        },
+        {
+          "asset_id": "GOOGL_NASDAQ_YH",
+          "name": "Alphabet (Yahoo fallback)",
+          "code": "NASDAQ:GOOGL",
+          "provider": "yahoo",
+          "provider_symbol": "GOOGL",
+          "economic_identity": "Alphabet ordinary shares (NASDAQ)",
+          "expected_exchange": "NASDAQ",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": []
         },
         {
           "asset_id": "AMZN_NASDAQ",
@@ -466,12 +498,28 @@
           "session_complete_at": "17:00",
           "price_kind": "PROVIDER_DAILY_CLOSE",
           "is_adjusted": false,
-          "fallback": null,
+          "fallback": "TSLA_NASDAQ_YH",
           "keywords": [
             "tesla",
             "tsla",
             "elon musk"
           ]
+        },
+        {
+          "asset_id": "TSLA_NASDAQ_YH",
+          "name": "Tesla (Yahoo fallback)",
+          "code": "NASDAQ:TSLA",
+          "provider": "yahoo",
+          "provider_symbol": "TSLA",
+          "economic_identity": "Tesla ordinary shares (NASDAQ)",
+          "expected_exchange": "NASDAQ",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": []
         }
       ]
     },

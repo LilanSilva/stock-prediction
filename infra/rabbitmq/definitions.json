@@ -155,6 +155,24 @@
       "arguments": { "x-queue-type": "classic" }
     },
     {
+      "name": "notification.scored",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic",
+        "x-dead-letter-exchange": "feed.dlx",
+        "x-dead-letter-routing-key": "prediction.scored"
+      }
+    },
+    {
+      "name": "notification.scored.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": { "x-queue-type": "classic" }
+    },
+    {
       "name": "gateway.predictions.live",
       "vhost": "/",
       "durable": false,
@@ -243,6 +261,14 @@
       "arguments": {}
     },
     {
+      "source": "feed.events",
+      "vhost": "/",
+      "destination": "notification.scored",
+      "destination_type": "queue",
+      "routing_key": "prediction.scored",
+      "arguments": {}
+    },
+    {
       "source": "feed.dlx",
       "vhost": "/",
       "destination": "cleansing.articles.dlq",
@@ -294,6 +320,14 @@
       "source": "feed.dlx",
       "vhost": "/",
       "destination": "credibility.scored.dlq",
+      "destination_type": "queue",
+      "routing_key": "prediction.scored",
+      "arguments": {}
+    },
+    {
+      "source": "feed.dlx",
+      "vhost": "/",
+      "destination": "notification.scored.dlq",
       "destination_type": "queue",
       "routing_key": "prediction.scored",
       "arguments": {}

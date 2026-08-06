@@ -8,7 +8,7 @@
 | Scope | Whole system — seven implemented components plus one approved (Notification) |
 | Requirement ID prefix | `SYS` |
 | Status | `Implemented` (components 1–7); `Approved` (Notification); Gateway and Dashboard not built |
-| Version | `1.1.0` |
+| Version | `1.2.0` |
 | Last verified against code | `2026-08-05` |
 
 ## 2. Purpose and scope
@@ -272,6 +272,21 @@ These rules are fixed system-wide so every prediction is scored identically.
 | `SYS-70` | All code **shall** pass `ruff check` with no violations. | Must | Implemented |
 | `SYS-71` | All code **shall** pass `mypy --strict` with no errors. | Must | Implemented |
 | `SYS-72` | All services **shall** share one root virtual environment and one editable `shared` package. | Must | Implemented |
+
+### 6.5 Governance
+
+Content-licensing and disclosure obligations for the POC. These are proven by inspection, not by test.
+Per-source obligations are in [SRS-02 §5.8](SRS-02-ingestion.md#58-source-governance).
+
+| ID | Requirement | Priority | Status |
+|---|---|---|---|
+| `SYS-73` | The system **shall** record, for every news source, its terms and whether full article bodies or raw HTML may be retained. | Must | Approved |
+| `SYS-74` | The system **shall** store the minimum article text the POC requires. | Must | Approved |
+| `SYS-75` | The system **shall** document a retention period for stored article text. | Must | Implemented |
+| `SYS-76` | Any presentation of a prediction **shall** carry a financial-information disclaimer stating that the output is experimental and is not financial advice. | Must | Approved |
+
+Deletion automation, backup/restore automation, and long-term audit infrastructure are deferred until
+the POC graduates — see 13.4.
 
 ## 7. How the system works
 
@@ -597,6 +612,8 @@ System-level behaviours and the tests that prove them.
 | `SYS-59`…`SYS-62` | Test | [test_fetcher.py](../src/services/ingestion/tests/test_fetcher.py) — SSRF, redirect revalidation, bounds |
 | `SYS-66`…`SYS-69` | Test | [test_logging.py](../src/shared/tests/test_logging.py) and each service's integration test |
 | `SYS-70`, `SYS-71` | Demonstration | `ruff check` and `mypy --strict` in CI |
+| `SYS-75` | Inspection | [SRS-02 §10.5](SRS-02-ingestion.md#10-configuration) — `ARTICLE_RETENTION_DAYS` default 30, `OUTBOX_RETENTION_DAYS` default 7 |
+| `SYS-73`, `SYS-74`, `SYS-76` | Inspection | **Not yet enforced.** Source terms are not modelled on a source record, and no Gateway or Dashboard exists to carry the disclaimer — `Approved`, not `Implemented` |
 
 ## 12. Failure handling
 
@@ -676,3 +693,4 @@ first things a new reader uses to orient.
 |---|---|---|---|
 | `2026-08-05` | `1.0.0` | Initial system specification, written from the implemented E01–E07 code | E01–E07 complete; replaces the epic/task backlog structure |
 | `2026-08-05` | `1.1.0` | Added Notification Service (Approved): section 4.2 component row, section 7.1 routing topology binding, section 8.3 endpoint count, scope updated | SRS-10 added |
+| `2026-08-06` | `1.2.0` | Added section 6.5 governance (`SYS-73`…`SYS-76`, mostly `Approved`) and its verification rows | Merged from `docs/requirements/agreed-system-requirements.md` "Governance for the POC"; the disclaimer and source-terms obligations had no requirement ID anywhere |

@@ -1,4 +1,4 @@
-"""Canonical message schemas (docs/contracts/message-contracts.md)."""
+"""Canonical message schemas (requirements/SRS-01-shared-foundation.md sec 8)."""
 
 from shared.schemas.messages import (
     EXCHANGE,

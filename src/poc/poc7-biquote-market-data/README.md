@@ -17,7 +17,8 @@ adapter depends on before we commit to a migration.
 > stable, no UA trickery), but biquote turned out to serve only a curated list of US mega-caps — every
 > European listing returns 0 bars, including EU giants on US exchanges (`ASML`, `SAP`, `NVO`, `SHEL`).
 > Yahoo is therefore back in use for non-US listings via `market_data.adapters.yahoo`, which sends a
-> browser User-Agent. See `docs/reference/asset-registry.md` and ADR-007.
+> browser User-Agent. See `requirements/REF-02-asset-registry.md` and ADR-007 in
+> `requirements/ADR-decisions.md`.
 
 ## Run
 

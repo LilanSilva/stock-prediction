@@ -1,28 +1,79 @@
 # Feed Analyzer Development Guidance
 
-## Project purpose and current scope
+## Start here
 
-Feed Analyzer is a local proof of concept for predicting one-trading-day market direction from
-structured news events and a causal graph. The initial walking skeleton supports only the canonical
-assets `GOLD` and `BRENT_OIL`. It does not execute trades or provide personalized financial advice.
+**Read the repository root `README.md` first** to understand the project folder structure and each
+folder's purpose. Every top-level folder has its own `README.md` describing its inner folders and
+files — **read the README of the folder you are working in before changing anything in it.**
 
-POC-6 recorded `STOP` for prediction-time KG-plus-LLM arbitration. M1 prediction is graph-only.
-Do not add prediction-time LLM calls unless a new controlled hypothesis is explicitly approved.
+This file contains only the conventions a coding agent must follow. Everything else lives where the
+root README points.
 
-## Source-of-truth order
+## Documentation rules
 
-Resolve conflicts in this order:
+Documentation is a **three-level chain, and each level explains only its own scope.** This is the flow
+every reader follows, and the one you must preserve when updating docs:
 
-1. Executable Pydantic models in `src/shared/shared/schemas/`
-2. `docs/contracts/message-contracts.md`
-3. `docs/requirements/agreed-system-requirements.md`
-4. Accepted decisions in `docs/decisions/README.md`
-5. Current functional documents and architecture diagrams
-6. `backlog/contract-freeze-overrides.md`
-7. Epic, story, and task detail under `backlog/`
+```text
+.github/copilot-instructions.md   agent conventions      -> sends the reader to the root README
+        v
+README.md                         top-level folders      -> one row per folder, linking to its README
+        v
+{folder}/README.md                that folder's contents -> its inner folders and files
+        v
+{folder}/{document}.md            the actual detail      -> specifications, ADRs, tasks, findings
+```
 
-Read the repository `README.md` and `backlog/contract-freeze-overrides.md` before implementing a
-backlog item. Never implement a legacy task detail that conflicts with a higher-authority source.
+**One fact, one home.** Never state the same thing in two documents. Before adding anything, find
+where the topic already lives:
+
+| Topic | Its only home |
+|---|---|
+| Folder structure and what each folder is for | root `README.md` |
+| What is inside one folder | that folder's `README.md` |
+| Requirements, service behaviour, contracts, schemas, config | the relevant `requirements/SRS-*.md` or `SyRS-system.md` |
+| Event types, asset registry | `requirements/REF-01-*`, `requirements/REF-02-*` |
+| Why a design decision was made | `requirements/ADR-decisions.md` |
+| Environment setup, project scope | root `README.md` |
+| Secrets rule, infrastructure validation | `infra/README.md` |
+| Test commands, code layout conventions | `src/README.md` |
+| Unbuilt work, milestones, POC findings | `backlog/README.md` and its subfolders |
+| Rules for agents (this file's subject) | `.github/copilot-instructions.md` |
+
+**When you update documentation:**
+
+1. **Find the owner first.** Search the repository for the topic before writing. If it already exists,
+   edit it there — do not restate it somewhere more convenient.
+2. **Link instead of repeating.** A second document that needs the fact gets a one-line pointer with a
+   relative link, never a copy. The exception is a hard safety constraint (for example "never commit a
+   secret"), which may be restated briefly while still naming the owning document.
+3. **Keep the chain intact.** Adding, moving, or deleting a folder or a significant file means updating
+   that folder's `README.md` — and the root `README.md` too if a top-level folder changed.
+4. **Do not document temporary or tool-owned paths.** Dot-folders (`.venv/`, `.claude/`, `.agents/`,
+   caches) and generated output stay out of every README.
+5. **Update the specification in the same change as the code.** See *Specifications* below — a
+   requirement with no proving test is `Approved`, not `Implemented`.
+6. **Delete what a change makes false.** A stale document is worse than a missing one, because it is
+   still trusted. When content moves, remove the original rather than leaving both.
+7. **Verify links before finishing.** Every relative link must resolve, including its `#anchor`.
+
+**Test to apply before adding a paragraph:** *does this fact already have a home?* If yes, link to it.
+If no, put it in the one document that owns the topic — and only there.
+
+## Specifications
+
+**Read the SRS for the service you are changing before you change it.** It lists every requirement,
+message, table, config key, and the tests that protect existing behaviour.
+
+The full authority order is in `requirements/README.md` ("Authority"). The part that governs your work:
+executable code outranks every document, so if code and a specification disagree, **the code is the
+truth and the specification is a defect** — fix the specification, or fix the code if the specification
+describes agreed intent. Task files under `backlog/` are the lowest authority and predate the
+specifications; never implement one that conflicts with a higher source.
+
+**When you change observable behaviour, update the SRS in the same change** — a requirement with no
+proving test is `Approved`, not `Implemented`. The update rules are in `requirements/README.md`
+("How to update these documents").
 
 ## Architecture invariants
 
@@ -33,8 +84,12 @@ backlog item. Never implement a legacy task detail that conflicts with a higher-
   key. Every consumer owns an independent queue; observers never consume another service's work
   queue.
 - Every durable work queue has a dedicated DLQ through `feed.dlx`.
-- Use canonical asset IDs at service boundaries. Provider symbols such as `GC=F` and `BZ=F` belong
-  only inside market-data adapters.
+- Use canonical asset IDs at service boundaries. Provider symbols such as `XAUUSD` and `SAAB-B.ST`
+  belong only inside market-data adapters. An asset ID absent from the loaded registry is rejected at
+  every message boundary.
+- Market Data routes per asset on the registry's `provider` field: `biquote.io` for a curated list of
+  US mega-caps, `yahoo` for European markets and the US names biquote lacks. The Yahoo adapter must
+  send a browser User-Agent.
 - Verification alone produces `PriceRequested`, containing both baseline and settlement sessions.
   Market Data returns both immutable closes in one `PriceObserved`.
 - State-changing persistence plus publication requires an outbox or equivalent reconciliation.
@@ -57,8 +112,11 @@ a major-version change.
 ## LLM policy
 
 - Prefer local deterministic processing.
-- M1 may use the shared LLM gateway only for ambiguous cleansing extraction, merge, or factual
-  conflict resolution.
+- **Never add an LLM call to the Prediction Service.** Prediction is graph-only and makes zero LLM
+  calls; the POC-6 controlled rerun recorded `STOP` for prediction-time arbitration. Only a new,
+  explicitly approved controlled hypothesis can change this.
+- Cleansing is the only service permitted to call the LLM, and only for ambiguous extraction, merge, or
+  factual-conflict resolution.
 - Keep provider and model selection in environment-backed settings.
 - Enforce compact input/output budgets, bounded retries, structured-output validation, and cache
   identity based on provider, model, task, prompt version, schema, and context/input.
@@ -76,51 +134,37 @@ a major-version change.
 - Add comments only for non-obvious design constraints or reliability behavior.
 - Preserve async cancellation and use graceful close/shutdown paths for external clients.
 
-## Infrastructure conventions
+## Infrastructure changes
 
-- Local infrastructure lives under `infra/`.
-- Compose must start Postgres with pgvector, Neo4j, a one-shot Neo4j seed container, and RabbitMQ.
-- Initialization and seed scripts must be idempotent.
-- Never hardcode real credentials, and never commit a password or a derived credential such as a
-  password **hash**. Store every secret only in `infra/.env` (git-ignored); document variable names
-  with placeholder values in `infra/.env.example`. Services and tests read credentials from
-  environment variables. When a tool needs a derived credential at rest, compute it at runtime from
-  the env var instead of committing it.
-- The Postgres service builds a local pgvector image from the org-approved official `postgres:16`
-  base (`infra/postgres-image/Dockerfile`); the community `pgvector/pgvector` image is blocked by
-  org registry policy.
-- RabbitMQ will not seed `RABBITMQ_DEFAULT_USER` when a definitions file is loaded, so the broker
-  user is injected at startup from env vars by `infra/rabbitmq/render-definitions.sh` (hash computed
-  at runtime). The tracked `infra/rabbitmq/definitions.json` stays topology-only with `"users": []`.
-- RabbitMQ definitions must match `docs/contracts/message-contracts.md` exactly.
-- Neo4j seed edges use separate `direction` and magnitude `weight` fields; `weight` is in `[0,1]`
-  and Beta-Bernoulli priors start at `alpha=1.0`, `beta=1.0`.
+`infra/README.md` is the authority: the secrets rule, the environment-specific image and broker notes,
+the seed-idempotency requirement, and the commands that validate a change. Two constraints matter most:
+
+- **Never commit a credential, including a derived one such as a password hash.** Secrets live only in
+  `infra/.env`.
+- RabbitMQ definitions must match `requirements/SRS-01-shared-foundation.md` section 8.4 exactly.
 
 ## Testing and review
 
-For shared-library changes, run from `src/shared/`:
+Test commands are in `src/README.md`. Use the fastest targeted test first, then the full shared suite.
 
-```bash
-python -m pytest
-python -m ruff check .
-python -m mypy shared tests
-```
-
-Use the fastest targeted test first, then the full shared suite. Unit tests must not require live
-infrastructure or provider credentials. Mark live RabbitMQ and real-provider checks as integration
-tests and skip them when required configuration is absent.
-
-For infrastructure changes, at minimum validate:
-
-```bash
-docker compose --env-file infra/.env.example -f infra/docker-compose.yml config
-python -m json.tool infra/rabbitmq/definitions.json
-```
-
-When Docker is available, also start the stack, wait for healthy services, verify Postgres schemas
-and pgvector, verify Neo4j constraints/seeds and at least 15 `CAUSES` edges, inspect RabbitMQ
-exchanges/queues/bindings, and tear down the test volumes.
+- Unit tests must not require live infrastructure or provider credentials. Mark live RabbitMQ and
+  real-provider checks as integration tests and skip them when required configuration is absent.
+- Validate infrastructure changes with the commands in `infra/README.md` before claiming they work.
 
 Review changes for contract alignment, canonical identifiers, idempotency, failure handling,
-correlation propagation, secret safety, and backward compatibility. Do not broaden scope into
-deferred epics while completing an earlier epic.
+correlation propagation, secret safety, and backward compatibility. Do not broaden scope into deferred
+epics while completing an earlier epic.
+
+### Failing-test handoff policy
+
+When a test fails, attempt a fix first. But if the investigation exceeds roughly **3 minutes of effort
+or a comparable token budget without a clear resolution**, stop and hand the failure back to a human
+with:
+
+- the failing test name and file,
+- the observed vs. expected behaviour,
+- the most likely root cause, and
+- a concrete suggested fix (without applying it).
+
+Do not brute-force test failures. A fast, documented handoff is better than a long unfocused
+investigation. This applies to every agent working in this repository.

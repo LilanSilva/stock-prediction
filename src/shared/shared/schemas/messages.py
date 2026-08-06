@@ -1,9 +1,11 @@
 """Canonical message contracts as Pydantic v2 models.
 
 These models are the executable source of truth for the contracts described in
-docs/contracts/message-contracts.md. Every field name, enum value, and routing key here matches
-that document. The legacy per-task schema examples (single-DB `close`, `window_close_at`, signed
-weights, `source` instead of `source_id`, etc.) are non-authoritative and intentionally NOT used.
+requirements/SRS-01-shared-foundation.md section 8 and each service's SRS section 8. Every field
+name, enum value, and routing key here matches those documents; where they disagree, this file wins
+and the specification is a defect. The legacy per-task schema examples (single-DB `close`,
+`window_close_at`, signed weights, `source` instead of `source_id`, etc.) are non-authoritative and
+intentionally NOT used.
 
 Envelope (all messages): message_id, correlation_id, causation_id, occurred_at, schema_version.
 Enum values use uppercase snake case. Asset values are canonical asset IDs (GOLD, BRENT_OIL).
@@ -31,7 +33,7 @@ from pydantic import (
 # for the ~100 existing call sites now that AssetId lives in its own module.
 from shared.schemas.asset_id import AssetId as AssetId
 
-# --- Routing keys (docs/contracts/message-contracts.md "Exchange and bindings") ---
+# --- Routing keys (requirements/SRS-01-shared-foundation.md sec 8.4 "RabbitMQ topology") ---
 
 EXCHANGE = "feed.events"
 
@@ -54,7 +56,7 @@ class RoutingKey(StrEnum):
 
 
 class EventType(StrEnum):
-    """docs/reference/event-taxonomy.md (version 1.1)."""
+    """requirements/REF-01-event-taxonomy.md (taxonomy version 1.1)."""
 
     MILITARY_CONFLICT = "MILITARY_CONFLICT"
     STRAIT_CLOSURE = "STRAIT_CLOSURE"

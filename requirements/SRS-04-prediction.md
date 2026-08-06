@@ -36,7 +36,7 @@
 | Author | Feed Analyzer project |
 | Created | 2026-08-05 |
 | Last updated | 2026-08-05 |
-| Replaces | `docs/functional-documents/prediction-service-functional-document.md` |
+| Replaces | `docs/functional-documents/prediction-service-functional-document.md` (deleted 2026-08-06) |
 | Source code | `src/services/prediction/` |
 | Config class | `prediction.config.PredictionSettings` |
 | DB schema | `prediction` (owned by this service) |

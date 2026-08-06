@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from notification.models import NotificationMessage
+from notification.models import NotificationMessage, VerificationMessage
 
 
 @runtime_checkable
@@ -15,4 +15,8 @@ class NotificationChannel(Protocol):
 
     async def send(self, message: NotificationMessage) -> None:
         """Deliver the notification to all of this channel's recipients."""
+        ...
+
+    async def send_scored(self, message: VerificationMessage) -> None:
+        """Deliver the verification result alert to all of this channel's recipients."""
         ...

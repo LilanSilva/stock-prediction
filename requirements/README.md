@@ -1,7 +1,12 @@
-# Feed Analyzer — Requirements Specifications
+# requirements — Requirement documents and functional knowledge
 
-This folder is the **primary specification** of the Feed Analyzer system. It describes what the
-system must do, how each service works internally, and which test proves each requirement.
+This folder holds **all requirement documents and the system's functional knowledge.** It is the
+**primary specification** of Feed Analyzer: what the system must do, how each service works internally,
+and which test proves each requirement.
+
+Naming tells you a document's kind: `SyRS` is the system, `SRS-##` a component, `REF-##` reference data,
+`ADR` the decision records. Every `SyRS`/`SRS` document uses the same 15 sections, so you always know
+where to look.
 
 > **Who this is for.** A developer or coding agent should be able to read one document here and then
 > safely change that service — knowing its purpose, its message contracts, its database tables,
@@ -24,6 +29,17 @@ system must do, how each service works internally, and which test proves each re
 
 Not yet built: API Gateway and Dashboard. Those remain in [backlog/](../backlog/) as E08 and E09;
 no SRS exists for them until they are implemented.
+
+### Reference data and decisions
+
+These are not specifications — they contain no `shall` statements — but the specifications depend on
+them:
+
+| Document | Contains |
+|---|---|
+| [REF-01-event-taxonomy.md](REF-01-event-taxonomy.md) | The 32 canonical event types and multilingual normalization rules |
+| [REF-02-asset-registry.md](REF-02-asset-registry.md) | Asset registry file shape, provider routing, session calendars, registry version history |
+| [ADR-decisions.md](ADR-decisions.md) | ADR-001…007 — why the system is shaped this way |
 
 ## Reading order
 
@@ -112,13 +128,14 @@ and its number is never reused.
 
 When two sources disagree, the higher one wins:
 
-1. **Executable Pydantic models** in [src/shared/shared/schemas/](../src/shared/shared/schemas/) —
-   the running contract.
-2. **These specifications.**
-3. [docs/reference/asset-registry.md](../docs/reference/asset-registry.md) and
-   [docs/reference/event-taxonomy.md](../docs/reference/event-taxonomy.md) — reference data.
-4. [docs/architectural-documents/](../docs/architectural-documents/) — diagrams.
-5. [backlog/](../backlog/) — unbuilt work only (E08, E09).
+1. **Executable Pydantic models** in [src/shared/shared/schemas/](../src/shared/shared/schemas/) and
+   [assets.json](../src/shared/shared/reference/assets.json) — the running contract.
+2. **These specifications** — [SyRS-system.md](SyRS-system.md) and the SRS documents.
+3. [REF-01-event-taxonomy.md](REF-01-event-taxonomy.md) and
+   [REF-02-asset-registry.md](REF-02-asset-registry.md) — reference data.
+4. [ADR-decisions.md](ADR-decisions.md) — accepted decisions and their reasoning.
+5. [docs/architectural-documents/](../docs/architectural-documents/) — diagrams.
+6. [backlog/](../backlog/) — unbuilt work only (E08, E09).
 
 If code and a specification disagree, **the code is the truth and the specification is a defect** —
 fix the specification, or fix the code if the specification describes agreed intent.

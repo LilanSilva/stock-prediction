@@ -21,7 +21,7 @@ from pydantic import ValidationError
 from shared.logging import setup_logging
 from shared.messaging.client import ConsumerCallback, RabbitMQClient
 from shared.messaging.exceptions import MessagePoisonError
-from shared.schemas.messages import PredictionMade
+from shared.schemas.messages import PredictionMade, PredictionScored
 
 from notification.channels.base import NotificationChannel
 from notification.channels.email_channel import EmailChannel
@@ -49,6 +49,7 @@ class AppContext:
     http_client: AsyncClient
     engine: NotificationEngine
     consumer_task: asyncio.Task[None]
+    scored_consumer_task: asyncio.Task[None]
     state: ServiceState
     db_pool: asyncpg.Pool | None = None
 
@@ -117,6 +118,21 @@ def _make_consumer(app: FastAPI) -> ConsumerCallback:
     return _on_message
 
 
+def _make_scored_consumer(app: FastAPI) -> ConsumerCallback:
+    async def _on_scored_message(message: AbstractIncomingMessage) -> None:
+        ctx: AppContext = app.state.ctx
+        try:
+            scored = PredictionScored.model_validate_json(message.body.decode("utf-8"))
+        except ValidationError as exc:
+            raise MessagePoisonError(f"invalid PredictionScored: {exc}") from exc
+
+        await ctx.engine.handle_scored(scored)
+        ctx.state.processed += 1
+        ctx.state.dispatched += 1
+
+    return _on_scored_message
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = NotificationSettings()
@@ -149,6 +165,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     consumer_task = asyncio.create_task(
         rabbit.consume(settings.predictions_queue, _make_consumer(app))
     )
+    scored_consumer_task = asyncio.create_task(
+        rabbit.consume(settings.scores_queue, _make_scored_consumer(app))
+    )
 
     app.state.ctx = AppContext(
         settings=settings,
@@ -156,12 +175,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         http_client=http_client,
         engine=engine,
         consumer_task=consumer_task,
+        scored_consumer_task=scored_consumer_task,
         state=state,
         db_pool=db_pool,
     )
     logger.info(
         "notification_started",
-        queue=settings.predictions_queue,
+        predictions_queue=settings.predictions_queue,
+        scores_queue=settings.scores_queue,
         channels=state.active_channels,
         min_confidence=settings.min_confidence,
     )
@@ -169,8 +190,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         consumer_task.cancel()
+        scored_consumer_task.cancel()
         try:
             await consumer_task
+        except asyncio.CancelledError:
+            pass
+        try:
+            await scored_consumer_task
         except asyncio.CancelledError:
             pass
         await http_client.aclose()

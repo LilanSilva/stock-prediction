@@ -7,7 +7,8 @@
 // factors sharing a condition never collide on weight. The condition is a plain edge property; the
 // canonical ConditionCode values live in the shared schema, so no separate node type is needed.
 //
-// Rationale (docs/decisions): a bare factor->asset edge cannot express context. MILITARY_CONFLICT
+// Rationale (requirements/ADR-decisions.md ADR-006): a bare factor->asset edge cannot express
+// context. MILITARY_CONFLICT
 // only lifts oil when it threatens transport/supply; a distant conflict is a safe-haven bid that
 // lifts gold, not oil. Conditions gate WHICH edge fires; event polarity (OCCURRENCE/RESOLUTION)
 // flips the sign at decision time. Beta-Bernoulli priors start at 1.0/1.0 and are refined online by

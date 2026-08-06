@@ -5,7 +5,7 @@ from __future__ import annotations
 import structlog
 from httpx import AsyncClient
 
-from notification.models import NotificationMessage
+from notification.models import NotificationMessage, VerificationMessage
 
 logger = structlog.get_logger(__name__)
 
@@ -55,6 +55,30 @@ class EmailChannel:
         logger.info("email_channel_done", total=len(self._recipients), successes=successes)
 
 
+    async def send_scored(self, message: VerificationMessage) -> None:
+        subject = _build_scored_subject(message)
+        body = _build_scored_body(message)
+        successes = 0
+        for address in self._recipients:
+            payload = {
+                "sender": {"name": self._sender_name, "email": self._sender_email},
+                "to": [{"email": address}],
+                "subject": subject,
+                "textContent": body,
+            }
+            try:
+                response = await self._http.post(
+                    _BREVO_SEND_URL,
+                    json=payload,
+                    headers={"api-key": self._api_key, "Content-Type": "application/json"},
+                )
+                response.raise_for_status()
+                successes += 1
+            except Exception as exc:  # noqa: BLE001
+                logger.error("email_send_failed", recipient=address, error=str(exc))
+        logger.info("email_channel_done", total=len(self._recipients), successes=successes)
+
+
 def _build_subject(msg: NotificationMessage) -> str:
     return (
         f"[FEED ANALYZER] {msg.company_name} ({msg.exchange}: {msg.ticker})"
@@ -78,3 +102,31 @@ def _build_body(msg: NotificationMessage) -> str:
         lines = "\n".join(f"  • {h.title} [{h.source_id}]" for h in msg.headlines)
         body += f"\nTop News:\n{lines}\n"
     return body
+
+
+def _build_scored_subject(msg: VerificationMessage) -> str:
+    outcome = "CORRECT" if msg.is_correct else "WRONG"
+    return (
+        f"[FEED ANALYZER] {msg.company_name} ({msg.exchange}: {msg.ticker})"
+        f" — Verification {outcome}"
+    )
+
+
+def _build_scored_body(msg: VerificationMessage) -> str:
+    confidence_pct = round(msg.confidence * 100, 1)
+    scored_str = msg.scored_at.strftime("%Y-%m-%d %H:%M:%S")
+    actual_return_pct = round(msg.actual_return * 100, 2)
+    outcome = "CORRECT" if msg.is_correct else "WRONG"
+    return (
+        "Feed Analyzer — Verification Alert\n"
+        "\n"
+        f"Company            : {msg.company_name} ({msg.exchange}: {msg.ticker})\n"
+        f"Outcome            : {outcome}\n"
+        f"Predicted Direction: {msg.predicted_direction}\n"
+        f"Actual Direction   : {msg.actual_direction}\n"
+        f"Predicted Magnitude: {msg.predicted_magnitude}\n"
+        f"Actual Magnitude   : {msg.actual_magnitude}\n"
+        f"Actual Return      : {actual_return_pct:+.2f}%\n"
+        f"Confidence         : {confidence_pct}%\n"
+        f"Scored             : {scored_str} UTC\n"
+    )

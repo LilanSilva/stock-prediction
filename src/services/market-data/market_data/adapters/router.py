@@ -4,6 +4,11 @@ One asset maps to exactly one provider, declared as ``provider`` in the asset re
 single vendor covers every market: biquote.io serves a curated list of US mega-caps, Yahoo serves
 Stockholm/Euronext/Xetra. Routing here means adding a market is a registry edit plus (if the vendor
 is new) one adapter, with no change to the request pipeline.
+
+When a primary asset declares a ``fallback`` in the registry, ``get_close`` retries automatically
+against the fallback asset's provider if the primary raises ``PriceNotYetAvailableError``. The
+observation returned carries the fallback asset_id so the caller stores it against the correct
+instrument; the original asset_id is logged for traceability.
 """
 
 from __future__ import annotations
@@ -15,7 +20,7 @@ import structlog
 from shared.reference import UnknownAssetError, resolve
 from shared.schemas.messages import AssetId, CloseObservation
 
-from market_data.exceptions import InvalidObservationError
+from market_data.exceptions import InvalidObservationError, PriceNotYetAvailableError
 
 logger = structlog.get_logger(__name__)
 
@@ -60,7 +65,20 @@ class AdapterRouter:
         return adapter
 
     async def get_close(self, asset_id: AssetId, session: date) -> CloseObservation:
-        return await self.adapter_for(asset_id).get_close(asset_id, session)
+        try:
+            return await self.adapter_for(asset_id).get_close(asset_id, session)
+        except PriceNotYetAvailableError as primary_exc:
+            fallback_id = resolve(asset_id).fallback
+            if fallback_id is None:
+                raise
+            logger.warning(
+                "primary provider missing bar, trying fallback",
+                asset_id=asset_id,
+                fallback_asset_id=fallback_id,
+                session=session,
+                primary_reason=str(primary_exc),
+            )
+            return await self.adapter_for(fallback_id).get_close(fallback_id, session)
 
     async def fetch_observations(
         self, asset_id: AssetId, session: date

@@ -16,6 +16,7 @@ class NotificationSettings(BaseSettings):
     log_level: str = Field(default="INFO", validation_alias="LOG_LEVEL")
 
     predictions_queue: str = Field(default="notification.predictions")
+    scores_queue: str = Field(default="notification.scored")
 
     min_confidence: float = Field(default=0.6, ge=0.0, le=1.0)
     channel_timeout_seconds: float = Field(default=30.0, gt=0)

@@ -1,5 +1,11 @@
 # Dashboard Functional Document
 
+> **Status: not built.** This is design intent for epic E09, not a specification of running code.
+> Moved here from `docs/functional-documents/` on 2026-08-06 because
+> [requirements/](../../requirements/README.md) holds specifications for implemented components only —
+> an SRS-09 will be written when the Dashboard is built. Where this document disagrees with
+> [requirements/](../../requirements/README.md), the requirements win.
+
 ## 1. Purpose
 
 The Dashboard is a local POC interface for inspecting events, predictions, outcomes, prices, and learned credibility. It visualizes system state but does not perform prediction, verification, or learning.

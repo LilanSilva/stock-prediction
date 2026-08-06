@@ -108,3 +108,63 @@ def test_every_registered_asset_is_routable() -> None:
     for asset_id in supported_assets():
         adapter = router.adapter_for(AssetId(asset_id))
         assert adapter.name == provider_of(asset_id) == resolve(asset_id).provider
+
+
+class _FailingAdapter:
+    """Primary adapter that always raises PriceNotYetAvailableError."""
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.calls: list[AssetId] = []
+
+    async def get_close(self, asset_id: AssetId, session: date) -> CloseObservation:
+        self.calls.append(asset_id)
+        from market_data.exceptions import PriceNotYetAvailableError
+        raise PriceNotYetAvailableError(f"no provider bar for {asset_id} session {session}")
+
+    async def fetch_observations(
+        self, asset_id: AssetId, session: date
+    ) -> list[CloseObservation]:
+        return []
+
+
+async def test_fallback_used_when_primary_missing_bar() -> None:
+    # When biquote raises PriceNotYetAvailableError and the asset has a fallback, the router
+    # retries against the fallback asset's adapter and returns its observation.
+    failing_biquote = _FailingAdapter("biquote.io")
+    yahoo = _StubAdapter("yahoo")
+    router = AdapterRouter({"biquote.io": failing_biquote, "yahoo": yahoo})
+
+    obs = await router.get_close(AssetId.LMT_NYSE, date(2026, 8, 4))
+
+    assert obs.source == "yahoo"
+    assert failing_biquote.calls == [AssetId.LMT_NYSE]
+    assert yahoo.calls == [AssetId.LMT_NYSE_YH]
+
+
+async def test_fallback_used_for_all_three_affected_assets() -> None:
+    failing_biquote = _FailingAdapter("biquote.io")
+    yahoo = _StubAdapter("yahoo")
+    router = AdapterRouter({"biquote.io": failing_biquote, "yahoo": yahoo})
+
+    for asset_id, fallback_id in (
+        (AssetId.LMT_NYSE, AssetId.LMT_NYSE_YH),
+        (AssetId.TSLA_NASDAQ, AssetId.TSLA_NASDAQ_YH),
+        (AssetId.GOOGL_NASDAQ, AssetId.GOOGL_NASDAQ_YH),
+    ):
+        yahoo.calls.clear()
+        obs = await router.get_close(asset_id, date(2026, 8, 4))
+        assert obs.source == "yahoo"
+        assert yahoo.calls == [fallback_id]
+
+
+async def test_no_fallback_re_raises() -> None:
+    # Assets without a fallback declared still propagate PriceNotYetAvailableError normally.
+    from market_data.exceptions import PriceNotYetAvailableError
+
+    failing_biquote = _FailingAdapter("biquote.io")
+    yahoo = _StubAdapter("yahoo")
+    router = AdapterRouter({"biquote.io": failing_biquote, "yahoo": yahoo})
+
+    with pytest.raises(PriceNotYetAvailableError):
+        await router.get_close(AssetId.GOLD, date(2026, 8, 4))

@@ -36,7 +36,7 @@
 | Author | Feed Analyzer project |
 | Created | 2026-08-05 |
 | Last updated | 2026-08-05 |
-| Replaces | `docs/functional-documents/market-data-service-functional-document.md` |
+| Replaces | `docs/functional-documents/market-data-service-functional-document.md` (deleted 2026-08-06) |
 | Source code | `src/services/market-data/` |
 | Config class | `market_data.config.MarketDataSettings` |
 | DB schema | `market_data` (owned by this service) |

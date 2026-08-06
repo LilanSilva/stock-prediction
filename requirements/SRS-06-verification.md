@@ -36,7 +36,7 @@
 | Author | Feed Analyzer project |
 | Created | 2026-08-05 |
 | Last updated | 2026-08-05 |
-| Replaces | `docs/functional-documents/verification-service-functional-document.md` |
+| Replaces | `docs/functional-documents/verification-service-functional-document.md` (deleted 2026-08-06) |
 | Source code | `src/services/verification/` |
 | Config class | `verification.config.VerificationSettings` |
 | DB schema | `verification` (owned by this service) |

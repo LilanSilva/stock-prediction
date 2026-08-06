@@ -10,7 +10,7 @@
 | Status | `Approved` |
 | Version | `1.0.0` |
 | Source code | [`src/services/notification/notification/`](../src/services/notification/notification/) |
-| Tests | [`src/services/notification/tests/`](../src/services/notification/tests/) |
+| Tests | None — `src/services/notification/tests/` does not exist yet, which is why this document is `Approved` rather than `Implemented` |
 | Owned schema | None — no database tables; recipient lists are file-based |
 | Last verified against code | `—` |
 
@@ -19,23 +19,24 @@
 ### 2.1 What this component does
 
 The Notification Service is the outbound alert layer of the Feed Analyzer pipeline. It consumes
-every `PredictionMade` message, applies a confidence gate, builds a human-readable notification
-from the prediction's details, and delivers that notification through all configured channels
-concurrently. Each channel formats the message in the way natural to its medium and delivers it to
-its own list of recipients.
+`PredictionMade` and `PredictionScored` messages, builds human-readable notifications, and delivers
+them through all configured channels concurrently. Each channel formats the message in the way
+natural to its medium and delivers it to its own list of recipients.
 
 It is deliberately unintelligent about predictions. It does not re-evaluate whether a prediction is
 good, filter by asset, or correlate with market data — it only guarantees that **a qualifying
-prediction is announced exactly once to every configured channel, with failure in one channel never
-blocking the others.**
+prediction or verification result is announced exactly once to every configured channel, with
+failure in one channel never blocking the others.**
 
 ### 2.2 In scope
 
-- Consuming `PredictionMade` messages from the `notification.predictions` queue.
-- Applying a configurable confidence threshold before dispatching.
+- Consuming `PredictionMade` messages from the `notification.predictions` queue and dispatching prediction alerts.
+- Consuming `PredictionScored` messages from the `notification.scored` queue and dispatching verification result alerts.
+- Applying a configurable confidence threshold before dispatching prediction alerts.
 - Resolving asset display details (company name, exchange, ticker) from the shared asset registry.
 - Building a `NotificationMessage` value object from the prediction and asset details.
-- Dispatching the message to all registered channels concurrently.
+- Building a `VerificationMessage` value object from the scored prediction and asset details.
+- Dispatching messages to all registered channels concurrently.
 - Email notifications via the Brevo transactional email API.
 - WhatsApp notifications via the Meta Cloud API.
 - Per-channel recipient lists loaded from JSON files at startup.
@@ -53,6 +54,7 @@ blocking the others.**
 | Unsubscribe handling | Deferred |
 | Rich media (charts, images) in messages | Deferred |
 | Publishing any message to the bus | This service has no outbound bus messages |
+| Filtering verification alerts by correctness | All `PredictionScored` messages trigger an alert regardless of `is_correct` |
 
 ## 3. Definitions
 
@@ -60,11 +62,12 @@ blocking the others.**
 |---|---|
 | Channel | One outbound delivery mechanism (email, WhatsApp, etc.) identified by a `channel_id` string |
 | `NotificationChannel` | The Python Protocol every channel implementation satisfies |
-| `NotificationMessage` | The value object built from a `PredictionMade` and the asset registry; passed to every channel |
+| `NotificationMessage` | The value object built from a `PredictionMade` and the asset registry; passed to every channel for prediction alerts |
+| `VerificationMessage` | The value object built from a `PredictionScored` and the asset registry; passed to every channel for verification result alerts |
 | Recipient | A destination address for one channel — an email address or an E.164 phone number |
 | Recipient file | A JSON file containing the list of recipients for one channel |
-| Confidence gate | The minimum confidence value a prediction must carry to trigger notifications |
-| Dispatch | The act of calling every registered channel's `send()` method concurrently |
+| Confidence gate | The minimum confidence value a prediction must carry to trigger a prediction alert (not applied to verification alerts) |
+| Dispatch | The act of calling every registered channel's `send()` or `send_scored()` method concurrently |
 | Channel registry | The in-process collection of `NotificationChannel` instances active at runtime |
 | `signal_strength` | A human-readable rendering of `PredictionMade.magnitude`: `LARGE` → `HIGH`, `MEDIUM` → `MEDIUM`, `SMALL` → `LOW` |
 | Brevo | The transactional email API used for the email channel |
@@ -75,29 +78,32 @@ blocking the others.**
 ### 4.1 Position in the pipeline
 
 ```text
-  Prediction Service
-        | prediction.made
-        v
-  feed.events exchange (topic)
-        |
-        +---> verification.predictions --> Verification Service
-        +---> gateway.predictions.live  --> API Gateway (future)
-        +---> notification.predictions  --> NOTIFICATION SERVICE
-                                                  |
-                              +-------------------+-------------------+
-                              |                                       |
-                      EmailChannel                          WhatsAppChannel
-                      (Brevo API)                          (Meta Cloud API)
-                              |                                       |
-                   email recipients list                  phone numbers list
-                   (email_recipients.json)               (whatsapp_recipients.json)
+  Prediction Service                        Verification Service
+        | prediction.made                         | prediction.scored
+        v                                         v
+  feed.events exchange (topic, durable)
+        |                                         |
+        +---> notification.predictions            +---> notification.scored
+                      |                                       |
+                      +-------------------+-------------------+
+                                          |
+                              NOTIFICATION SERVICE
+                                          |
+                          +--------------+--------------+
+                          |                             |
+                  EmailChannel                 WhatsAppChannel
+                  (Brevo API)                  (Meta Cloud API)
+                          |                             |
+               email recipients list         phone numbers list
+               (email_recipients.json)       (whatsapp_recipients.json)
 ```
 
 ### 4.2 Dependencies
 
 | Dependency | Purpose | Failure impact |
 |---|---|---|
-| RabbitMQ `notification.predictions` queue | Source of `PredictionMade` messages | No notifications are dispatched; messages queue and deliver when the service recovers |
+| RabbitMQ `notification.predictions` queue | Source of `PredictionMade` messages | No prediction alerts dispatched; messages queue and deliver when the service recovers |
+| RabbitMQ `notification.scored` queue | Source of `PredictionScored` messages | No verification alerts dispatched; messages queue and deliver when the service recovers |
 | Shared asset registry (`assets.json`) | Resolve company name, exchange, and ticker from `asset_id` | Service fails to start if the registry cannot be loaded |
 | Brevo transactional email API | Deliver email notifications | Email channel fails; WhatsApp channel is unaffected |
 | Meta Cloud API | Deliver WhatsApp notifications | WhatsApp channel fails; email channel is unaffected |
@@ -113,6 +119,8 @@ blocking the others.**
 | `NTF-1` | The service **shall** consume `PredictionMade` messages from the `notification.predictions` queue. | Must | Approved |
 | `NTF-2` | The service **shall** acknowledge a message only after all channel dispatches have completed or failed. | Must | Approved |
 | `NTF-3` | The service **shall** dead-letter a message after the configured maximum retry count is exceeded. | Must | Approved |
+| `NTF-39` | The service **shall** consume `PredictionScored` messages from the `notification.scored` queue. | Must | Approved |
+| `NTF-40` | The service **shall** acknowledge a `PredictionScored` message only after all channel dispatches have completed or failed. | Must | Approved |
 
 ### 5.2 Confidence gate
 
@@ -140,11 +148,21 @@ blocking the others.**
 | `NTF-13` | The service **shall** log the outcome (success or failure) of each channel dispatch, including the `channel_id` and the number of recipients targeted. | Must | Approved |
 | `NTF-14` | If every channel fails, the service **shall** treat the message as a processing failure and follow the retry path. | Should | Approved |
 
+### 5.4a Verification result alert construction and dispatch
+
+| ID | Requirement | Priority | Status |
+|---|---|---|---|
+| `NTF-41` | The service **shall** resolve asset display details from the shared registry using the `asset_id` carried on `PredictionScored`. | Must | Approved |
+| `NTF-42` | The service **shall** construct a `VerificationMessage` carrying: `company_name`, `exchange`, `ticker`, `predicted_direction`, `actual_direction`, `predicted_magnitude`, `actual_magnitude`, `actual_return`, `confidence`, `is_correct`, and `scored_at`. | Must | Approved |
+| `NTF-43` | The service **shall** dispatch the `VerificationMessage` to every registered channel without a confidence gate — every `PredictionScored` message triggers an alert. | Must | Approved |
+| `NTF-44` | The service **shall** fail the message, triggering the retry path, if the `asset_id` is not present in the registry. | Must | Approved |
+| `NTF-45` | If every channel fails dispatching a verification alert, the service **shall** treat the message as a processing failure and follow the retry path. | Should | Approved |
+
 ### 5.5 Channel extensibility
 
 | ID | Requirement | Priority | Status |
 |---|---|---|---|
-| `NTF-15` | The service **shall** define a `NotificationChannel` Protocol with a `channel_id: str` property and an `async send(message: NotificationMessage) -> None` method. | Must | Approved |
+| `NTF-15` | The service **shall** define a `NotificationChannel` Protocol with a `channel_id: str` property, an `async send(message: NotificationMessage) -> None` method, and an `async send_scored(message: VerificationMessage) -> None` method. | Must | Approved |
 | `NTF-16` | The notification engine **shall** depend only on the `NotificationChannel` Protocol, with no reference to any concrete channel class. | Must | Approved |
 | `NTF-17` | Adding a new channel **shall** require no changes to the engine — only implementing the Protocol and registering the instance. | Must | Approved |
 
@@ -252,6 +270,20 @@ blocking the others.**
 - No channel exception propagates to another channel.
 - Each channel call is wrapped in a timeout (`NOTIFICATION_CHANNEL_TIMEOUT_SECONDS`).
 
+### 7.2a Consuming a scored prediction
+
+**Purpose:** receive every `PredictionScored` from the bus and dispatch a verification result alert.
+
+**Steps** → `NotificationEngine.handle_scored`
+
+1. A `PredictionScored` message arrives on `notification.scored`.
+2. Deserialise to a `PredictionScored` instance.
+3. No confidence gate — all scored predictions produce an alert.
+4. Resolve asset details from the shared registry using `scored.asset_id`. If the asset is unknown, raise `MessageProcessingError`.
+5. Build a `VerificationMessage` with: `company_name`, `exchange`, `ticker`, `predicted_direction`, `actual_direction`, `predicted_magnitude`, `actual_magnitude`, `actual_return`, `confidence`, `is_correct`, `scored_at`.
+6. Dispatch to all channels via `_dispatch_scored` (same concurrency pattern as `_dispatch`).
+7. Ack the message.
+
 ### 7.4 Email channel
 
 **Purpose:** deliver a structured prediction alert to all email recipients via Brevo.
@@ -304,6 +336,50 @@ blocking the others.**
 - Phone numbers in `whatsapp_recipients.json` must be in E.164 format (e.g. `+94771234567`). The
   channel validates the format at startup and rejects malformed entries with a warning.
 
+### 7.4a Email channel — verification result alert
+
+**Steps** → `EmailChannel.send_scored`
+
+1. Read the pre-loaded recipient list.
+2. Format the subject: `[FEED ANALYZER] {company_name} ({exchange}: {ticker}) — Verification CORRECT` or `— Verification WRONG`.
+3. Format the plain-text body:
+
+   ```
+   Feed Analyzer — Verification Alert
+
+   Company            : {company_name} ({exchange}: {ticker})
+   Outcome            : CORRECT / WRONG
+   Predicted Direction: {predicted_direction}
+   Actual Direction   : {actual_direction}
+   Predicted Magnitude: {predicted_magnitude}
+   Actual Magnitude   : {actual_magnitude}
+   Actual Return      : {actual_return_pct}%
+   Confidence         : {confidence_pct}%
+   Scored             : {scored_at} UTC
+   ```
+
+4. POST to the Brevo `/v3/smtp/email` endpoint per recipient.
+
+### 7.5a WhatsApp channel — verification result alert
+
+**Steps** → `WhatsAppChannel.send_scored`
+
+1. Read the pre-loaded recipient list.
+2. Format the message text:
+
+   ```
+   Feed Analyzer — Verification Alert
+   {company_name} ({exchange}: {ticker})
+   Outcome    : CORRECT / WRONG
+   Predicted  : {predicted_direction} / {predicted_magnitude}
+   Actual     : {actual_direction} / {actual_magnitude}
+   Return     : {actual_return_pct}%
+   Confidence : {confidence_pct}%
+   Scored     : {scored_at} UTC
+   ```
+
+3. POST to the Meta Cloud API per recipient.
+
 ### 7.6 Recipient file loading
 
 **Purpose:** supply each channel with its recipient list without reading the file on every message.
@@ -325,6 +401,7 @@ blocking the others.**
 | Queue | Binding key | Message | When |
 |---|---|---|---|
 | `notification.predictions` | `prediction.made` | `PredictionMade` | Every prediction emitted by the Prediction Service |
+| `notification.scored` | `prediction.scored` | `PredictionScored` | Every scored prediction emitted by the Verification Service |
 
 **`PredictionMade` fields used by this service:**
 
@@ -337,6 +414,22 @@ blocking the others.**
 | `magnitude` | Mapped to `signal_strength` |
 | `confidence` | Confidence gate; notification content |
 | `decision_at` | Notification content (`decided_at`) |
+
+**`PredictionScored` fields used by this service:**
+
+| Field | Used for |
+|---|---|
+| `prediction_id` | Log correlation |
+| `correlation_id` | Log correlation, passed to channel logs |
+| `asset_id` | Registry lookup for company name, exchange, ticker |
+| `predicted_direction` | Verification alert content |
+| `actual_direction` | Verification alert content |
+| `predicted_magnitude` | Verification alert content |
+| `actual_magnitude` | Verification alert content |
+| `actual_return` | Verification alert content (displayed as percentage) |
+| `confidence` | Verification alert content |
+| `is_correct` | Verification alert outcome label (`CORRECT` / `WRONG`) |
+| `scored_at` | Verification alert content |
 
 All other fields are forwarded unchanged to logs only.
 
@@ -416,7 +509,9 @@ Read from the environment. Connection strings use their conventional unprefixed 
 
 | Variable | Default | Effect |
 |---|---|---|
-| `NOTIFICATION_MIN_CONFIDENCE` | `0.6` | Predictions below this confidence are silently discarded |
+| `NOTIFICATION_PREDICTIONS_QUEUE` | `notification.predictions` | Queue for `PredictionMade` messages |
+| `NOTIFICATION_SCORES_QUEUE` | `notification.scored` | Queue for `PredictionScored` messages |
+| `NOTIFICATION_MIN_CONFIDENCE` | `0.6` | Predictions below this confidence are silently discarded (not applied to verification alerts) |
 | `NOTIFICATION_CHANNEL_TIMEOUT_SECONDS` | `30.0` | Per-channel send timeout; exceeded → channel fails, others continue |
 | `NOTIFICATION_RECIPIENTS_DIR` | `config/recipients` | Directory from which channel recipient files are loaded |
 
@@ -437,6 +532,11 @@ Read from the environment. Connection strings use their conventional unprefixed 
 | `META_API_VERSION` | `v18.0` | Graph API version segment in the request URL |
 
 ## 11. Verification
+
+> **None of these tests exist yet.** `src/services/notification/tests/` has not been created, so every
+> row below states the test that *must* be written, not one that passes today. This is why the document
+> status is `Approved`. Create the tests, then change the status to `Implemented` and set
+> *Last verified against code* in section 1.
 
 | Requirement | Method | Evidence |
 |---|---|---|
@@ -466,9 +566,10 @@ Read from the environment. Connection strings use their conventional unprefixed 
 | Failure | Behaviour | Recovery |
 |---|---|---|
 | RabbitMQ unavailable at startup | Readiness fails; service waits for broker | Automatic on reconnection |
-| RabbitMQ drops mid-run | Consumer stops; messages remain queued | aio-pika reconnects; messages redelivered |
-| `asset_id` not in registry | `MessageProcessingError` raised; message follows retry path | Requires a registry or message fix |
-| Confidence below threshold | Message acked silently; no channel called | Not applicable — this is correct behaviour |
+| RabbitMQ drops mid-run | Both consumers stop; messages remain queued | aio-pika reconnects; messages redelivered |
+| `asset_id` not in registry (either message type) | `MessageProcessingError` raised; message follows retry path | Requires a registry or message fix |
+| Prediction confidence below threshold | Message acked silently; no channel called | Not applicable — this is correct behaviour |
+| `PredictionScored` received (any `is_correct` value) | Verification alert dispatched without a confidence gate | Not applicable — all scored predictions alert |
 | Brevo returns non-2xx | Error logged for that recipient; remaining recipients still sent | No automatic retry per recipient; next message unaffected |
 | Meta Cloud API returns non-2xx | Error logged for that recipient; remaining recipients still sent | No automatic retry per recipient; next message unaffected |
 | All channels fail for a message | `MessageProcessingError` raised; message follows retry path | Retried up to max retries; then dead-lettered |
@@ -530,3 +631,4 @@ Component-specific notes:
 | Date | Version | Change | Driver |
 |---|---|---|---|
 | `2026-08-05` | `1.0.0` | Initial specification | Notification service grooming session |
+| `2026-08-06` | `1.1.0` | Added verification result alerts: `notification.scored` queue, `VerificationMessage`, `send_scored` protocol method, `NTF-39`–`NTF-45` | Verification alert feature |

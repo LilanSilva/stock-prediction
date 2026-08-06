@@ -36,7 +36,7 @@
 | Author | Feed Analyzer project |
 | Created | 2026-08-05 |
 | Last updated | 2026-08-05 |
-| Replaces | `docs/functional-documents/credibility-service-functional-document.md` |
+| Replaces | `docs/functional-documents/credibility-service-functional-document.md` (deleted 2026-08-06) |
 | Source code | `src/services/credibility/` |
 | Config class | `credibility.config.CredibilitySettings`, `credibility.learning.config.LearningSettings` |
 | DB schema | `credibility` (owned by this service; the offline learner reads `cleansing` and `market_data` in read-only mode) |

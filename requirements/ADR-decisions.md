@@ -1,35 +1,68 @@
-# Architecture Decision Records
+# ADR: Architecture Decision Records
 
-Only lightweight ADRs are maintained for decisions that materially shape the POC. Formal FR/NFR/BR identifier traceability is intentionally not used.
+## 1. Document control
 
-| ADR | Decision | Status |
-|---|---|---|
-| ADR-001 | Multi-event context before prediction | Accepted |
-| ADR-002 | One PostgreSQL database with service-owned schemas | Accepted |
-| ADR-003 | Topic exchange with one queue per consumer | Accepted |
-| ADR-004 | Verification owns evaluation and one dual-session price request | Accepted |
-| ADR-005 | Token-efficient conditional LLM use | Accepted |
-| ADR-006 | Conditional causal graph with event polarity and offline structure learning | Accepted |
+| | |
+|---|---|
+| Document ID | `ADR` |
+| Type | Decision record |
+| Status | `Implemented` (ADR-001 … ADR-007 all Accepted) |
+| Version | `1.0.0` |
+| Diagrams | [docs/architectural-documents/](../docs/architectural-documents/) |
+| Last verified against code | `2026-08-06` |
+
+This document records **why** the system is shaped the way it is. It contains no `shall` statements —
+the binding requirements live in [SyRS-system.md](SyRS-system.md) and the SRS documents, which state
+*what* the system does. An ADR carries the reasoning a requirement alone cannot.
+
+Only lightweight ADRs are maintained, for decisions that materially shape the POC. Formal
+`FR-*`/`NFR-*`/`BR-*` identifier traceability is intentionally not used; the requirement IDs in the
+SyRS and SRS documents supersede it.
+
+An ADR is **never rewritten to match a later decision.** A superseded ADR keeps its text and gains a
+`Superseded by` note, so the reasoning trail survives.
+
+## 2. Decision index
+
+| ADR | Decision | Status | Binding requirements |
+|---|---|---|---|
+| ADR-001 | Multi-event context before prediction | Accepted | [`SYS-3`](SyRS-system.md#51-product-behaviour), [SRS-04](SRS-04-prediction.md) |
+| ADR-002 | One PostgreSQL database with service-owned schemas | Accepted | [`SYS-15` … `SYS-19`](SyRS-system.md#53-data-ownership) |
+| ADR-003 | Topic exchange with one queue per consumer | Accepted | [`SYS-20` … `SYS-22`](SyRS-system.md#54-messaging) |
+| ADR-004 | Verification owns evaluation and one dual-session price request | Accepted | [SRS-06](SRS-06-verification.md), [SRS-05](SRS-05-market-data.md) |
+| ADR-005 | Token-efficient conditional LLM use | Accepted | [`SYS-29` … `SYS-38`](SyRS-system.md#55-llm-usage-policy) |
+| ADR-006 | Conditional causal graph with event polarity and offline structure learning | Accepted | [SyRS §9.2](SyRS-system.md#92-neo4j-graph-model), [SRS-07](SRS-07-credibility.md) |
+| ADR-007 | Multi-market coverage via a file-driven asset registry | Accepted | [`SYS-9` … `SYS-14`](SyRS-system.md#52-identity-and-reference-data), [REF-02](REF-02-asset-registry.md) |
 
 ## ADR-001: Multi-event context before prediction
 
-Prediction groups distinct events by canonical asset and event-time window. One immutable prediction is produced per asset/context version. Late events may create a superseding version.
+Prediction groups distinct events by canonical asset and event-time window. One immutable prediction
+is produced per asset/context version. Late events may create a superseding version.
 
 ## ADR-002: One database, schema ownership
 
-The POC uses one PostgreSQL database to permit read-only BFF joins while preserving ownership through schemas and roles. Database-per-service may be reconsidered only when independent deployment needs justify it.
+The POC uses one PostgreSQL database to permit read-only BFF joins while preserving ownership through
+schemas and roles. Database-per-service may be reconsidered only when independent deployment needs
+justify it.
 
 ## ADR-003: Event exchange and consumer queues
 
-Producers publish to `feed.events`. Each business consumer and live-update observer uses its own bound queue. No observer consumes another service's work queue.
+Producers publish to `feed.events`. Each business consumer and live-update observer uses its own bound
+queue. No observer consumes another service's work queue.
 
 ## ADR-004: Verification owns evaluation
 
-Prediction publishes the forecast. Verification resolves baseline and settlement sessions and publishes one request containing both. Market Data returns both approved immutable reference closes with explicit price kind and provider metadata.
+Prediction publishes the forecast. Verification resolves baseline and settlement sessions and
+publishes one request containing both. Market Data returns both approved immutable reference closes
+with explicit price kind and provider metadata.
 
 ## ADR-005: Conditional LLM use
 
-Local deterministic processing is the default. For M1, LLM use is restricted to ambiguous cleansing/factual-conflict resolution. The shared LLM gateway is provider-configurable through environment settings and API keys, so the project can switch models/providers without changing service business logic. Prediction-time LLM arbitration remains deferred after the POC-6 `STOP` result unless a new controlled hypothesis is approved.
+Local deterministic processing is the default. For M1, LLM use is restricted to ambiguous
+cleansing/factual-conflict resolution. The shared LLM gateway is provider-configurable through
+environment settings and API keys, so the project can switch models/providers without changing service
+business logic. Prediction-time LLM arbitration remains deferred after the POC-6 `STOP` result unless
+a new controlled hypothesis is approved.
 
 ## ADR-006: Conditional causal graph with polarity and offline learning
 
@@ -96,3 +129,27 @@ than having to walk them down. `CORPORATE_EARNINGS` gets a prior on every group,
 company-specific news is the case this feature exists for and that factor previously had no edge at
 all. Inheritance without a seeded prior is inert — the mechanism resolves to nothing — so the two
 belong together.
+
+## 3. How to update this document
+
+**When to add an ADR** — a decision that changes the system's shape and whose reasoning would not be
+obvious from the requirement alone: a new store or engine, a change in who owns a responsibility, a
+messaging-topology change, or the reversal of an earlier ADR.
+
+**Steps**
+
+1. Add the record with the next free number (`ADR-008`). Never reuse a number.
+2. State the problem that forced the decision, then the decision, then the cost accepted. An ADR with
+   no stated cost is usually incomplete.
+3. Add a row to the section 2 index, naming the requirements the decision binds to.
+4. Add or update those requirements in [SyRS-system.md](SyRS-system.md) or the relevant SRS — the ADR
+   explains, it does not bind.
+5. To reverse a decision, add a **new** ADR and mark the old one `Superseded by ADR-00N`. Never edit
+   superseded reasoning.
+6. Add a row to section 4.
+
+## 4. Change history
+
+| Date | Version | Change | Driver |
+|---|---|---|---|
+| `2026-08-06` | `1.0.0` | Moved into `requirements/` from `docs/decisions/README.md`. Added ADR-007 to the index (present in the body but missing from the table), requirement-ID cross-references, and update rules | Requirements consolidation |

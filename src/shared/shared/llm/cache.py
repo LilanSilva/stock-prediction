@@ -1,7 +1,7 @@
 """LLM response cache.
 
 Cache identity includes provider, model, task, prompt version, schema hash, and context/input
-hash (docs/functional-documents/cleansing-service-functional-document.md sec 6). Replaying the same
+hash (requirements/SRS-03-cleansing.md sec 7, SyRS SYS-36). Replaying the same
 completed request must return the cached response and make zero provider calls.
 
 The default implementation is a process-local in-memory cache, sufficient for the POC and tests.

@@ -1,6 +1,6 @@
 """Async RabbitMQ client wrapper (aio-pika).
 
-Contract alignment (docs/contracts/message-contracts.md, contract-freeze-overrides.md E01):
+Contract alignment (requirements/SRS-01-shared-foundation.md sec 8.4):
   - Publish by ROUTING KEY to the durable topic exchange `feed.events`. This wrapper never publishes
     directly to a queue's default exchange, and never to a legacy per-service work queue.
   - Consume an explicitly-owned queue by name. Queues, the exchange, DLX and bindings are declared

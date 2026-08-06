@@ -1,14 +1,19 @@
-# Feature Requirement: Bounded Growth / Retention for Unbounded Database Tables
+# E11: Bounded Growth / Retention for Unbounded Database Tables
 
-Status: Proposed (not scheduled). Captured 2026-08-02.
+Status: **Proposed, not scheduled.** Captured 2026-08-02; moved here from `new-feature/` on
+2026-08-06 so unbuilt work lives in `backlog/`. No code exists for this yet — only
+[Ingestion](../../requirements/SRS-02-ingestion.md#56-retention) has a retention cleaner today.
+
+When this is built, the per-service rules become requirements in that service's SRS, not a copy of
+this document.
 
 ## Motivation
 
 Feed Analyzer uses one PostgreSQL database (`feed`) with six service-owned schemas. Every service
 applies its own table DDL idempotently at startup. Auditing all tables shows that **only the
 Ingestion Service has a scheduled cleanup job** (`RetentionCleaner`, see
-[retention.py](../src/services/ingestion/ingestion/retention.py) and
-[config.py](../src/services/ingestion/ingestion/config.py#L28-L33)). Every other schema accumulates
+[retention.py](../../src/services/ingestion/ingestion/retention.py) and
+[config.py](../../src/services/ingestion/ingestion/config.py#L28-L33)). Every other schema accumulates
 rows for the life of the deployment with no pruning, so the database grows without bound on a
 continuously running POC.
 
@@ -18,12 +23,12 @@ safe way to bound each one.
 ## Method
 
 - Schema source of truth: each service's `db.py` (`SCHEMA_DDL`).
-  - [ingestion/db.py](../src/services/ingestion/ingestion/db.py)
-  - [cleansing/db.py](../src/services/cleansing/cleansing/db.py)
-  - [prediction/db.py](../src/services/prediction/prediction/db.py)
-  - [market-data/db.py](../src/services/market-data/market_data/db.py)
-  - [verification/db.py](../src/services/verification/verification/db.py)
-  - [credibility/db.py](../src/services/credibility/credibility/db.py)
+  - [ingestion/db.py](../../src/services/ingestion/ingestion/db.py)
+  - [cleansing/db.py](../../src/services/cleansing/cleansing/db.py)
+  - [prediction/db.py](../../src/services/prediction/prediction/db.py)
+  - [market-data/db.py](../../src/services/market-data/market_data/db.py)
+  - [verification/db.py](../../src/services/verification/verification/db.py)
+  - [credibility/db.py](../../src/services/credibility/credibility/db.py)
 - A table is flagged if new rows are appended over normal operation and no code deletes them.
 - Tables that are **UPSERTED** (bounded row count) are not flagged.
 
@@ -123,7 +128,7 @@ This table is a price cache: rows are reused across replays (unique per
 pruning.
 
 > **Cross-schema dependency — do not prune below the learner window.** The offline structure learner
-> ([credibility/learning/dataset.py](../src/services/credibility/credibility/learning/dataset.py))
+> ([credibility/learning/dataset.py](../../src/services/credibility/credibility/learning/dataset.py))
 > reads `market_data.close_observations` (and `cleansing.events`) for the last `lookback_days` of
 > history. Any retention on these two tables **must keep at least `lookback_days` of data**, or
 > training samples silently disappear and Neo4j weight learning degrades (no crash, a correctness
@@ -178,7 +183,7 @@ WHERE processed_at < now() - make_interval(days => :idempotency_retention_days);
 - Config-gate each with `*_retention_enabled` and per-table `*_retention_days`, defaulting to
   conservative windows; expose them as `pydantic-settings` env vars.
 - Run on the existing daily interval (`retention_interval_seconds`, default 86400) via the same
-  background-task pattern as [ingestion/app.py](../src/services/ingestion/ingestion/app.py).
+  background-task pattern as [ingestion/app.py](../../src/services/ingestion/ingestion/app.py).
 - Make every delete idempotent and bounded; log deleted counts with structured logging, as the
   Ingestion cleaner already does.
 - Never let a cleaner delete rows a downstream consumer still needs (open clusters, pending
@@ -187,8 +192,9 @@ WHERE processed_at < now() - make_interval(days => :idempotency_retention_days);
 ## Out of scope / open questions
 
 - Retention windows must be agreed against the documented POC retention policy
-  ([docs/requirements/agreed-system-requirements.md](../docs/requirements/agreed-system-requirements.md#L136)
-  and the ingestion functional document's retention section) before defaults are locked.
+  ([SyRS §6.5 governance](../../requirements/SyRS-system.md#65-governance), `SYS-75`) and the
+  Ingestion retention rules ([SRS-02 §5.6 and §10.5](../../requirements/SRS-02-ingestion.md#56-retention))
+  before defaults are locked.
 - Whether business/audit records are archived vs. deleted is a product decision, not a technical
   one.
 - Neo4j (causal graph) is out of scope here; this document covers PostgreSQL tables only.

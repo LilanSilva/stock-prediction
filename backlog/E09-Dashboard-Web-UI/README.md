@@ -1,6 +1,8 @@
 # E09 - Dashboard Web UI
 
-> Contract-freeze status: this epic and its child tasks are governed by the [backlog override matrix](../contract-freeze-overrides.md). Conflicting legacy details are non-authoritative until re-slicing.
+> **Not built.** Read [functional-document.md](functional-document.md) for this epic's design intent, and
+> [requirements/](../../requirements/README.md) for the contracts it must consume — the task files below
+> predate those and their conflicting details are non-authoritative.
 
 ## Overview
 

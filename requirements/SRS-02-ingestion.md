@@ -7,8 +7,8 @@
 | Document ID | `SRS-02` |
 | Component | Ingestion Service |
 | Requirement ID prefix | `ING` |
-| Status | `Implemented` |
-| Version | `1.0.0` |
+| Status | `Implemented` (section 5.8 governance is `Approved`) |
+| Version | `1.1.0` |
 | Source code | [src/services/ingestion/ingestion/](../src/services/ingestion/ingestion/) |
 | Tests | [src/services/ingestion/tests/](../src/services/ingestion/tests/) |
 | Owned schema | `ingestion` |
@@ -180,6 +180,18 @@ in a clean and consistent form, with its provenance intact.**
 | `ING-49` | The service **shall** expose `GET /health` reporting process liveness. | Must | Implemented |
 | `ING-50` | The service **shall** expose `GET /ready` reporting PostgreSQL, RabbitMQ, and scheduler readiness. | Must | Implemented |
 | `ING-51` | On shutdown the service **shall** stop new polls, allow active fetches to finish or cancel safely, flush eligible outbox work, and close its pools. | Must | Implemented |
+
+### 5.8 Source governance
+
+These are content-licensing obligations, verified by inspecting the source registry rather than by an
+automated test. They gate whether a source may be added at all.
+
+| ID | Requirement | Priority | Status |
+|---|---|---|---|
+| `ING-58` | The source registry **shall** record, for every configured source, its terms, required attribution, permitted retention, and whether body extraction is allowed. | Must | Approved |
+| `ING-59` | A source **shall not** be added before the fields required by `ING-58` are recorded. | Must | Approved |
+| `ING-60` | The service **shall** store the minimum article text the POC requires, and **shall not** retain a full body or raw HTML where the source's terms do not permit it. | Must | Approved |
+| `ING-61` | The retention period applied to stored article text **shall** be documented and **shall not** exceed what the source's terms permit. | Must | Approved |
 
 ## 6. Non-functional requirements
 
@@ -613,6 +625,7 @@ accepted content types `text/html`, `application/xhtml+xml`, `text/plain`.
 | `ING-54` | Inspection | [config.py](../src/services/ingestion/ingestion/config.py) — key read from `FREENEWSAPI_KEY`, default empty |
 | `ING-55` | Inspection | [config.py](../src/services/ingestion/ingestion/config.py) — pool bounds |
 | `ING-57` | Demonstration | `ruff check` and `mypy --strict` |
+| `ING-58`…`ING-61` | Inspection | Source registry entries in [config.py](../src/services/ingestion/ingestion/config.py). **Not yet enforced by code — the terms/attribution/retention fields are not modelled on a source, so these are `Approved`, not `Implemented`.** |
 
 ## 12. Failure handling
 
@@ -684,3 +697,4 @@ Component-specific notes:
 | Date | Version | Change | Driver |
 |---|---|---|---|
 | `2026-08-05` | `1.0.0` | Initial specification, written from the implemented code | E02 complete; replaces the E02 epic and task files |
+| `2026-08-06` | `1.1.0` | Added section 5.8 source governance (`ING-58`…`ING-61`, all `Approved`) | Merged from `docs/requirements/agreed-system-requirements.md` "Governance for the POC", which had no SRS equivalent |

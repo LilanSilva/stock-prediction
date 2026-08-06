@@ -1,6 +1,6 @@
 // Seed CAUSES edges between canonical factors and the two POC assets (GOLD, BRENT_OIL).
 //
-// Contract alignment (docs/contracts/message-contracts.md ContributingEdge, contract-freeze-overrides.md E04/E07):
+// Contract alignment (requirements/SyRS-system.md sec 9.2 edge business key, SRS-04/SRS-07):
 //   - weight is MAGNITUDE in [0,1]; sign is carried by the separate `direction` field, not the weight.
 //   - Beta-Bernoulli learnable state starts at alpha=1.0, beta=1.0 (NOT 2/2).
 //   - direction is UP | DOWN | NEUTRAL.

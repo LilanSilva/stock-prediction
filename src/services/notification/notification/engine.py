@@ -7,14 +7,14 @@ from typing import TYPE_CHECKING
 
 import asyncpg
 import structlog
+from shared.messaging.exceptions import MessageProcessingError
 from shared.reference.asset_registry import resolve
 from shared.reference.exceptions import UnknownAssetError
-from shared.messaging.exceptions import MessageProcessingError
-from shared.schemas.messages import Magnitude, PredictionMade
+from shared.schemas.messages import Magnitude, PredictionMade, PredictionScored
 
 from notification.channels.base import NotificationChannel
 from notification.db import fetch_headlines
-from notification.models import Headline, NotificationMessage
+from notification.models import Headline, NotificationMessage, VerificationMessage
 
 if TYPE_CHECKING:
     pass
@@ -86,6 +86,34 @@ class NotificationEngine:
 
         await self._dispatch(message, log)
 
+    async def handle_scored(self, scored: PredictionScored) -> None:
+        log = logger.bind(
+            prediction_id=str(scored.prediction_id),
+            asset_id=str(scored.asset_id),
+            correlation_id=str(scored.correlation_id),
+        )
+
+        try:
+            asset = resolve(str(scored.asset_id))
+        except UnknownAssetError as exc:
+            raise MessageProcessingError(f"unknown asset_id: {scored.asset_id}") from exc
+
+        message = VerificationMessage(
+            company_name=asset.display_name,
+            exchange=asset.expected_exchange,
+            ticker=asset.provider_symbol,
+            predicted_direction=scored.predicted_direction.value,
+            actual_direction=scored.actual_direction.value,
+            predicted_magnitude=scored.predicted_magnitude.value,
+            actual_magnitude=scored.actual_magnitude.value,
+            actual_return=scored.actual_return,
+            confidence=scored.confidence,
+            is_correct=scored.is_correct,
+            scored_at=scored.scored_at,
+        )
+
+        await self._dispatch_scored(message, log)
+
     async def _dispatch(
         self, message: NotificationMessage, log: structlog.BoundLogger
     ) -> None:
@@ -122,4 +150,42 @@ class NotificationEngine:
         if len(failures) == len(self._channels):
             raise MessageProcessingError(
                 f"all {len(self._channels)} channel(s) failed to dispatch notification"
+            )
+
+    async def _dispatch_scored(
+        self, message: VerificationMessage, log: structlog.BoundLogger
+    ) -> None:
+        if not self._channels:
+            log.warning("no_channels_registered")
+            return
+
+        async def _call_channel(channel: NotificationChannel) -> None:
+            try:
+                await asyncio.wait_for(
+                    channel.send_scored(message), timeout=self._channel_timeout
+                )
+                log.info(
+                    "channel_dispatch_succeeded",
+                    channel_id=channel.channel_id,
+                )
+            except asyncio.TimeoutError:
+                log.error("channel_dispatch_timeout", channel_id=channel.channel_id)
+                raise
+            except Exception as exc:
+                log.error(
+                    "channel_dispatch_failed",
+                    channel_id=channel.channel_id,
+                    error=str(exc),
+                )
+                raise
+
+        results = await asyncio.gather(
+            *[_call_channel(ch) for ch in self._channels],
+            return_exceptions=True,
+        )
+
+        failures = [r for r in results if isinstance(r, BaseException)]
+        if len(failures) == len(self._channels):
+            raise MessageProcessingError(
+                f"all {len(self._channels)} channel(s) failed to dispatch verification notification"
             )

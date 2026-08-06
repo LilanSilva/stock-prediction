@@ -1,42 +1,71 @@
 # Feed Analyzer
 
-Feed Analyzer is a POC for predicting short-horizon market direction from global and Swedish news. Its distinguishing requirement is to preserve distinct concurrent events, combine all relevant forces affecting the same asset, resolve conflicts, verify the prediction against market closes, and learn from the outcome.
+Feed Analyzer is a local proof of concept that tests one hypothesis:
+
+> Can structured news events combined with a causal knowledge graph predict the next trading
+> session's price direction for a given asset?
+
+It reads news, groups articles describing the same real-world event, maps that event to causal factors
+in a knowledge graph, produces a directional prediction with confidence and magnitude, waits for the
+market to close, scores the prediction against the actual price move, and feeds the outcome back to
+adjust the graph's edge weights.
+
+The loop is: **news → event → prediction → price → score → learning.**
+
+It does not execute trades or provide personalised financial advice.
+
+## Repository structure
+
+Each folder below has its own `README.md` explaining its inner folders and files. **Start with the
+README of the folder you need** — this file only says which folder that is.
+
+| Folder | Purpose | Its README |
+|---|---|---|
+| [requirements/](requirements/) | **All requirement documents and the system's functional knowledge.** The authoritative specification: what the system must do, how each service works internally, and which test proves each requirement. | [requirements/README.md](requirements/README.md) |
+| [src/](src/) | **All system code.** The shared library, the seven services, and the completed POC harnesses. | [src/README.md](src/README.md) |
+| [backlog/](backlog/) | **Backlog tasks (epics, stories, tasks) and POC documentation.** Unbuilt work only, plus the proof-of-concept research that justified the technical choices. | [backlog/README.md](backlog/README.md) |
+| [docs/](docs/) | **System architecture diagrams** and other system documents not covered by a requirement specification. | [docs/README.md](docs/README.md) |
+| [scripts/](scripts/) | **Manual scripts users run** — environment setup, registry validation, seed generation. | [scripts/README.md](scripts/README.md) |
+| [infra/](infra/) | **All infrastructure code** — the Docker Compose stack, database and broker initialisation, message topology, graph seed data. | [infra/README.md](infra/README.md) |
+
+> **Note:** [requirements.txt](requirements.txt) is the pinned dependency lockfile and has nothing to do
+> with the [requirements/](requirements/) folder, which holds specifications.
+
+## Where to start
+
+- **Changing a service?** Read its SRS in [requirements/](requirements/README.md) first — it lists every
+  requirement, message, table, config key, and the tests that protect existing behaviour.
+- **Understanding the whole system?** [requirements/SyRS-system.md](requirements/SyRS-system.md).
+- **Wondering why a technical choice was made?** [backlog/POC/](backlog/POC/README.md) for the research,
+  [requirements/ADR-decisions.md](requirements/ADR-decisions.md) for the architecture decisions.
+- **Setting up locally?** *Development environment* below.
+
+## Source of truth
+
+Executable code outranks every document: the Pydantic models in
+[src/shared/shared/schemas/](src/shared/shared/schemas/) and the
+[asset registry JSON](src/shared/shared/reference/assets.json) are the running contract, and the
+specifications in [requirements/](requirements/README.md) describe it.
+
+The full authority order, and what to do when two sources disagree, is in
+[requirements/README.md](requirements/README.md#authority).
 
 ## Current status
 
-The architecture and backlog are aligned around a token-efficient POC. P06 remediation completed the controlled POC-6 rerun on 2026-07-13 and recorded `STOP`: KG-plus-LLM arbitration did not improve enough over graph-only to justify implementation in the next walking skeleton. The next build scope should use graph-only prediction while LLM arbitration remains deferred unless a new hypothesis is approved.
+The seven services (shared foundation, ingestion, cleansing, prediction, market data, verification,
+credibility) are built and specified. Notification is specified and `Approved`. The API Gateway and
+Dashboard are not built — see [backlog/](backlog/README.md).
 
-## Authoritative documentation
-
-Read these in order:
-
-1. [Agreed system requirements](docs/requirements/agreed-system-requirements.md)
-2. [Canonical message contracts](docs/contracts/message-contracts.md)
-3. [Asset registry](docs/reference/asset-registry.md)
-4. [Event taxonomy](docs/reference/event-taxonomy.md)
-5. [Architecture decisions](docs/decisions/README.md)
-6. [Core acceptance map](docs/requirements/core-acceptance-map.md)
-7. [Functional and architecture index](docs/README.md)
-8. [Backlog and milestones](backlog/README.md)
-9. [POC-6 result and controlled-rerun plan](backlog/POC/poc-6-end-to-end-prediction-validation.md)
-10. [Executable POC-6 harness](src/poc/poc6/README.md)
-
-Executable Pydantic models in the future `shared` package are the source of truth for message fields. Generated contract documentation must remain consistent with those models.
-
-## Repository layout
-
-- `src/shared/` — installable shared Python package and its tests.
-- `src/poc/poc6/` — completed POC-6 evaluation harness, fixtures, and recorded results.
-- `infra/` — Docker Compose and database/broker initialization.
-- `docs/` — authoritative requirements, contracts, decisions, and architecture.
-- `backlog/` — epics and tasks interpreted through the contract-freeze overrides.
+Prediction is graph-only and makes zero LLM calls: the POC-6 controlled rerun recorded `STOP` for
+prediction-time LLM arbitration. Details in
+[backlog/POC/poc-6-end-to-end-prediction-validation.md](backlog/POC/poc-6-end-to-end-prediction-validation.md).
 
 ## Development environment
 
 This repository uses **one shared virtual environment at the repository root** (`.venv/`). Every
-service (E02–E09) imports the same editable `shared` package from this single environment. Do not
-create per-service virtual environments and do not install project packages into a machine-level
-(global) interpreter.
+service imports the same editable `shared` package from this single environment. Do not create
+per-service virtual environments and do not install project packages into a machine-level (global)
+interpreter.
 
 Dependencies are pinned and checksum-verified in [requirements.txt](requirements.txt), which is
 compiled from [src/shared/pyproject.toml](src/shared/pyproject.toml) (including the `dev` and `llm`
@@ -98,77 +127,32 @@ python -m piptools compile --generate-hashes --extra dev --extra llm \
   --output-file requirements.txt src/shared/pyproject.toml
 ```
 
-### Validate the shared package
-
-```bash
-cd src/shared
-python -m pytest
-python -m ruff check .
-python -m mypy shared tests
-```
-
-### Unit-test/integration-test debugging policy (for coding agents)
-
-When a unit test fails, a coding agent should first attempt a fix. However, if the investigation
-exceeds roughly **3 minutes of effort or a comparable token budget without a clear resolution**,
-stop investigating and hand the failure back to a human with:
-
-- the failing test name and file,
-- the observed vs. expected behavior,
-- the most likely root cause, and
-- a concrete suggested fix (without applying it).
-
-Do not spend extended time or tokens brute-forcing test failures. Prefer a fast, documented handoff
-so a human can debug efficiently. This policy applies to all agents working in this repository.
+Validation commands for the shared package are in [src/README.md](src/README.md#working-here).
+Conventions for coding agents — including the test-failure handoff policy — are in
+[.github/copilot-instructions.md](.github/copilot-instructions.md).
 
 ## Local infrastructure
 
-The local stack (Postgres + pgvector, Neo4j, RabbitMQ) is defined in
-[infra/docker-compose.yml](infra/docker-compose.yml). Bring it up with:
+Bring up the local stack (Postgres + pgvector, Neo4j, RabbitMQ) from the repository root:
 
 ```bash
 cp infra/.env.example infra/.env   # then edit infra/.env with local values
 docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build
 ```
 
-Two environment-specific notes apply to this repository:
+**Every secret lives in `infra/.env` only** (git-ignored) — never in a tracked file, not even a
+password hash. That rule, the environment-specific image and broker notes, and how to validate an
+infrastructure change are all in [infra/README.md](infra/README.md).
 
-- **Postgres/pgvector image:** the community `pgvector/pgvector` image may be blocked by org
-  registry policy, so Postgres is built from the org-approved official `postgres:16` base plus the
-  `pgvector` package — see [infra/postgres-image/Dockerfile](infra/postgres-image/Dockerfile). The
-  compose `feed-postgres` service uses `build:` instead of a community `image:`.
-- **RabbitMQ user:** when a definitions file is loaded, RabbitMQ will not seed the
-  `RABBITMQ_DEFAULT_USER`, so the broker user is injected at startup from environment variables by
-  [infra/rabbitmq/render-definitions.sh](infra/rabbitmq/render-definitions.sh) (the password hash is
-  computed at runtime, never committed).
+## Scope boundaries
 
-### Secrets and environment variables (all agents follow this)
-
-Every secret lives in **one** place: `infra/.env` (git-ignored). Nothing secret is ever written to a
-tracked file.
-
-- Document each variable — names and placeholder values only — in
-  [infra/.env.example](infra/.env.example); never put real values there.
-- Services and tests read credentials from environment variables
-  (`DATABASE_URL`, `NEO4J_URI`, `RABBITMQ_URL`, `RABBITMQ_DEFAULT_USER/PASS`, LLM keys, …).
-- Never hardcode a password, token, or even a password **hash** in a tracked file. If a tool needs a
-  derived credential (like RabbitMQ's `password_hash`), compute it at runtime from the env var, as
-  the RabbitMQ render script does.
-- `infra/.env` and `.env` are already excluded in [.gitignore](.gitignore); keep them untracked.
-
-## POC scope
-
-- Initial validated POC assets: Gold and Brent oil using the P06 Yahoo reference-close policy.
-- Initial horizon: one trading day, close-to-close.
-- Initial news sources: a deliberately small subset selected from the proven sources.
-- LLM calls: allowed only for explicitly approved experiments or ambiguous cleansing cases; prediction-time LLM arbitration is blocked by the POC-6 `STOP` result.
+- Assets: declared in the [asset registry](requirements/REF-02-asset-registry.md) — adding a market is a
+  registry edit, not a code change.
+- Horizon: one trading day, close-to-close.
+- LLM calls: only for ambiguous cleansing extraction or factual-conflict resolution. Never at
+  prediction time.
 - No automated trade execution.
-- Local-only API and Dashboard until production security work is explicitly approved.
+- Local-only deployment until production security work is explicitly approved.
 
-## Delivery sequence
-
-1. Freeze contracts, registries, database topology, and queue bindings.
-2. Build a thin graph-only end-to-end walking skeleton for Gold and Brent oil.
-3. Keep prediction-time LLM arbitration out of M1 unless a new controlled hypothesis is approved.
-4. Add reliability and security required for persistent use.
-5. Expand source, asset, API, and Dashboard scope only after validation.
+Full scope, including what is explicitly out of scope and why, is in
+[requirements/SyRS-system.md](requirements/SyRS-system.md#2-purpose-and-scope).

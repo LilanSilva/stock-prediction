@@ -1,6 +1,6 @@
 // Feed Analyzer causal knowledge graph — constraints and indexes.
 //
-// Schema (docs/reference/event-taxonomy.md, docs/reference/asset-registry.md):
+// Schema (requirements/REF-01-event-taxonomy.md, requirements/REF-02-asset-registry.md):
 //   (:CausalFactor {id})-[:CAUSES {direction, weight, confidence, alpha, beta, last_updated}]->(:Asset {id})
 //   (:CausalFactor {id})-[:CAUSES {...}]->(:AssetGroup {id})   -- industry-level edge, inherited
 //   (:Asset {id})-[:MEMBER_OF]->(:AssetGroup {id})

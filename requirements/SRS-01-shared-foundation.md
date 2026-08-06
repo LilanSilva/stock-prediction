@@ -431,7 +431,7 @@ Defined on `FeedMessage`, inherited by all six messages.
 | `LlmStatus` | `SUCCESS`, `FAILED` |
 | `EventPolarity` | `OCCURRENCE`, `RESOLUTION` |
 | `ConditionCode` | `TRANSPORT_AFFECTED`, `SAFE_HAVEN_ONLY`, `RISK_PREMIUM_ELEVATED` |
-| `EventType` | 32 values — see [event-taxonomy.md](../docs/reference/event-taxonomy.md) |
+| `EventType` | 32 values — see [REF-01-event-taxonomy.md](REF-01-event-taxonomy.md) |
 | `RoutingKey` | `article.ingested`, `event.detected`, `prediction.made`, `price.requested`, `price.observed`, `prediction.scored` |
 
 ### 8.3 Shared nested types
@@ -593,7 +593,9 @@ Each `(factor, target, condition)` triple is a distinct edge with its own weight
 Loaded from [infra/assets/assets.json](../infra/assets/assets.json) when mounted, else the packaged
 copy at `src/shared/shared/reference/assets.json`.
 
-Current version `multi-market-v2`: 18 groups, 34 assets, 4 currencies, 6 markets.
+Current version `multi-market-v2`: 16 groups, 37 assets (34 primary + 3 fallback entries),
+4 currencies, 6 markets. Provider routing, session calendars, and the version history are in
+[REF-02-asset-registry.md](REF-02-asset-registry.md).
 
 ```json
 {

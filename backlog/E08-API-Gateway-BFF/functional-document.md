@@ -1,5 +1,11 @@
 # API Gateway / BFF Functional Document
 
+> **Status: not built.** This is design intent for epic E08, not a specification of running code.
+> Moved here from `docs/functional-documents/` on 2026-08-06 because
+> [requirements/](../../requirements/README.md) holds specifications for implemented components only —
+> an SRS-08 will be written when the Gateway is built. Where this document disagrees with
+> [requirements/](../../requirements/README.md), the requirements win.
+
 ## 1. Purpose
 
 The API Gateway is a read-only backend-for-frontend (BFF) for the local POC dashboard. It exposes stable REST responses and live updates without owning prediction, scoring, or credibility business logic.
@@ -23,7 +29,7 @@ The Gateway must not write to another service's schema, update graph weights, sc
 - Acknowledgement occurs only after a message has been validated and handed to the connection manager.
 - Duplicate messages are suppressed by `message_id` for a bounded retention period.
 
-The canonical internal messages are defined in [message-contracts.md](../contracts/message-contracts.md). Public models use canonical `asset_id`, `event_type`, horizon, direction, and decision-method values.
+The canonical internal messages are defined in [SRS-01 §8](../../requirements/SRS-01-shared-foundation.md#8-interfaces) and each producing service's SRS section 8. Public models use canonical `asset_id`, `event_type`, horizon, direction, and decision-method values.
 
 ## 4. Minimum REST surface
 
