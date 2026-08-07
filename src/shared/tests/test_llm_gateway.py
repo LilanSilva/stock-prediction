@@ -143,7 +143,13 @@ def test_api_key_is_resolved_from_settings() -> None:
     assert settings.require_api_key() == "secret"
 
 
-def test_base_url_defaults_to_none_and_is_configurable() -> None:
+def test_base_url_defaults_to_none_and_is_configurable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # LLMSettings reads LLM_* from the environment by design, so the "no base_url configured" case
+    # must clear it explicitly. Otherwise a developer (or CI) with LLM_BASE_URL exported in
+    # infra/.env fails this test even though the default is correct.
+    monkeypatch.delenv("LLM_BASE_URL", raising=False)
     assert LLMSettings(provider="openai", model="m", api_key="k").resolve_base_url() is None
     kimi = LLMSettings(
         provider="openai",

@@ -33,6 +33,7 @@ the one remediation epic `P06`, which does use the epic/story/task nesting.
 |---|---|---|---|
 | [E08](E08-API-Gateway-BFF/README.md) | API Gateway / read-only BFF | M3 | Not started — design in [functional-document.md](E08-API-Gateway-BFF/functional-document.md) |
 | [E09](E09-Dashboard-Web-UI/README.md) | Dashboard web UI | M3 | Not started — design in [functional-document.md](E09-Dashboard-Web-UI/functional-document.md) |
+| [E10](E10-Cross-Asset-Propagation/README.md) | Cross-asset `CORRELATES_WITH` propagation | M4 | Not started — plan in [E10/README.md](E10-Cross-Asset-Propagation/README.md) |
 | [E11](E11-Data-Retention/README.md) | Bounded growth/retention for unbounded tables | Unscheduled | Proposed; only Ingestion has a retention cleaner today |
 
 E08 and E09 have no SRS by design: [requirements/](../requirements/README.md) specifies implemented
