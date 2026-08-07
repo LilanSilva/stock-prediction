@@ -31,7 +31,7 @@ _DECISION_AT = datetime(2026, 7, 27, 22, 46, tzinfo=UTC)  # Monday after the 17:
 
 
 def _prediction(
-    asset: AssetId = AssetId.GOLD,
+    asset: AssetId = AssetId.NEM_NYSE,
     direction: Direction = Direction.UP,
     supersedes: uuid.UUID | None = None,
 ) -> PredictionMade:
@@ -50,11 +50,11 @@ def _prediction(
         rationale="test",
         contributing_edges=[
             ContributingEdge(
-                edge_id="SANCTIONS->GOLD",
+                edge_id="SANCTIONS->NEM_NYSE",
                 direction=Direction.UP,
                 current_weight=0.5,
                 influence_weight=0.55,
-                path="SANCTIONS->GOLD",
+                path="SANCTIONS->NEM_NYSE",
             )
         ],
         decision_at=_DECISION_AT,
@@ -72,7 +72,7 @@ def _evaluation(
     return EvaluationRecord(
         prediction_id=uuid.uuid4(),
         context_id=uuid.uuid4(),
-        asset_id=AssetId.GOLD,
+        asset_id=AssetId.NEM_NYSE,
         predicted_direction=direction,
         predicted_magnitude=Magnitude.MEDIUM,
         confidence=1.0,
@@ -120,7 +120,7 @@ def _observed(
         occurred_at=datetime.now(UTC),
         request_id=request_id,
         prediction_id=uuid.uuid4(),
-        asset_id=AssetId.GOLD,
+        asset_id=AssetId.NEM_NYSE,
         baseline=baseline,
         settlement=settlement,
     )
@@ -179,7 +179,7 @@ async def test_process_prediction_resolves_sessions_and_requests_price() -> None
     evaluation, request = repo.created[0]
     assert request.baseline_session == date(2026, 7, 27)
     assert request.settlement_session == date(2026, 7, 28)
-    assert request.asset_id == AssetId.GOLD
+    assert request.asset_id == AssetId.NEM_NYSE
     assert request.market_calendar == "America/New_York"
     assert evaluation.registry_version == _REGISTRY
     assert request.prediction_id == prediction.prediction_id
@@ -257,7 +257,7 @@ async def test_process_price_registry_mismatch_is_rejected() -> None:
 async def test_conditioned_edge_id_passes_through_unchanged() -> None:
     # A 3-part "FACTOR|CONDITION->ASSET" edge_id is opaque: it must survive PredictionMade ->
     # evaluation -> PredictionScored verbatim (no split on "->" or "|", no truncation).
-    conditioned = "MILITARY_CONFLICT|TRANSPORT_AFFECTED->BRENT_OIL"
+    conditioned = "MILITARY_CONFLICT|TRANSPORT_AFFECTED->XOM_NYSE"
     edge = ContributingEdge(
         edge_id=conditioned,
         direction=Direction.UP,
@@ -265,7 +265,7 @@ async def test_conditioned_edge_id_passes_through_unchanged() -> None:
         influence_weight=0.65,
         path=conditioned,
     )
-    prediction = _prediction(asset=AssetId.BRENT_OIL).model_copy(
+    prediction = _prediction(asset=AssetId.XOM_NYSE).model_copy(
         update={"contributing_edges": [edge]}
     )
 
@@ -275,7 +275,7 @@ async def test_conditioned_edge_id_passes_through_unchanged() -> None:
     assert [e.edge_id for e in evaluation.contributing_edges] == [conditioned]
 
     observed = _observed(evaluation.request_id, "100.00", "103.00").model_copy(
-        update={"asset_id": AssetId.BRENT_OIL}
+        update={"asset_id": AssetId.XOM_NYSE}
     )
     score_repo = _FakeRepo(evaluation=evaluation)
     await _pipeline(score_repo).process_price(observed)

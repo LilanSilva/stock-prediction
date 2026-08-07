@@ -73,7 +73,7 @@ async def test_commit_updates_writes_state_history_and_is_idempotent() -> None:
         repo = CredibilityRepository(pool)
 
         updates = [
-            WeightUpdate("MILITARY_CONFLICT->GOLD", "edge", 1.0, 1.0, 1.7, 1.0),
+            WeightUpdate("MILITARY_CONFLICT->NEM_NYSE", "edge", 1.0, 1.0, 1.7, 1.0),
             WeightUpdate(source_id, "source", 1.0, 1.0, 1.5, 1.0),
         ]
         first = await repo.commit_updates(prediction_id, updates)
@@ -127,7 +127,7 @@ async def test_scored_message_round_trips_to_queue() -> None:
             occurred_at=datetime.now(UTC),
             prediction_id=uuid.uuid4(),
             context_id=uuid.uuid4(),
-            asset_id=AssetId.GOLD,
+            asset_id=AssetId.NEM_NYSE,
             predicted_direction=Direction.UP,
             actual_direction=Direction.UP,
             predicted_magnitude=Magnitude.MEDIUM,
@@ -138,11 +138,11 @@ async def test_scored_message_round_trips_to_queue() -> None:
             score=1.0,
             contributing_edges=[
                 ContributingEdge(
-                    edge_id="SANCTIONS->GOLD",
+                    edge_id="SANCTIONS->NEM_NYSE",
                     direction=Direction.UP,
                     current_weight=0.5,
                     influence_weight=0.6,
-                    path="SANCTIONS->GOLD",
+                    path="SANCTIONS->NEM_NYSE",
                 )
             ],
             source_ids=["di.se"],

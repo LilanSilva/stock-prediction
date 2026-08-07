@@ -43,7 +43,7 @@ def _prediction() -> PredictionMade:
         context_id=uuid.uuid4(),
         context_version=1,
         event_ids=[uuid.uuid4()],
-        asset_id=AssetId.GOLD,
+        asset_id=AssetId.NEM_NYSE,
         direction=Direction.UP,
         magnitude=Magnitude.MEDIUM,
         confidence=1.0,
@@ -51,11 +51,11 @@ def _prediction() -> PredictionMade:
         rationale="itest",
         contributing_edges=[
             ContributingEdge(
-                edge_id="SANCTIONS->GOLD",
+                edge_id="SANCTIONS->NEM_NYSE",
                 direction=Direction.UP,
                 current_weight=0.5,
                 influence_weight=0.55,
-                path="SANCTIONS->GOLD",
+                path="SANCTIONS->NEM_NYSE",
             )
         ],
         decision_at=_DECISION_AT,
@@ -143,7 +143,7 @@ async def test_price_observed_scores_prediction() -> None:
             occurred_at=datetime.now(UTC),
             request_id=request_id,
             prediction_id=prediction.prediction_id,
-            asset_id=AssetId.GOLD,
+            asset_id=AssetId.NEM_NYSE,
             baseline=_close(evaluation["baseline_session"], "100.00"),
             settlement=_close(evaluation["settlement_session"], "103.00"),
         )

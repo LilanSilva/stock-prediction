@@ -102,7 +102,7 @@ _BASELINE, _SETTLEMENT = resolve_baseline_settlement(_DECISION_AT, NEW_YORK)
 async def test_builds_one_sample_per_asset_and_condition() -> None:
     payload = _event_payload(
         event_type=EventType.MILITARY_CONFLICT,
-        assets=[AssetId.BRENT_OIL],
+        assets=[AssetId.XOM_NYSE],
         polarity=EventPolarity.OCCURRENCE,
         context_tags=[ConditionCode.TRANSPORT_AFFECTED],
         first_seen_at=_DECISION_AT,
@@ -110,8 +110,8 @@ async def test_builds_one_sample_per_asset_and_condition() -> None:
     conn = _FakeConnection(
         rows=[{"event_id": uuid.uuid4(), "payload": payload}],
         closes={
-            ("BRENT_OIL", _BASELINE): Decimal("100"),
-            ("BRENT_OIL", _SETTLEMENT): Decimal("105"),
+            ("XOM_NYSE", _BASELINE): Decimal("100"),
+            ("XOM_NYSE", _SETTLEMENT): Decimal("105"),
         },
     )
     samples = await build_samples(_FakePool(conn), lookback_days=365)
@@ -121,7 +121,7 @@ async def test_builds_one_sample_per_asset_and_condition() -> None:
     assert {s.condition for s in samples} == {None, ConditionCode.TRANSPORT_AFFECTED}
     for sample in samples:
         assert sample.factor is EventType.MILITARY_CONFLICT
-        assert sample.asset is AssetId.BRENT_OIL
+        assert sample.asset is AssetId.XOM_NYSE
         assert sample.actual_return == pytest.approx(0.05)
 
 
@@ -129,14 +129,14 @@ async def test_builds_one_sample_per_asset_and_condition() -> None:
 async def test_skips_event_with_missing_price() -> None:
     payload = _event_payload(
         event_type=EventType.SANCTIONS,
-        assets=[AssetId.GOLD],
+        assets=[AssetId.NEM_NYSE],
         polarity=EventPolarity.OCCURRENCE,
         context_tags=[],
         first_seen_at=_DECISION_AT,
     )
     conn = _FakeConnection(
         rows=[{"event_id": uuid.uuid4(), "payload": payload}],
-        closes={("GOLD", _BASELINE): Decimal("2000")},  # settlement close missing
+        closes={("NEM_NYSE", _BASELINE): Decimal("2000")},  # settlement close missing
     )
     samples = await build_samples(_FakePool(conn), lookback_days=365)
     assert samples == []
@@ -173,7 +173,7 @@ async def test_sample_tagged_abnormal_when_return_exceeds_threshold() -> None:
     # Daily closes showing ~1% volatility; event moves +10% -> abnormal at 2x threshold.
     payload = _event_payload(
         event_type=EventType.MILITARY_CONFLICT,
-        assets=[AssetId.BRENT_OIL],
+        assets=[AssetId.XOM_NYSE],
         polarity=EventPolarity.OCCURRENCE,
         context_tags=[],
         first_seen_at=_DECISION_AT,
@@ -182,10 +182,10 @@ async def test_sample_tagged_abnormal_when_return_exceeds_threshold() -> None:
     conn = _FakeConnection(
         rows=[{"event_id": uuid.uuid4(), "payload": payload}],
         closes={
-            ("BRENT_OIL", _BASELINE): Decimal("100"),
-            ("BRENT_OIL", _SETTLEMENT): Decimal("110"),  # +10% move
+            ("XOM_NYSE", _BASELINE): Decimal("100"),
+            ("XOM_NYSE", _SETTLEMENT): Decimal("110"),  # +10% move
         },
-        volatility_closes={"BRENT_OIL": vol_closes},
+        volatility_closes={"XOM_NYSE": vol_closes},
     )
     samples = await build_samples(
         _FakePool(conn), lookback_days=365, volatility_lookback_days=30, abnormal_threshold=2.0
@@ -199,7 +199,7 @@ async def test_sample_tagged_abnormal_when_return_exceeds_threshold() -> None:
 async def test_sample_tagged_normal_when_return_within_threshold() -> None:
     payload = _event_payload(
         event_type=EventType.MILITARY_CONFLICT,
-        assets=[AssetId.BRENT_OIL],
+        assets=[AssetId.XOM_NYSE],
         polarity=EventPolarity.OCCURRENCE,
         context_tags=[],
         first_seen_at=_DECISION_AT,
@@ -208,10 +208,10 @@ async def test_sample_tagged_normal_when_return_within_threshold() -> None:
     conn = _FakeConnection(
         rows=[{"event_id": uuid.uuid4(), "payload": payload}],
         closes={
-            ("BRENT_OIL", _BASELINE): Decimal("100"),
-            ("BRENT_OIL", _SETTLEMENT): Decimal("100.5"),  # tiny move
+            ("XOM_NYSE", _BASELINE): Decimal("100"),
+            ("XOM_NYSE", _SETTLEMENT): Decimal("100.5"),  # tiny move
         },
-        volatility_closes={"BRENT_OIL": vol_closes},
+        volatility_closes={"XOM_NYSE": vol_closes},
     )
     samples = await build_samples(
         _FakePool(conn), lookback_days=365, volatility_lookback_days=30, abnormal_threshold=2.0
@@ -225,7 +225,7 @@ async def test_sample_tagged_normal_when_no_volatility_history() -> None:
     # No volatility closes available -> volatility=0.0 -> is_abnormal=False regardless of move.
     payload = _event_payload(
         event_type=EventType.MILITARY_CONFLICT,
-        assets=[AssetId.BRENT_OIL],
+        assets=[AssetId.XOM_NYSE],
         polarity=EventPolarity.OCCURRENCE,
         context_tags=[],
         first_seen_at=_DECISION_AT,
@@ -233,8 +233,8 @@ async def test_sample_tagged_normal_when_no_volatility_history() -> None:
     conn = _FakeConnection(
         rows=[{"event_id": uuid.uuid4(), "payload": payload}],
         closes={
-            ("BRENT_OIL", _BASELINE): Decimal("100"),
-            ("BRENT_OIL", _SETTLEMENT): Decimal("120"),
+            ("XOM_NYSE", _BASELINE): Decimal("100"),
+            ("XOM_NYSE", _SETTLEMENT): Decimal("120"),
         },
         volatility_closes={},  # no history
     )

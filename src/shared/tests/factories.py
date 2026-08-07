@@ -61,7 +61,7 @@ def make_event() -> EventDetected:
         action="attack",
         object="StateB",
         entities=["StateA", "StateB"],
-        affected_asset_ids=["GOLD", "BRENT_OIL"],
+        affected_asset_ids=["NEM_NYSE", "XOM_NYSE"],
         first_seen_at=_NOW,
         last_seen_at=_NOW,
         sources=[
@@ -81,11 +81,11 @@ def make_event() -> EventDetected:
 
 def _edge() -> ContributingEdge:
     return ContributingEdge(
-        edge_id="MILITARY_CONFLICT->GOLD",
+        edge_id="MILITARY_CONFLICT->NEM_NYSE",
         direction=Direction.UP,
         current_weight=0.75,
         influence_weight=0.6,
-        path="MILITARY_CONFLICT-[CAUSES]->GOLD",
+        path="MILITARY_CONFLICT-[CAUSES]->NEM_NYSE",
     )
 
 
@@ -97,7 +97,7 @@ def make_prediction() -> PredictionMade:
         context_id=uuid.uuid4(),
         context_version=1,
         event_ids=[uuid.uuid4()],
-        asset_id="GOLD",
+        asset_id="NEM_NYSE",
         direction=Direction.UP,
         magnitude=Magnitude.MEDIUM,
         confidence=0.7,
@@ -117,7 +117,7 @@ def make_price_requested() -> PriceRequested:
         occurred_at=_NOW,
         request_id=uuid.uuid4(),
         prediction_id=uuid.uuid4(),
-        asset_id="GOLD",
+        asset_id="NEM_NYSE",
         baseline_session=date(2026, 7, 13),
         settlement_session=date(2026, 7, 14),
         market_calendar="America/New_York",
@@ -144,7 +144,7 @@ def make_price_observed() -> PriceObserved:
         occurred_at=_NOW,
         request_id=uuid.uuid4(),
         prediction_id=uuid.uuid4(),
-        asset_id="GOLD",
+        asset_id="NEM_NYSE",
         baseline=_close(date(2026, 7, 13), "2400.5"),
         settlement=_close(date(2026, 7, 14), "2430.0"),
     )
@@ -156,7 +156,7 @@ def make_prediction_scored() -> PredictionScored:
         occurred_at=_NOW,
         prediction_id=uuid.uuid4(),
         context_id=uuid.uuid4(),
-        asset_id="GOLD",
+        asset_id="NEM_NYSE",
         predicted_direction=Direction.UP,
         actual_direction=Direction.UP,
         predicted_magnitude=Magnitude.MEDIUM,

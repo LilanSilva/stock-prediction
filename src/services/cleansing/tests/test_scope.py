@@ -78,14 +78,14 @@ def test_plural_headline_still_matches_a_singular_keyword() -> None:
 def test_falls_back_to_event_type_assets_when_nothing_is_named() -> None:
     scope = resolve_scope("USA calls off Iran attack", EventType.MILITARY_CONFLICT)
     assert scope.scope is NewsScope.EVENT_TYPE
-    assert AssetId.GOLD in scope.assets
-    assert AssetId.BRENT_OIL in scope.assets
+    assert AssetId.NEM_NYSE in scope.assets
+    assert AssetId.XOM_NYSE in scope.assets
 
 
 def test_military_conflict_fallback_also_reaches_weapons_makers() -> None:
     # A war moves defence stocks, not only the safe-haven commodities.
     assets = assets_for_event_type(EventType.MILITARY_CONFLICT)
-    assert AssetId.GOLD in assets
+    assert AssetId.NEM_NYSE in assets
     assert set(members_of("WEAPON_INDUSTRY")) <= set(assets)
 
 

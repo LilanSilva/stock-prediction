@@ -36,7 +36,7 @@ async def test_keyword_extractor_detects_resolution() -> None:
     assert action.polarity == EventPolarity.RESOLUTION
     # No company or industry keyword is named, so assets fall back to the event type's graph
     # assets: the safe-haven commodities plus the weapons makers a conflict moves.
-    assert {AssetId.GOLD, AssetId.BRENT_OIL} <= set(action.affected_asset_ids)
+    assert {AssetId.NEM_NYSE, AssetId.XOM_NYSE} <= set(action.affected_asset_ids)
     assert set(members_of("WEAPON_INDUSTRY")) <= set(action.affected_asset_ids)
     # A distant conflict with no transport cue is a safe-haven tag.
     assert action.context_tags == (ConditionCode.SAFE_HAVEN_ONLY,)

@@ -48,7 +48,7 @@ RETURN cf.id AS factor_id, a.id AS asset_id, r.direction AS direction,
 """
 
 _UPDATE_EDGE_CYPHER = """
-MATCH (cf:CausalFactor {id: $factor_id})-[r:CAUSES]->(a:Asset {id: $asset_id})
+MATCH (cf:CausalFactor {id: $factor_id})-[r:CAUSES]->(a:Asset {id: $target_id})
 WHERE r.condition IS NULL
 SET r.alpha = $alpha, r.beta = $beta, r.last_updated = datetime()
 RETURN r.alpha AS alpha, r.beta AS beta
@@ -56,8 +56,34 @@ RETURN r.alpha AS alpha, r.beta AS beta
 
 _UPDATE_CONDITIONED_EDGE_CYPHER = """
 MATCH (cf:CausalFactor {id: $factor_id})-[r:CAUSES {condition: $condition}]->
-      (a:Asset {id: $asset_id})
+      (a:Asset {id: $target_id})
 SET r.alpha = $alpha, r.beta = $beta, r.last_updated = datetime()
+RETURN r.alpha AS alpha, r.beta AS beta
+"""
+
+# Industry-level (inherited) edges target an :AssetGroup, not an :Asset. A prediction that fired an
+# inherited edge reports the GROUP edge in its `edge_id`, so learning must land on that shared prior
+# rather than on a per-asset edge that was never seeded.
+_UPDATE_GROUP_EDGE_CYPHER = """
+MATCH (cf:CausalFactor {id: $factor_id})-[r:CAUSES]->(g:AssetGroup {id: $target_id})
+WHERE r.condition IS NULL
+SET r.alpha = $alpha, r.beta = $beta, r.last_updated = datetime()
+RETURN r.alpha AS alpha, r.beta AS beta
+"""
+
+_UPDATE_CONDITIONED_GROUP_EDGE_CYPHER = """
+MATCH (cf:CausalFactor {id: $factor_id})-[r:CAUSES {condition: $condition}]->
+      (g:AssetGroup {id: $target_id})
+SET r.alpha = $alpha, r.beta = $beta, r.last_updated = datetime()
+RETURN r.alpha AS alpha, r.beta AS beta
+"""
+
+# Current counts for one group edge, addressed directly by (factor, group, condition). Reading it
+# through a member asset would be wrong: `_GROUP_FIRING_EDGES_CYPHER` hides the group edge from any
+# member that has its own edge for that pair, so a member-based lookup can miss it.
+_GROUP_EDGE_COUNTS_CYPHER = """
+MATCH (cf:CausalFactor {id: $factor_id})-[r:CAUSES]->(g:AssetGroup {id: $group_id})
+WHERE ($condition IS NULL AND r.condition IS NULL) OR r.condition = $condition
 RETURN r.alpha AS alpha, r.beta AS beta
 """
 
@@ -177,40 +203,78 @@ class CausalGraphClient:
             )
         return edges
 
+    async def get_group_edge_counts(
+        self,
+        factor_id: EventType,
+        group_id: str,
+        condition: ConditionCode | None = None,
+    ) -> tuple[float, float] | None:
+        """Return ``(alpha, beta)`` for one industry-group edge, or ``None`` when it does not exist.
+
+        Addressed directly by (factor, group, condition) rather than through a member asset:
+        ``get_firing_edges`` deliberately hides a group edge from any member that has its own edge
+        for the same pair, so a member-based lookup can miss an edge that genuinely fired.
+        """
+        driver = self._require_driver()
+        params: dict[str, Any] = {
+            "factor_id": factor_id.value,
+            "group_id": group_id,
+            "condition": condition.value if condition is not None else None,
+        }
+        try:
+            async with driver.session() as session:
+                result = await session.run(_GROUP_EDGE_COUNTS_CYPHER, params)
+                row = await result.single()
+        except Exception as exc:  # noqa: BLE001 - normalized to a typed transport error
+            raise GraphTransportError(f"neo4j group-edge count query failed: {exc}") from exc
+        if row is None:
+            return None
+        return float(row["alpha"]), float(row["beta"])
+
     async def update_edge_weight(
         self,
         factor_id: EventType,
-        asset_id: AssetId,
+        asset_id: AssetId | str,
         *,
         alpha: float,
         beta: float,
         condition: ConditionCode | None = None,
+        target_is_group: bool = False,
     ) -> None:
         """Persist Beta-Bernoulli counts for a CAUSES edge (used by Credibility).
 
         When ``condition`` is given the conditioned edge is updated; otherwise the legacy
         unconditional edge is updated (keeps older scored messages working).
+
+        With ``target_is_group`` the edge targets an ``:AssetGroup`` rather than an ``:Asset`` —
+        the inherited industry prior a prediction actually fired. ``asset_id`` then carries the
+        group id as a plain string, because a group id is not a registry-validated ``AssetId``.
         """
         driver = self._require_driver()
+        target_id = asset_id.value if isinstance(asset_id, AssetId) else str(asset_id)
         if condition is None:
-            cypher = _UPDATE_EDGE_CYPHER
+            cypher = _UPDATE_GROUP_EDGE_CYPHER if target_is_group else _UPDATE_EDGE_CYPHER
             params: dict[str, Any] = {
                 "factor_id": factor_id.value,
-                "asset_id": asset_id.value,
+                "target_id": target_id,
                 "alpha": alpha,
                 "beta": beta,
             }
-            edge_label = f"{factor_id.value}->{asset_id.value}"
+            edge_label = f"{factor_id.value}->{target_id}"
         else:
-            cypher = _UPDATE_CONDITIONED_EDGE_CYPHER
+            cypher = (
+                _UPDATE_CONDITIONED_GROUP_EDGE_CYPHER
+                if target_is_group
+                else _UPDATE_CONDITIONED_EDGE_CYPHER
+            )
             params = {
                 "factor_id": factor_id.value,
-                "asset_id": asset_id.value,
+                "target_id": target_id,
                 "condition": condition.value,
                 "alpha": alpha,
                 "beta": beta,
             }
-            edge_label = f"{factor_id.value}|{condition.value}->{asset_id.value}"
+            edge_label = f"{factor_id.value}|{condition.value}->{target_id}"
         try:
             async with driver.session() as session:
                 result = await session.run(cypher, params)
@@ -218,7 +282,8 @@ class CausalGraphClient:
         except Exception as exc:  # noqa: BLE001 - normalized to a typed transport error
             raise GraphTransportError(f"neo4j edge-weight update failed: {exc}") from exc
         if updated is None:
-            raise GraphTransportError(f"no CAUSES edge for {edge_label}")
+            kind = "AssetGroup" if target_is_group else "Asset"
+            raise GraphTransportError(f"no CAUSES edge for {edge_label} (target {kind})")
 
     async def upsert_conditioned_edge(
         self,

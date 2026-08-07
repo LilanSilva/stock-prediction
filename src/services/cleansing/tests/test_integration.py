@@ -4,6 +4,7 @@ import os
 import uuid
 from datetime import UTC, datetime
 
+import asyncpg
 import pytest
 from shared.messaging.client import RabbitMQClient
 from shared.schemas.messages import ArticleIngested
@@ -35,6 +36,43 @@ def _message() -> ArticleIngested:
         language="en",
         country="US",
         content_hash=uuid.uuid4().hex,
+    )
+
+
+async def _purge_article(pool: asyncpg.Pool, article_id: uuid.UUID) -> None:
+    """Remove every row this article produced, whatever state the test reached.
+
+    Must run in a ``finally``: the fingerprint is the dedup guard, so a run that fails before its
+    inline cleanup leaves one behind and *every later run* is then discarded as a near-duplicate of
+    itself — the test passes once and fails forever after.
+    """
+    clusters = [
+        r["cluster_id"]
+        for r in await pool.fetch(
+            "SELECT cluster_id FROM cleansing.cluster_articles WHERE article_id = $1", article_id
+        )
+    ]
+    for cluster_id in clusters:
+        await pool.execute(
+            "DELETE FROM cleansing.outbox_events WHERE aggregate_id IN "
+            "(SELECT event_id FROM cleansing.events WHERE cluster_id = $1)",
+            cluster_id,
+        )
+        await pool.execute("DELETE FROM cleansing.events WHERE cluster_id = $1", cluster_id)
+        await pool.execute(
+            "DELETE FROM cleansing.cluster_articles WHERE cluster_id = $1", cluster_id
+        )
+        await pool.execute(
+            "DELETE FROM cleansing.event_clusters WHERE cluster_id = $1", cluster_id
+        )
+    await pool.execute(
+        "DELETE FROM cleansing.article_actions WHERE article_id = $1", article_id
+    )
+    await pool.execute(
+        "DELETE FROM cleansing.article_embeddings WHERE article_id = $1", article_id
+    )
+    await pool.execute(
+        "DELETE FROM cleansing.article_fingerprints WHERE article_id = $1", article_id
     )
 
 
@@ -106,27 +144,9 @@ async def test_process_and_close_produces_event_and_outbox() -> None:
         )
         assert outbox_count == 1
 
-        # Cleanup this test's rows.
-        await pool.execute(
-            "DELETE FROM cleansing.outbox_events WHERE aggregate_id IN "
-            "(SELECT event_id FROM cleansing.events WHERE cluster_id = $1)",
-            cluster_id,
-        )
-        await pool.execute("DELETE FROM cleansing.events WHERE cluster_id = $1", cluster_id)
-        await pool.execute(
-            "DELETE FROM cleansing.cluster_articles WHERE cluster_id = $1", cluster_id
-        )
-        await pool.execute("DELETE FROM cleansing.event_clusters WHERE cluster_id = $1", cluster_id)
-        await pool.execute(
-            "DELETE FROM cleansing.article_fingerprints WHERE article_id = $1", message.article_id
-        )
-        await pool.execute(
-            "DELETE FROM cleansing.article_embeddings WHERE article_id = $1", message.article_id
-        )
-        await pool.execute(
-            "DELETE FROM cleansing.article_actions WHERE article_id = $1", message.article_id
-        )
     finally:
+        # Always: a failure before this point would otherwise leave the dedup fingerprint behind.
+        await _purge_article(pool, message.article_id)
         await pool.close()
 
 
@@ -161,27 +181,9 @@ async def test_outbox_relay_publishes_event_detected() -> None:
         delivered = await publisher.publish_pending()
         assert delivered >= 1
 
-        # Cleanup.
-        await pool.execute(
-            "DELETE FROM cleansing.outbox_events WHERE aggregate_id IN "
-            "(SELECT event_id FROM cleansing.events WHERE cluster_id = $1)",
-            cluster_id,
-        )
-        await pool.execute("DELETE FROM cleansing.events WHERE cluster_id = $1", cluster_id)
-        await pool.execute(
-            "DELETE FROM cleansing.cluster_articles WHERE cluster_id = $1", cluster_id
-        )
-        await pool.execute("DELETE FROM cleansing.event_clusters WHERE cluster_id = $1", cluster_id)
-        await pool.execute(
-            "DELETE FROM cleansing.article_fingerprints WHERE article_id = $1", message.article_id
-        )
-        await pool.execute(
-            "DELETE FROM cleansing.article_embeddings WHERE article_id = $1", message.article_id
-        )
-        await pool.execute(
-            "DELETE FROM cleansing.article_actions WHERE article_id = $1", message.article_id
-        )
     finally:
+        # Always: a failure before this point would otherwise leave the dedup fingerprint behind.
+        await _purge_article(pool, message.article_id)
         await rabbit.close()
         await pool.close()
 
@@ -241,25 +243,7 @@ async def test_swedish_article_extracts_actor_and_produces_event() -> None:
         assert event_row["extraction_method"] == "LOCAL"
         assert event_row["canonical_summary"]
 
-        # Cleanup this test's rows.
-        await pool.execute(
-            "DELETE FROM cleansing.outbox_events WHERE aggregate_id IN "
-            "(SELECT event_id FROM cleansing.events WHERE cluster_id = $1)",
-            cluster_id,
-        )
-        await pool.execute("DELETE FROM cleansing.events WHERE cluster_id = $1", cluster_id)
-        await pool.execute(
-            "DELETE FROM cleansing.cluster_articles WHERE cluster_id = $1", cluster_id
-        )
-        await pool.execute("DELETE FROM cleansing.event_clusters WHERE cluster_id = $1", cluster_id)
-        await pool.execute(
-            "DELETE FROM cleansing.article_fingerprints WHERE article_id = $1", message.article_id
-        )
-        await pool.execute(
-            "DELETE FROM cleansing.article_embeddings WHERE article_id = $1", message.article_id
-        )
-        await pool.execute(
-            "DELETE FROM cleansing.article_actions WHERE article_id = $1", message.article_id
-        )
     finally:
+        # Always: a failure before this point would otherwise leave the dedup fingerprint behind.
+        await _purge_article(pool, message.article_id)
         await pool.close()

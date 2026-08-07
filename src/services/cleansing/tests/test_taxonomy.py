@@ -46,10 +46,18 @@ def test_classify_text_unmatched_is_other() -> None:
     assert keyword is None
 
 
-def test_infer_assets() -> None:
-    assert infer_assets("Brent crude oil climbs on OPEC news") == (AssetId.BRENT_OIL,)
-    assert infer_assets("Gold and guld rally") == (AssetId.GOLD,)
-    assert set(infer_assets("oil and gold both move")) == {AssetId.GOLD, AssetId.BRENT_OIL}
+def test_infer_assets_matches_company_keywords_only() -> None:
+    # infer_assets is the narrow COMPANY-scope lookup: it resolves a listing named specifically in
+    # the text and nothing else. (The commodity cases this test used to cover went away with the
+    # GOLD/BRENT_OIL instruments; company keywords are what the registry declares now.)
+    assert infer_assets("Exxon lifts guidance after refinery upgrade") == (AssetId.XOM_NYSE,)
+    assert infer_assets("Newmont reports higher output") == (AssetId.NEM_NYSE,)
+    assert set(infer_assets("Exxon and Newmont both rally")) == {
+        AssetId.NEM_NYSE,
+        AssetId.XOM_NYSE,
+    }
+    # An industry-level headline names no company, so company scope resolves nothing.
+    assert infer_assets("oil prices climb on OPEC news") == ()
 
 
 def test_gate2_conservative() -> None:
@@ -108,17 +116,17 @@ def test_infer_conditions_never_returns_risk_premium() -> None:
 def test_assets_for_event_type_geopolitical() -> None:
     # A conflict moves the safe-haven commodities AND the weapons makers, across markets.
     conflict = assets_for_event_type(EventType.MILITARY_CONFLICT)
-    assert {AssetId.GOLD, AssetId.BRENT_OIL} <= set(conflict)
+    assert {AssetId.NEM_NYSE, AssetId.XOM_NYSE} <= set(conflict)
     assert set(members_of("WEAPON_INDUSTRY")) <= set(conflict)
 
     # A supply disruption moves oil and the producers/refiners, not defence.
     disruption = assets_for_event_type(EventType.SUPPLY_DISRUPTION)
-    assert AssetId.BRENT_OIL in disruption
+    assert AssetId.XOM_NYSE in disruption
     assert set(members_of("OIL_GAS")) <= set(disruption)
     assert AssetId.SAAB_B_STO not in disruption
 
     # An event type with no group mapping stays commodity-only.
-    assert assets_for_event_type(EventType.INFLATION_CHANGE) == (AssetId.GOLD,)
+    assert assets_for_event_type(EventType.INFLATION_CHANGE) == (AssetId.NEM_NYSE,)
 
 
 def test_assets_for_event_type_unmapped_is_empty() -> None:

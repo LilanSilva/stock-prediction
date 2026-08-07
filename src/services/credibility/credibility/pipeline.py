@@ -20,6 +20,7 @@ from typing import Protocol
 
 import structlog
 from shared.graph.models import FiringEdge
+from shared.reference.asset_registry import groups
 from shared.schemas.messages import AssetId, ConditionCode, EventType, PredictionScored
 
 from credibility.exceptions import InvalidScoredMessageError
@@ -44,14 +45,22 @@ class GraphClient(Protocol):
         self, event_type: EventType, asset_ids: list[AssetId] | None = None
     ) -> list[FiringEdge]: ...
 
+    async def get_group_edge_counts(
+        self,
+        factor_id: EventType,
+        group_id: str,
+        condition: ConditionCode | None = None,
+    ) -> tuple[float, float] | None: ...
+
     async def update_edge_weight(
         self,
         factor_id: EventType,
-        asset_id: AssetId,
+        asset_id: AssetId | str,
         *,
         alpha: float,
         beta: float,
         condition: ConditionCode | None = None,
+        target_is_group: bool = False,
     ) -> None: ...
 
 
@@ -67,29 +76,47 @@ class Repository(Protocol):
     ) -> bool: ...
 
 
-def parse_edge_id(edge_id: str) -> tuple[EventType, ConditionCode | None, AssetId]:
+def parse_edge_id(edge_id: str) -> tuple[EventType, ConditionCode | None, AssetId | str]:
     """Parse a contributing ``edge_id`` into its Neo4j lookup keys.
 
-    Two forms of the deterministic business key produced by ``FiringEdge.edge_id`` are accepted:
-    ``'FACTOR->ASSET'`` (unconditional/legacy, condition is ``None``) and
-    ``'FACTOR|CONDITION->ASSET'`` (conditioned). A malformed or unknown value is terminal (the
+    The deterministic business key produced by ``FiringEdge.edge_id`` is ``'FACTOR->TARGET'``
+    (unconditional/legacy, condition is ``None``) or ``'FACTOR|CONDITION->TARGET'`` (conditioned).
+
+    ``TARGET`` is either a registry-validated ``AssetId`` or an **industry group id**: a prediction
+    that fired an inherited edge names the group edge, so learning lands on the shared prior that
+    actually fired instead of a per-asset edge that was never seeded. An asset id is returned as
+    ``AssetId``; a group id is returned as a plain ``str``, and callers distinguish the two by type.
+
+    A malformed value, or a target that is neither a known asset nor a known group, is terminal (the
     message is dead-lettered), never retried.
     """
-    left, sep, asset_str = edge_id.partition("->")
-    if not sep or not left or not asset_str:
+    left, sep, target_str = edge_id.partition("->")
+    if not sep or not left or not target_str:
         raise InvalidScoredMessageError(
-            f"malformed edge_id {edge_id!r} (expected 'FACTOR->ASSET' or 'FACTOR|CONDITION->ASSET')"
+            f"malformed edge_id {edge_id!r} "
+            "(expected 'FACTOR->TARGET' or 'FACTOR|CONDITION->TARGET')"
         )
     factor_str, cond_sep, condition_str = left.partition("|")
     try:
         factor = EventType(factor_str)
-        asset = AssetId(asset_str)
         condition = ConditionCode(condition_str) if cond_sep else None
     except ValueError as exc:
         raise InvalidScoredMessageError(
-            f"unknown factor/condition/asset in edge_id {edge_id!r}"
+            f"unknown factor/condition in edge_id {edge_id!r}"
         ) from exc
-    return factor, condition, asset
+
+    target: AssetId | str
+    try:
+        target = AssetId(target_str)
+    except ValueError:
+        # Not an asset: the only other legal target is an industry group (an inherited edge).
+        if target_str not in groups():
+            raise InvalidScoredMessageError(
+                f"target {target_str!r} in edge_id {edge_id!r} is neither a known asset "
+                "nor a known asset group"
+            ) from None
+        target = target_str
+    return factor, condition, target
 
 
 class CredibilityPipeline:
@@ -105,19 +132,28 @@ class CredibilityPipeline:
         credits = compute_proportional_credits(list(message.contributing_edges))
         updates: list[WeightUpdate] = []
         for edge in message.contributing_edges:
-            factor_id, condition, asset_id = parse_edge_id(edge.edge_id)
-            firing = await self._graph.get_firing_edges(factor_id, [asset_id])
-            # Match on the full business key so the right conditioned edge is picked when several
-            # conditions share one (factor, asset) pair.
-            current = next((e for e in firing if e.edge_id == edge.edge_id), None)
-            if current is None:
+            factor_id, condition, target = parse_edge_id(edge.edge_id)
+            counts: tuple[float, float] | None
+            if isinstance(target, AssetId):
+                firing = await self._graph.get_firing_edges(factor_id, [target])
+                # Match on the full business key so the right conditioned edge is picked
+                # when several conditions share one (factor, asset) pair.
+                current = next((e for e in firing if e.edge_id == edge.edge_id), None)
+                counts = (current.alpha, current.beta) if current is not None else None
+            else:
+                # A group target means the prediction fired an inherited industry edge. Read it
+                # directly: get_firing_edges hides a group edge from members that own an edge
+                # for the same pair, so a member-based lookup can miss the edge that fired.
+                counts = await self._graph.get_group_edge_counts(factor_id, target, condition)
+            target_is_group = not isinstance(target, AssetId)
+            if counts is None:
                 logger.warning(
                     "edge_missing_in_graph",
                     edge_id=edge.edge_id,
                     prediction_id=str(message.prediction_id),
                 )
                 continue
-            alpha_before, beta_before = current.alpha, current.beta
+            alpha_before, beta_before = counts
             alpha_after, beta_after = apply_bernoulli(
                 alpha_before,
                 beta_before,
@@ -126,7 +162,12 @@ class CredibilityPipeline:
                 floor=self._floor,
             )
             await self._graph.update_edge_weight(
-                factor_id, asset_id, alpha=alpha_after, beta=beta_after, condition=condition
+                factor_id,
+                target,
+                alpha=alpha_after,
+                beta=beta_after,
+                condition=condition,
+                target_is_group=target_is_group,
             )
             updates.append(
                 WeightUpdate(

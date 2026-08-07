@@ -21,7 +21,7 @@ def _sample(
     polarity: EventPolarity = EventPolarity.OCCURRENCE,
     factor: EventType = EventType.MILITARY_CONFLICT,
     condition: ConditionCode | None = ConditionCode.TRANSPORT_AFFECTED,
-    asset: AssetId = AssetId.BRENT_OIL,
+    asset: AssetId = AssetId.XOM_NYSE,
     is_abnormal: bool = False,
     asset_volatility: float = 0.0,
 ) -> Sample:
@@ -128,19 +128,19 @@ def test_mixed_group_with_one_abnormal_sample_uses_effective_min_one() -> None:
 
 def test_groups_are_split_by_factor_condition_and_asset() -> None:
     samples = [
-        _sample(0.03, condition=ConditionCode.TRANSPORT_AFFECTED, asset=AssetId.BRENT_OIL),
-        _sample(0.04, condition=ConditionCode.TRANSPORT_AFFECTED, asset=AssetId.BRENT_OIL),
-        _sample(0.02, condition=ConditionCode.SAFE_HAVEN_ONLY, asset=AssetId.GOLD),
-        _sample(0.03, condition=ConditionCode.SAFE_HAVEN_ONLY, asset=AssetId.GOLD),
-        _sample(0.05, condition=None, asset=AssetId.BRENT_OIL),
-        _sample(0.06, condition=None, asset=AssetId.BRENT_OIL),
+        _sample(0.03, condition=ConditionCode.TRANSPORT_AFFECTED, asset=AssetId.XOM_NYSE),
+        _sample(0.04, condition=ConditionCode.TRANSPORT_AFFECTED, asset=AssetId.XOM_NYSE),
+        _sample(0.02, condition=ConditionCode.SAFE_HAVEN_ONLY, asset=AssetId.NEM_NYSE),
+        _sample(0.03, condition=ConditionCode.SAFE_HAVEN_ONLY, asset=AssetId.NEM_NYSE),
+        _sample(0.05, condition=None, asset=AssetId.XOM_NYSE),
+        _sample(0.06, condition=None, asset=AssetId.XOM_NYSE),
     ]
     estimates = estimate_edges(samples, deadband=0.002, min_samples=2)
     keys = {(e.factor, e.condition, e.asset) for e in estimates}
     assert keys == {
-        (EventType.MILITARY_CONFLICT, ConditionCode.TRANSPORT_AFFECTED, AssetId.BRENT_OIL),
-        (EventType.MILITARY_CONFLICT, ConditionCode.SAFE_HAVEN_ONLY, AssetId.GOLD),
-        (EventType.MILITARY_CONFLICT, None, AssetId.BRENT_OIL),
+        (EventType.MILITARY_CONFLICT, ConditionCode.TRANSPORT_AFFECTED, AssetId.XOM_NYSE),
+        (EventType.MILITARY_CONFLICT, ConditionCode.SAFE_HAVEN_ONLY, AssetId.NEM_NYSE),
+        (EventType.MILITARY_CONFLICT, None, AssetId.XOM_NYSE),
     }
 
 
@@ -159,10 +159,10 @@ def test_weight_scales_with_magnitude() -> None:
 
 def test_output_is_sorted_deterministically() -> None:
     samples = [
-        _sample(0.03, factor=EventType.SANCTIONS, condition=None, asset=AssetId.GOLD),
-        _sample(0.03, factor=EventType.SANCTIONS, condition=None, asset=AssetId.GOLD),
-        _sample(0.03, factor=EventType.MILITARY_CONFLICT, condition=None, asset=AssetId.BRENT_OIL),
-        _sample(0.03, factor=EventType.MILITARY_CONFLICT, condition=None, asset=AssetId.BRENT_OIL),
+        _sample(0.03, factor=EventType.SANCTIONS, condition=None, asset=AssetId.NEM_NYSE),
+        _sample(0.03, factor=EventType.SANCTIONS, condition=None, asset=AssetId.NEM_NYSE),
+        _sample(0.03, factor=EventType.MILITARY_CONFLICT, condition=None, asset=AssetId.XOM_NYSE),
+        _sample(0.03, factor=EventType.MILITARY_CONFLICT, condition=None, asset=AssetId.XOM_NYSE),
     ]
     estimates = estimate_edges(samples, deadband=0.002, min_samples=2)
     assert [e.factor for e in estimates] == [EventType.MILITARY_CONFLICT, EventType.SANCTIONS]

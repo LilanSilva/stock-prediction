@@ -53,7 +53,7 @@ def _router() -> tuple[AdapterRouter, _StubAdapter, _StubAdapter]:
 
 def test_us_assets_route_to_biquote() -> None:
     router, biquote, _ = _router()
-    assert router.adapter_for(AssetId.GOLD) is biquote
+    assert router.adapter_for(AssetId.XOM_NYSE) is biquote
     assert router.adapter_for(AssetId.LMT_NYSE) is biquote
 
 
@@ -68,16 +68,16 @@ def test_us_listings_biquote_cannot_serve_route_to_yahoo() -> None:
     # Probed 2026-08-03: biquote returns 0 bars for these despite them being US-listed, so the
     # registry routes them to Yahoo. Routing follows the provider field, not the exchange.
     router, _, yahoo = _router()
-    for asset_id in (AssetId.BNTX_NASDAQ, AssetId.UAL_NASDAQ, AssetId.VLO_NYSE):
+    for asset_id in (AssetId.UAL_NASDAQ, AssetId.MRNA_NASDAQ, AssetId.ZM_NASDAQ):
         assert router.adapter_for(asset_id) is yahoo
 
 
 async def test_get_close_delegates_to_the_routed_adapter() -> None:
     router, biquote, yahoo = _router()
     await router.get_close(AssetId.SAAB_B_STO, date(2026, 7, 29))
-    await router.get_close(AssetId.GOLD, date(2026, 7, 29))
+    await router.get_close(AssetId.XOM_NYSE, date(2026, 7, 29))
     assert yahoo.calls == [AssetId.SAAB_B_STO]
-    assert biquote.calls == [AssetId.GOLD]
+    assert biquote.calls == [AssetId.XOM_NYSE]
 
 
 async def test_fetch_observations_delegates_to_the_routed_adapter() -> None:
@@ -166,5 +166,6 @@ async def test_no_fallback_re_raises() -> None:
     yahoo = _StubAdapter("yahoo")
     router = AdapterRouter({"biquote.io": failing_biquote, "yahoo": yahoo})
 
+    # XOM_NYSE is biquote-served (so it reaches the failing adapter) and declares no fallback.
     with pytest.raises(PriceNotYetAvailableError):
-        await router.get_close(AssetId.GOLD, date(2026, 8, 4))
+        await router.get_close(AssetId.XOM_NYSE, date(2026, 8, 4))

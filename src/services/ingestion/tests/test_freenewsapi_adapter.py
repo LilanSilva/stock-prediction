@@ -74,7 +74,7 @@ def _handler_single_keyword() -> httpx.MockTransport:
 async def test_fetch_maps_list_plus_details_to_articles() -> None:
     async with httpx.AsyncClient(transport=_handler_single_keyword()) as client:
         adapter = FreeNewsApiAdapter(
-            client, api_key="k", min_request_interval_seconds=0, keywords=("oil",)
+            client, api_key="k", min_request_interval_seconds=0
         )
         articles = await adapter.fetch()
 
@@ -89,25 +89,30 @@ async def test_fetch_maps_list_plus_details_to_articles() -> None:
     assert first.published_at.year == 2026
 
 
-async def test_fetch_dedupes_uuid_across_keywords() -> None:
-    # Every keyword search returns the same list; each uuid must be fetched/emitted only once.
+async def test_fetch_issues_one_list_call_and_one_details_call_per_item() -> None:
+    # No keyword pre-filtering (SRS-02: `in_title` queries returned HTTP 500 from the provider), so
+    # one `/news` call returns the recent list and each uuid is detailed exactly once. This bounds
+    # the rate budget at 1 + page_size requests per poll.
+    calls: list[str] = []
+
     def handle(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.path)
         if request.url.path.endswith("/news"):
             return httpx.Response(200, json=_LIST)
         uuid_value = request.url.params.get("uuid", "")
         return httpx.Response(200, json=_DETAILS.get(uuid_value, {"data": {}}))
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
-        adapter = FreeNewsApiAdapter(
-            client, api_key="k", min_request_interval_seconds=0, keywords=("oil", "gold")
-        )
+        adapter = FreeNewsApiAdapter(client, api_key="k", min_request_interval_seconds=0)
         articles = await adapter.fetch()
 
     assert {a.url.__str__() for a in articles} == {
         "https://www.reuters.com/markets/oil-rises",
         "https://www.bloomberg.com/news/gold-gains",
     }
-    assert len(articles) == 2  # not 4, despite two keywords both returning both items
+    assert len(articles) == 2
+    assert sum(1 for p in calls if p.endswith("/news")) == 1, "exactly one list call per fetch"
+    assert sum(1 for p in calls if p.endswith("/details")) == 2, "one details call per uuid"
 
 
 async def test_item_without_details_url_is_skipped() -> None:
@@ -119,7 +124,7 @@ async def test_item_without_details_url_is_skipped() -> None:
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
         adapter = FreeNewsApiAdapter(
-            client, api_key="k", min_request_interval_seconds=0, keywords=("oil",)
+            client, api_key="k", min_request_interval_seconds=0
         )
         assert await adapter.fetch() == []
 
@@ -128,7 +133,7 @@ async def test_empty_results_returns_empty_list() -> None:
     transport = httpx.MockTransport(lambda _req: httpx.Response(200, json={"data": []}))
     async with httpx.AsyncClient(transport=transport) as client:
         adapter = FreeNewsApiAdapter(
-            client, api_key="k", min_request_interval_seconds=0, keywords=("oil",)
+            client, api_key="k", min_request_interval_seconds=0
         )
         assert await adapter.fetch() == []
 
@@ -137,7 +142,7 @@ async def test_rate_limited_raises_adapter_error() -> None:
     transport = httpx.MockTransport(lambda _req: httpx.Response(429))
     async with httpx.AsyncClient(transport=transport) as client:
         adapter = FreeNewsApiAdapter(
-            client, api_key="k", min_request_interval_seconds=0, keywords=("oil",)
+            client, api_key="k", min_request_interval_seconds=0
         )
         with pytest.raises(AdapterError, match="429"):
             await adapter.fetch()
@@ -149,7 +154,7 @@ async def test_invalid_key_raises_adapter_error() -> None:
     )
     async with httpx.AsyncClient(transport=transport) as client:
         adapter = FreeNewsApiAdapter(
-            client, api_key="bad", min_request_interval_seconds=0, keywords=("oil",)
+            client, api_key="bad", min_request_interval_seconds=0
         )
         with pytest.raises(AdapterError, match="401"):
             await adapter.fetch()
@@ -161,7 +166,7 @@ async def test_timeout_raises_adapter_error() -> None:
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
         adapter = FreeNewsApiAdapter(
-            client, api_key="k", min_request_interval_seconds=0, keywords=("oil",)
+            client, api_key="k", min_request_interval_seconds=0
         )
         with pytest.raises(AdapterError, match="timeout"):
             await adapter.fetch()
@@ -173,7 +178,7 @@ async def test_invalid_json_raises_adapter_error() -> None:
     )
     async with httpx.AsyncClient(transport=transport) as client:
         adapter = FreeNewsApiAdapter(
-            client, api_key="k", min_request_interval_seconds=0, keywords=("oil",)
+            client, api_key="k", min_request_interval_seconds=0
         )
         with pytest.raises(AdapterError):
             await adapter.fetch()

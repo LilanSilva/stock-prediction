@@ -40,7 +40,7 @@ def _request() -> PendingRequest:
     return PendingRequest(
         request_id=uuid.uuid4(),
         prediction_id=uuid.uuid4(),
-        asset_id=AssetId.GOLD,
+        asset_id=AssetId.NEM_NYSE,
         baseline_session=_BASELINE,
         settlement_session=_SETTLEMENT,
         market_calendar="COMEX",

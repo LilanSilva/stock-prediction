@@ -23,23 +23,23 @@ def _edge(edge_id: str, influence: float) -> ContributingEdge:
 
 
 def test_proportional_credits_normalise_to_one() -> None:
-    edges = [_edge("MILITARY_CONFLICT->GOLD", 0.7), _edge("INFLATION_CHANGE->GOLD", 0.3)]
+    edges = [_edge("MILITARY_CONFLICT->NEM_NYSE", 0.7), _edge("INFLATION_CHANGE->NEM_NYSE", 0.3)]
     credits = compute_proportional_credits(edges)
-    assert credits["MILITARY_CONFLICT->GOLD"] == pytest.approx(0.7)
-    assert credits["INFLATION_CHANGE->GOLD"] == pytest.approx(0.3)
+    assert credits["MILITARY_CONFLICT->NEM_NYSE"] == pytest.approx(0.7)
+    assert credits["INFLATION_CHANGE->NEM_NYSE"] == pytest.approx(0.3)
     assert sum(credits.values()) == pytest.approx(1.0)
 
 
 def test_proportional_credits_single_edge_gets_full_credit() -> None:
-    credits = compute_proportional_credits([_edge("SANCTIONS->BRENT_OIL", 0.2)])
-    assert credits["SANCTIONS->BRENT_OIL"] == pytest.approx(1.0)
+    credits = compute_proportional_credits([_edge("SANCTIONS->XOM_NYSE", 0.2)])
+    assert credits["SANCTIONS->XOM_NYSE"] == pytest.approx(1.0)
 
 
 def test_proportional_credits_zero_sum_falls_back_to_equal() -> None:
-    edges = [_edge("SANCTIONS->GOLD", 0.0), _edge("RATE_DECISION->GOLD", 0.0)]
+    edges = [_edge("SANCTIONS->NEM_NYSE", 0.0), _edge("RATE_DECISION->NEM_NYSE", 0.0)]
     credits = compute_proportional_credits(edges)
-    assert credits["SANCTIONS->GOLD"] == pytest.approx(0.5)
-    assert credits["RATE_DECISION->GOLD"] == pytest.approx(0.5)
+    assert credits["SANCTIONS->NEM_NYSE"] == pytest.approx(0.5)
+    assert credits["RATE_DECISION->NEM_NYSE"] == pytest.approx(0.5)
 
 
 def test_proportional_credits_empty_list() -> None:

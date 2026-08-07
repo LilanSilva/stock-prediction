@@ -150,6 +150,7 @@ Test commands are in `src/README.md`. Use the fastest targeted test first, then 
 - Unit tests must not require live infrastructure or provider credentials. Mark live RabbitMQ and
   real-provider checks as integration tests and skip them when required configuration is absent.
 - Validate infrastructure changes with the commands in `infra/README.md` before claiming they work.
+- Dont add any new test based on asset.json file content. The asset.json file is a reference file and should not be used as a source of truth for tests.
 
 Review changes for contract alignment, canonical identifiers, idempotency, failure handling,
 correlation propagation, secret safety, and backward compatibility. Do not broaden scope into deferred

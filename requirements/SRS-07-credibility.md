@@ -35,7 +35,7 @@
 |---|---|
 | Author | Feed Analyzer project |
 | Created | 2026-08-05 |
-| Last updated | 2026-08-05 |
+| Last updated | 2026-08-07 |
 | Replaces | `docs/functional-documents/credibility-service-functional-document.md` (deleted 2026-08-06) |
 | Source code | `src/services/credibility/` |
 | Config class | `credibility.config.CredibilitySettings`, `credibility.learning.config.LearningSettings` |
@@ -142,7 +142,10 @@ Specific responsibilities:
 | CRD-8 | Both `alpha` and `beta` shall be floored at `prior_floor` (default 1.0) after the update so seeded values can only grow | Implemented |
 | CRD-9 | The new `(alpha, beta)` shall be written back to Neo4j via the shared graph client's `update_edge_weight` | Implemented |
 | CRD-10 | If a contributing edge is not found in Neo4j (the graph was modified after the prediction), a WARNING shall be logged and that edge skipped; remaining edges still proceed | Implemented |
-| CRD-11 | The `edge_id` parser shall accept two forms: `"FACTOR->ASSET"` (unconditional) and `"FACTOR|CONDITION->ASSET"` (conditioned); any other format shall raise `InvalidScoredMessageError` (terminal) | Implemented |
+| CRD-11 | The `edge_id` parser shall accept `"FACTOR->TARGET"` (unconditional) and `"FACTOR|CONDITION->TARGET"` (conditioned), where `TARGET` is either a registry asset ID or an industry **group** ID; any other format shall raise `InvalidScoredMessageError` (terminal) | Implemented |
+| CRD-45 | A `TARGET` that is neither a declared asset nor a declared asset group shall raise `InvalidScoredMessageError` (terminal) | Implemented |
+| CRD-46 | When `TARGET` is a group ID, the service shall read and update the `(:CausalFactor)-[:CAUSES]->(:AssetGroup)` edge itself, **not** a per-asset edge — an inherited edge's credit belongs to the industry prior that fired | Implemented |
+| CRD-47 | The current `(alpha, beta)` for a group edge shall be read by matching `(factor, group, condition)` directly, never through a member asset | Implemented |
 
 ### 5.3 Online consumer: source credit (PostgreSQL)
 
@@ -287,14 +290,29 @@ ci_upper = min(1, centre + half_width)
 ### 7.4 Edge ID parser (parse_edge_id)
 
 ```
-edge_id format 1 (unconditional): "MILITARY_CONFLICT->GOLD"
-  → factor = MILITARY_CONFLICT, condition = None, asset = GOLD
+format 1 (unconditional, asset):  "MILITARY_CONFLICT->GOLD"
+  → factor = MILITARY_CONFLICT, condition = None, target = AssetId("GOLD")
 
-edge_id format 2 (conditioned):   "MILITARY_CONFLICT|TRANSPORT_AFFECTED->BRENT_OIL"
-  → factor = MILITARY_CONFLICT, condition = TRANSPORT_AFFECTED, asset = BRENT_OIL
+format 2 (conditioned, asset):    "MILITARY_CONFLICT|TRANSPORT_AFFECTED->BRENT_OIL"
+  → factor = MILITARY_CONFLICT, condition = TRANSPORT_AFFECTED, target = AssetId("BRENT_OIL")
+
+format 3 (inherited group edge):  "MILITARY_CONFLICT->WEAPON_INDUSTRY"
+  → factor = MILITARY_CONFLICT, condition = None, target = "WEAPON_INDUSTRY"  (plain str)
 ```
 
-The parser splits on `->` (right), then on `|` (left part). An unknown factor, condition, or asset raises `InvalidScoredMessageError` (terminal).
+The parser splits on `->` (right), then on `|` (left part). An unknown factor or condition raises
+`InvalidScoredMessageError` (terminal).
+
+**The target may be an asset or an industry group.** Prediction reports the *group* edge in
+`edge_id` whenever an asset inherited it (see [REF-02 §4.1](REF-02-asset-registry.md)), so the target
+is resolved as an `AssetId` when the registry knows it as an asset, otherwise as a group ID when the
+registry knows it as a group. A target that is neither is terminal (`CRD-45`).
+
+Callers distinguish the two by type: an `AssetId` reads via `get_firing_edges`, a group ID reads via
+`get_group_edge_counts` and writes with `target_is_group=True`. A group edge must be addressed
+directly rather than through a member asset, because `get_firing_edges` deliberately hides a group
+edge from any member that owns an edge for the same `(factor, condition)` pair — so a member-based
+lookup can miss the very edge that fired (`CRD-47`).
 
 ### 7.5 Offline structure learner pipeline
 
@@ -365,6 +383,25 @@ This keeps all edge learning in the OCCURRENCE orientation. A war being called o
 7. Source updates: `source_ids=[]` → log warning, skip
 8. Postgres commit: insert `processed_predictions`, upsert `credibility(MILITARY_CONFLICT->GOLD, edge, 4.0, 1.0, 0.80)`, append history row
 9. Log `prediction_credibility_applied`, edges_updated=1, sources_updated=0
+
+### 7.8 Worked example (inherited group edge)
+
+**Input:** `PredictionScored` for `LMT_NYSE`, `is_correct=True`, contributing_edges =
+[edge_id=`MILITARY_CONFLICT->WEAPON_INDUSTRY`, influence_weight=0.6]. Prediction fired the industry
+edge because `LMT_NYSE` had no edge of its own for that `(factor, condition)` pair.
+
+1. `processed_predictions` check → not found → proceed
+2. Edge credit: total=0.6, credit=0.6/0.6=1.0
+3. `parse_edge_id(...)` → factor=MILITARY_CONFLICT, condition=None, target=`"WEAPON_INDUSTRY"` (a
+   group ID, not an `AssetId`)
+4. `graph.get_group_edge_counts(MILITARY_CONFLICT, "WEAPON_INDUSTRY", None)` → alpha=1.0, beta=1.0
+5. `apply_bernoulli(1.0, 1.0, 1.0, is_correct=True, floor=1.0)` → alpha=2.0, beta=1.0
+6. `graph.update_edge_weight(..., "WEAPON_INDUSTRY", alpha=2.0, beta=1.0, target_is_group=True)` —
+   the `:AssetGroup` edge is updated; **`LMT_NYSE`'s own edges are untouched**
+7. Postgres commit: upsert `credibility(MILITARY_CONFLICT->WEAPON_INDUSTRY, edge, 2.0, 1.0, 0.67)`
+
+Every listing in the group therefore contributes evidence to one shared prior, which is what lets a
+newly listed company predict before it has company-specific history.
 
 ---
 
@@ -497,6 +534,9 @@ Neo4j connection variables: `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`, `NEO4J_
 | CRD-4 – CRD-8 (edge credit math) | `tests/test_updater.py` | Proportional credit; zero-total fallback; floor enforcement; hit/miss |
 | CRD-12 – CRD-15 (source credit math) | `tests/test_updater.py` | Equal credit; lowercase normalisation; empty sources warning |
 | CRD-11 (edge_id parser) | `tests/test_pipeline.py` | Unconditional and conditioned formats; malformed → InvalidScoredMessageError |
+| CRD-45 (unknown target) | `tests/test_pipeline.py` | `test_parse_edge_id_rejects_target_that_is_neither_asset_nor_group` |
+| CRD-46 (group credit) | `tests/test_pipeline.py` | `test_inherited_group_edge_credit_lands_on_the_group_prior` — group alpha rises, the asset's own edge is unchanged |
+| CRD-47 (direct group read) | `src/shared/tests/test_graph_client.py` | `test_get_group_edge_counts_returns_counts`, `test_update_edge_weight_targets_asset_group_when_flagged` |
 | CRD-17 – CRD-19 (Postgres commit) | `tests/test_pipeline.py` | Atomic commit; race-loss returns False |
 | CRD-20 – CRD-22 (history rows) | `tests/test_pipeline.py` | History appended; CI values present; before/after correct |
 | CRD-25 – CRD-30 (sample builder) | `tests/learning/test_dataset.py` | Events loaded; conditions expanded; missing price skipped; abnormal flagging |
@@ -581,3 +621,4 @@ Update this document whenever any of the following changes:
 | Date | Description |
 |---|---|
 | 2026-08-05 | Initial as-built specification for E07 (Credibility Service); CRD-1 through CRD-44 |
+| 2026-08-07 | **Defect fix.** `parse_edge_id` coerced the `edge_id` target to `AssetId`, so every scored prediction that fired an *inherited group* edge was dead-lettered and its learning silently lost (8 such messages found in `credibility.scored.dlq`). ADR-007 and SyRS §9.2 always required both forms to parse; the code implemented only the asset form. CRD-11 reworded; CRD-45…CRD-47 added; §7.4 rewritten; §7.8 worked example added |

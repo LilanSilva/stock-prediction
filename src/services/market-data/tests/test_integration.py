@@ -10,11 +10,11 @@ import os
 import uuid
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 import asyncpg
 import pytest
 from fastapi.testclient import TestClient
-from shared.messaging.client import RabbitMQClient
 from shared.reference import REGISTRY_VERSION
 from shared.schemas.messages import (
     AssetId,
@@ -27,6 +27,9 @@ from market_data.app import app
 from market_data.db import apply_schema, create_pool
 from market_data.storage import OutboxPublisher, PriceRequestRepository, build_price_observed
 
+if TYPE_CHECKING:
+    from shared.schemas.messages import PriceObserved
+
 DATABASE_URL = os.environ.get("DATABASE_URL")
 RABBITMQ_URL = os.environ.get("RABBITMQ_URL")
 
@@ -36,6 +39,25 @@ _requires_infra = pytest.mark.skipif(
     not DATABASE_URL or not RABBITMQ_URL,
     reason="DATABASE_URL and RABBITMQ_URL required for live integration tests",
 )
+
+
+class _RecordingPublisher:
+    """Captures what the outbox would publish instead of sending it to the live exchange.
+
+    Publishing for real here would leak: this test fabricates a `prediction_id`, so the live
+    Verification consumer receives a `PriceObserved` with no matching evaluation, rejects it as
+    terminal, and leaves a permanent row in `verification.prices.dlq` on every run. The outbox
+    logic, the Postgres round-trip and the DELIVERED transition are all still exercised — only the
+    broker hop is stubbed. The broker hop itself is covered by
+    `test_publish_consume_roundtrip_live` in `src/shared/tests/test_messaging.py`, which round-trips
+    through the real exchange on its own auto-delete queue, so no service consumer is affected.
+    """
+
+    def __init__(self) -> None:
+        self.published: list[PriceObserved] = []
+
+    async def publish(self, message: PriceObserved) -> None:
+        self.published.append(message)
 
 
 def _observation(session: date, close: str) -> CloseObservation:
@@ -59,7 +81,7 @@ def _price_requested(request_id: uuid.UUID) -> PriceRequested:
         occurred_at=datetime.now(UTC),
         request_id=request_id,
         prediction_id=uuid.uuid4(),
-        asset_id=AssetId.GOLD,
+        asset_id=AssetId.NEM_NYSE,
         baseline_session=date(2026, 7, 10),
         settlement_session=date(2026, 7, 13),
         market_calendar="COMEX",
@@ -84,8 +106,6 @@ async def test_register_is_idempotent_and_outbox_delivers() -> None:
     assert DATABASE_URL and RABBITMQ_URL
     pool = await create_pool(DATABASE_URL)
     await apply_schema(pool)
-    rabbit = RabbitMQClient(RABBITMQ_URL)
-    await rabbit.connect()
 
     request_id = uuid.uuid4()
     repo = PriceRequestRepository(pool)
@@ -105,10 +125,19 @@ async def test_register_is_idempotent_and_outbox_delivers() -> None:
         # A second completion enqueues no second outbox row (idempotent on request_id).
         assert await repo.complete_request(message) is False
 
-        # The outbox relays the PriceObserved to feed.events and marks it DELIVERED.
-        outbox = OutboxPublisher(pool, rabbit)
+        # The outbox relays the PriceObserved and marks it DELIVERED. The publisher is a spy: this
+        # request carries a fabricated prediction_id, so publishing for real would dead-letter in
+        # verification.prices.dlq forever (see _RecordingPublisher).
+        spy = _RecordingPublisher()
+        outbox = OutboxPublisher(pool, spy)
         published = await outbox.publish_pending()
         assert published >= 1
+
+        # The relayed message is the real one built from the persisted request and both closes.
+        relayed = next(m for m in spy.published if m.request_id == request_id)
+        assert relayed.asset_id == AssetId.NEM_NYSE
+        assert relayed.baseline.close == Decimal("3315.0")
+        assert relayed.settlement.close == Decimal("3290.25")
 
         status = await pool.fetchval(
             "SELECT delivery_status FROM market_data.outbox WHERE aggregate_id = $1",
@@ -117,7 +146,6 @@ async def test_register_is_idempotent_and_outbox_delivers() -> None:
         assert status == "DELIVERED"
     finally:
         await _cleanup(pool, request_id)
-        await rabbit.close()
         await pool.close()
 
 

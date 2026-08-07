@@ -47,8 +47,8 @@ def test_postgres_initializes_one_database_with_six_schemas_and_pgvector() -> No
 def test_neo4j_seed_has_canonical_assets_and_minimum_edges() -> None:
     assets = (INFRA / "neo4j/init/02-seed-assets.cypher").read_text(encoding="utf-8")
     edges = (INFRA / "neo4j/init/04-seed-causal-edges.cypher").read_text(encoding="utf-8")
-    assert "MERGE (a:Asset {id: 'GOLD'})" in assets
-    assert "MERGE (a:Asset {id: 'BRENT_OIL'})" in assets
+    assert "MERGE (a:Asset {id: 'NEM_NYSE'})" in assets
+    assert "MERGE (a:Asset {id: 'XOM_NYSE'})" in assets
     assert "GC=F" not in re.sub(r"//.*", "", assets)
     assert "BZ=F" not in re.sub(r"//.*", "", assets)
     assert len(re.findall(r"MERGE \(cf\)-\[r:CAUSES\]->\(a\)", edges)) >= 15

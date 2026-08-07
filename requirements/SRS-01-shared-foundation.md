@@ -8,7 +8,7 @@
 | Component | Shared Python library (`shared`) and local infrastructure |
 | Requirement ID prefix | `SHR` |
 | Status | `Implemented` |
-| Version | `1.0.0` |
+| Version | `1.1.0` |
 | Source code | [src/shared/shared/](../src/shared/shared/), [infra/](../infra/) |
 | Tests | [src/shared/tests/](../src/shared/tests/) |
 | Last verified against code | `2026-08-05` |
@@ -172,6 +172,9 @@ Two parts:
 | `SHR-44` | The client **shall** compute each edge's reliability as `alpha / (alpha + beta)`. | Must | Implemented |
 | `SHR-45` | The client **shall** bound connection acquisition, so a graph outage surfaces promptly instead of hanging. | Must | Implemented |
 | `SHR-46` | The client **shall** support an idempotent edge weight update for Credibility. | Must | Implemented |
+| `SHR-76` | The weight update **shall** target either an `:Asset` or an `:AssetGroup` edge, selected by the caller, so credit for an inherited edge lands on the industry prior that fired (`SHR-43`). | Must | Implemented |
+| `SHR-77` | The client **shall** return the current `(alpha, beta)` of one group edge addressed directly by `(factor, group, condition)`, because a lookup through a member asset would miss a group edge that the member overrides. | Must | Implemented |
+| `SHR-78` | A weight update naming an edge that does not exist **shall** raise, identifying whether an `:Asset` or an `:AssetGroup` target was expected. | Must | Implemented |
 
 ### 5.6 Session calendar
 
@@ -695,6 +698,7 @@ Current version `multi-market-v2`: 16 groups, 37 assets (34 primary + 3 fallback
 | `SHR-23`…`SHR-27` | Test | [test_messaging.py](../src/shared/tests/test_messaging.py) — publish by routing key, consume owned queue, persistence, prefetch |
 | `SHR-28`…`SHR-38` | Test | [test_llm_gateway.py](../src/shared/tests/test_llm_gateway.py) — provider selection, budget enforcement, schema validation, single retry, cache hit with zero calls, usage metadata |
 | `SHR-39`…`SHR-46` | Test | [test_graph_client.py](../src/shared/tests/test_graph_client.py) — firing edges, condition gating, asset-over-group override, reliability, weight update |
+| `SHR-76`…`SHR-78` | Test | [test_graph_client.py](../src/shared/tests/test_graph_client.py) — group-targeted update (conditional and unconditional), direct group count read, missing-edge error names the target label |
 | `SHR-47`, `SHR-48`, `SHR-54` | Test | [test_calendar.py](../src/shared/tests/test_calendar.py) — IANA resolution, unknown zone rejected, DST from tz database |
 | `SHR-49`…`SHR-53` | Test | [test_calendar_us_baseline.py](../src/shared/tests/test_calendar_us_baseline.py) — weekday sessions, completion clock, no look-ahead |
 | `SHR-47`, `SHR-50` | Test | [test_calendar_multi_market.py](../src/shared/tests/test_calendar_multi_market.py) — Stockholm and New York resolve on their own clocks |
@@ -778,3 +782,4 @@ Component-specific notes:
 | Date | Version | Change | Driver |
 |---|---|---|---|
 | `2026-08-05` | `1.0.0` | Initial specification, written from the implemented code | E01 complete; replaces the E01 epic and task files |
+| `2026-08-07` | `1.1.0` | Added `SHR-76`…`SHR-78`: the graph client's weight update can target an `:AssetGroup`, and group counts are readable directly. `update_edge_weight`'s Cypher parameter renamed `asset_id` → `target_id` | Credibility could not apply learning from inherited group edges (see SRS-07 change history) |

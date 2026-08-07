@@ -124,6 +124,13 @@ ACTION_TAXONOMY: dict[str, EventType] = {
     "steps down": EventType.EXECUTIVE_CHANGE,
     "step down": EventType.EXECUTIVE_CHANGE,
     "fired": EventType.EXECUTIVE_CHANGE,
+    # An officer appointment is an EXECUTIVE_CHANGE, not a POLITICAL_TRANSITION. These phrases are
+    # needed because classify_text takes the EARLIEST match: in "Board appoints new CFO" the generic
+    # "appoint" (pos 6) would otherwise beat the specific "cfo" (pos 17).
+    "appoints new ceo": EventType.EXECUTIVE_CHANGE,
+    "appoints new cfo": EventType.EXECUTIVE_CHANGE,
+    "appoints new coo": EventType.EXECUTIVE_CHANGE,
+    "appoints new chief": EventType.EXECUTIVE_CHANGE,
     "vd avgår": EventType.EXECUTIVE_CHANGE,         # sv: CEO resigns
     "ny vd": EventType.EXECUTIVE_CHANGE,            # sv: new CEO
     "vd utsedd": EventType.EXECUTIVE_CHANGE,        # sv: CEO appointed
@@ -162,7 +169,9 @@ ACTION_TAXONOMY: dict[str, EventType] = {
     "cost cutting": EventType.RESTRUCTURING,
     "restructure": EventType.RESTRUCTURING,
     "restructuring": EventType.RESTRUCTURING,
-    "spin-off": EventType.RESTRUCTURING,
+    # "spin off" (not "spin-off"): _normalise turns punctuation into spaces, so a hyphenated key
+    # could never match. Both "spin-off" and "spin off" normalise to this form.
+    "spin off": EventType.RESTRUCTURING,
     "divestiture": EventType.RESTRUCTURING,
     "divest": EventType.RESTRUCTURING,
     "varsel": EventType.RESTRUCTURING,              # sv: redundancy notice
@@ -355,20 +364,29 @@ def classify_text(text: str) -> tuple[EventType, str | None]:
     best_type = EventType.OTHER
     best_keyword: str | None = None
     best_pos = len(haystack) + 1
+    best_len = 0
     for keyword, event_type in ACTION_TAXONOMY.items():
         if " " in keyword:
             # Multi-word phrase: find position for earliest-match tie-breaking.
             pos = haystack.find(keyword)
-            if pos != -1 and pos < best_pos:
+            # On a tie the LONGER keyword wins: both "appoint" and "appoints new cfo" start at the
+            # same word, and the more specific phrase is the better classification.
+            if pos != -1 and (pos < best_pos or (pos == best_pos and len(keyword) > best_len)):
                 best_pos = pos
+                best_len = len(keyword)
                 best_type = event_type
                 best_keyword = keyword
         else:
             # Single token: use suffix-tolerant match; position is the bare-token index.
+            # `find(" keyword")` returns the index of the leading SPACE, so +1 gives the index of
+            # the word itself — the same basis the phrase branch uses. Without this a single token
+            # always appeared one character earlier than a phrase starting at the same word, so a
+            # generic token beat a more specific phrase ("appoint" over "appoints new cfo").
             if _keyword_present(haystack, keyword):
-                pos = haystack.find(f" {keyword}")
-                if pos < best_pos:
+                pos = haystack.find(f" {keyword}") + 1
+                if pos < best_pos or (pos == best_pos and len(keyword) > best_len):
                     best_pos = pos
+                    best_len = len(keyword)
                     best_type = event_type
                     best_keyword = keyword
     return best_type, best_keyword
@@ -505,16 +523,20 @@ def gate2_compatible(left: EventType, right: EventType) -> bool:
 # Downstream assets implied by each canonical event type, mirroring the seeded Neo4j CAUSES edges
 # (infra/neo4j/init/04+05). Used only as a fallback when neither a company nor an industry keyword
 # named an asset, so a geopolitical headline like "USA calls off Iran attack" still resolves.
+#
+# The registry no longer carries the GOLD and BRENT_OIL commodity instruments; equity proxies stand
+# in for that macro exposure. NEM_NYSE (Newmont, PRECIOUS_METALS) is the gold proxy and XOM_NYSE
+# (Exxon, OIL_GAS) the oil proxy, so these entries keep resolving to a real, priceable asset.
 EVENT_TYPE_ASSETS: dict[EventType, tuple[AssetId, ...]] = {
-    EventType.MILITARY_CONFLICT: (AssetId.GOLD, AssetId.BRENT_OIL),
-    EventType.STRAIT_CLOSURE: (AssetId.GOLD, AssetId.BRENT_OIL),
-    EventType.SUPPLY_DISRUPTION: (AssetId.BRENT_OIL,),
-    EventType.SANCTIONS: (AssetId.GOLD, AssetId.BRENT_OIL),
-    EventType.RATE_DECISION: (AssetId.GOLD, AssetId.BRENT_OIL),
-    EventType.INFLATION_CHANGE: (AssetId.GOLD,),
-    EventType.RECESSION_SIGNAL: (AssetId.GOLD, AssetId.BRENT_OIL),
-    EventType.NATURAL_DISASTER: (AssetId.GOLD, AssetId.BRENT_OIL),
-    EventType.POLITICAL_TRANSITION: (AssetId.GOLD,),
+    EventType.MILITARY_CONFLICT: (AssetId.NEM_NYSE, AssetId.XOM_NYSE),
+    EventType.STRAIT_CLOSURE: (AssetId.NEM_NYSE, AssetId.XOM_NYSE),
+    EventType.SUPPLY_DISRUPTION: (AssetId.XOM_NYSE,),
+    EventType.SANCTIONS: (AssetId.NEM_NYSE, AssetId.XOM_NYSE),
+    EventType.RATE_DECISION: (AssetId.NEM_NYSE, AssetId.XOM_NYSE),
+    EventType.INFLATION_CHANGE: (AssetId.NEM_NYSE,),
+    EventType.RECESSION_SIGNAL: (AssetId.NEM_NYSE, AssetId.XOM_NYSE),
+    EventType.NATURAL_DISASTER: (AssetId.NEM_NYSE, AssetId.XOM_NYSE),
+    EventType.POLITICAL_TRANSITION: (AssetId.NEM_NYSE,),
 }
 
 # Industry groups an event type moves in addition to the commodities above. This is what lets an

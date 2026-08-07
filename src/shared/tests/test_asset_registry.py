@@ -20,24 +20,25 @@ from shared.schemas.messages import AssetId, PriceKind
 def test_supported_assets_cover_every_canonical_asset() -> None:
     # Every AssetId must have an approved reference series (commodities + sector bellwethers).
     assert set(supported_assets()) == set(AssetId)
-    assert {AssetId.GOLD, AssetId.BRENT_OIL} <= set(supported_assets())
+    assert {AssetId.NEM_NYSE, AssetId.XOM_NYSE} <= set(supported_assets())
 
 
 @pytest.mark.parametrize(
-    ("asset_id", "provider_symbol", "expected_exchange"),
+    ("asset_id", "provider_symbol", "expected_exchange", "provider"),
     [
-        (AssetId.GOLD, "XAUUSD", "COMEX"),
-        (AssetId.BRENT_OIL, "UKOIL", "NYMEX"),
+        # NEM routes to yahoo, XOM to biquote — provider is per asset, not per market.
+        (AssetId.NEM_NYSE, "NEM", "NYSE", "yahoo"),
+        (AssetId.XOM_NYSE, "XOM", "NYSE", "biquote.io"),
     ],
 )
 def test_resolve_maps_canonical_id_to_frozen_policy(
-    asset_id: AssetId, provider_symbol: str, expected_exchange: str
+    asset_id: AssetId, provider_symbol: str, expected_exchange: str, provider: str
 ) -> None:
     series = resolve(asset_id)
     assert series.asset_id == asset_id
     assert series.provider_symbol == provider_symbol
     assert series.expected_exchange == expected_exchange
-    assert series.provider == "biquote.io"
+    assert series.provider == provider
     assert series.timezone == "America/New_York"
     assert series.currency == "USD"
 
@@ -84,8 +85,8 @@ def test_every_asset_belongs_to_exactly_one_group() -> None:
         group_id = group_of(asset_id)
         assert group_id
         assert asset_id in members_of(group_id)
-    assert group_of(AssetId.GOLD) == "PRECIOUS_METALS"
-    assert group_of(AssetId.BRENT_OIL) == "OIL_GAS"
+    assert group_of(AssetId.NEM_NYSE) == "PRECIOUS_METALS"
+    assert group_of(AssetId.XOM_NYSE) == "OIL_GAS"
 
 
 def test_group_lookups_reject_an_unknown_asset() -> None:
@@ -109,14 +110,36 @@ def test_code_is_documentation_only_and_never_the_provider_symbol() -> None:
         assert series.provider_symbol != series.code
 
 
-def test_resolve_has_no_validated_fallback_for_the_poc() -> None:
-    # No validated fallback provider for the POC: fallback must be None, never a substitution.
+def test_fallback_is_null_or_names_a_declared_asset() -> None:
+    # A fallback must be explicitly null or name a DECLARED asset — never a silent substitution to
+    # some other listing, ETF, or contract (REF-02 "Registry rules"). Since multi-market-v2 three
+    # biquote-served assets legitimately declare a Yahoo fallback, so "always None" is no longer the
+    # rule; what must hold is that every declared fallback resolves.
+    declared = set(supported_assets())
+    for asset_id in declared:
+        fallback = resolve(asset_id).fallback
+        if fallback is not None:
+            assert fallback in declared, f"{asset_id} fallback {fallback} is not a declared asset"
+
+
+def test_fallback_preserves_currency_and_session_semantics() -> None:
+    # A fallback must represent the same economic instrument: same currency, timezone and session
+    # clock. Otherwise scoring would silently compare closes from different markets.
     for asset_id in supported_assets():
-        assert resolve(asset_id).fallback is None
+        series = resolve(asset_id)
+        if series.fallback is None:
+            continue
+        alt = resolve(series.fallback)
+        assert alt.currency == series.currency
+        assert alt.timezone == series.timezone
+        assert alt.session_completion_hour == series.session_completion_hour
+        assert alt.session_completion_minute == series.session_completion_minute
+        assert alt.price_kind == series.price_kind
+        assert alt.is_adjusted == series.is_adjusted
 
 
 def test_reference_series_is_immutable() -> None:
-    series = resolve(AssetId.GOLD)
+    series = resolve(AssetId.NEM_NYSE)
     with pytest.raises(Exception):  # noqa: B017 - pydantic frozen model raises ValidationError
         series.provider_symbol = "XXX"  # type: ignore[misc]
 

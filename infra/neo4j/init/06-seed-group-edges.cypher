@@ -86,10 +86,6 @@ MATCH (cf:CausalFactor {id: 'RATE_DECISION'}), (g:AssetGroup {id: 'BANKING_FINAN
 MERGE (cf)-[r:CAUSES]->(g)
 SET r.direction = 'UP', r.weight = 0.45, r.confidence = 0.60, r.alpha = 1.0, r.beta = 1.0, r.last_updated = datetime();
 
-MATCH (cf:CausalFactor {id: 'RATE_DECISION'}), (g:AssetGroup {id: 'REAL_ESTATE'})
-MERGE (cf)-[r:CAUSES]->(g)
-SET r.direction = 'DOWN', r.weight = 0.50, r.confidence = 0.60, r.alpha = 1.0, r.beta = 1.0, r.last_updated = datetime();
-
 MATCH (cf:CausalFactor {id: 'RATE_DECISION'}), (g:AssetGroup {id: 'SOFTWARE_INDUSTRY'})
 MERGE (cf)-[r:CAUSES]->(g)
 SET r.direction = 'DOWN', r.weight = 0.35, r.confidence = 0.50, r.alpha = 1.0, r.beta = 1.0, r.last_updated = datetime();
@@ -110,10 +106,6 @@ SET r.direction = 'DOWN', r.weight = 0.50, r.confidence = 0.60, r.alpha = 1.0, r
 MATCH (cf:CausalFactor {id: 'RECESSION_SIGNAL'}), (g:AssetGroup {id: 'CONSUMER_ELECTRONICS'})
 MERGE (cf)-[r:CAUSES]->(g)
 SET r.direction = 'DOWN', r.weight = 0.45, r.confidence = 0.55, r.alpha = 1.0, r.beta = 1.0, r.last_updated = datetime();
-
-MATCH (cf:CausalFactor {id: 'RECESSION_SIGNAL'}), (g:AssetGroup {id: 'CONSUMER_FITNESS'})
-MERGE (cf)-[r:CAUSES]->(g)
-SET r.direction = 'DOWN', r.weight = 0.45, r.confidence = 0.50, r.alpha = 1.0, r.beta = 1.0, r.last_updated = datetime();
 
 MATCH (cf:CausalFactor {id: 'SUPPLY_DISRUPTION'}), (g:AssetGroup {id: 'AUTOMOTIVE_INDUSTRY'})
 MERGE (cf)-[r:CAUSES]->(g)

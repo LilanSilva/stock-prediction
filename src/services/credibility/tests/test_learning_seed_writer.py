@@ -54,7 +54,7 @@ def _estimate(
     return EdgeEstimate(
         factor=EventType.MILITARY_CONFLICT,
         condition=condition,
-        asset=AssetId.BRENT_OIL,
+        asset=AssetId.XOM_NYSE,
         direction=direction,
         weight=0.6,
         confidence=0.9,

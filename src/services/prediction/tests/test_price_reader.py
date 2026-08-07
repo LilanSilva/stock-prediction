@@ -32,55 +32,55 @@ def _closes_payload(asset_id: AssetId, closes: list[str]) -> dict[str, object]:
 
 async def test_is_elevated_true_when_latest_exceeds_baseline_mean_by_threshold() -> None:
     # latest 3400 vs baseline mean of [3300, 3290, 3310] = 3300; 3400 > 3300 * 1.01 = 3333.
-    payload = _closes_payload(AssetId.BRENT_OIL, ["3400", "3300", "3290", "3310"])
+    payload = _closes_payload(AssetId.XOM_NYSE, ["3400", "3300", "3290", "3310"])
 
     def handler(request: httpx.Request) -> httpx.Response:
-        assert request.url.params["asset_id"] == "BRENT_OIL"
+        assert request.url.params["asset_id"] == "XOM_NYSE"
         assert request.url.params["sessions"] == "4"  # lookback 3 + 1
         return httpx.Response(200, json=payload)
 
     reader = _reader(handler)
     try:
-        assert await reader.is_elevated(AssetId.BRENT_OIL) is True
+        assert await reader.is_elevated(AssetId.XOM_NYSE) is True
     finally:
         await reader.close()
 
 
 async def test_is_elevated_false_when_price_is_flat() -> None:
     # latest 3305 vs baseline mean 3300; 3305 < 3333 threshold -> not elevated.
-    payload = _closes_payload(AssetId.BRENT_OIL, ["3305", "3300", "3290", "3310"])
+    payload = _closes_payload(AssetId.XOM_NYSE, ["3305", "3300", "3290", "3310"])
 
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json=payload)
 
     reader = _reader(handler)
     try:
-        assert await reader.is_elevated(AssetId.BRENT_OIL) is False
+        assert await reader.is_elevated(AssetId.XOM_NYSE) is False
     finally:
         await reader.close()
 
 
 async def test_is_elevated_false_on_insufficient_data() -> None:
     # A single close has no baseline to compare against -> fail safe.
-    payload = _closes_payload(AssetId.GOLD, ["3400"])
+    payload = _closes_payload(AssetId.NEM_NYSE, ["3400"])
 
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json=payload)
 
     reader = _reader(handler)
     try:
-        assert await reader.is_elevated(AssetId.GOLD) is False
+        assert await reader.is_elevated(AssetId.NEM_NYSE) is False
     finally:
         await reader.close()
 
 
 async def test_is_elevated_false_on_empty_closes() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={"asset_id": "GOLD", "closes": []})
+        return httpx.Response(200, json={"asset_id": "NEM_NYSE", "closes": []})
 
     reader = _reader(handler)
     try:
-        assert await reader.is_elevated(AssetId.GOLD) is False
+        assert await reader.is_elevated(AssetId.NEM_NYSE) is False
     finally:
         await reader.close()
 
@@ -91,7 +91,7 @@ async def test_is_elevated_false_on_http_error() -> None:
 
     reader = _reader(handler)
     try:
-        assert await reader.is_elevated(AssetId.GOLD) is False
+        assert await reader.is_elevated(AssetId.NEM_NYSE) is False
     finally:
         await reader.close()
 
@@ -102,6 +102,6 @@ async def test_is_elevated_false_on_transport_error() -> None:
 
     reader = _reader(handler)
     try:
-        assert await reader.is_elevated(AssetId.GOLD) is False
+        assert await reader.is_elevated(AssetId.NEM_NYSE) is False
     finally:
         await reader.close()

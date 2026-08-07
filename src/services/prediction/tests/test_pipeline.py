@@ -40,7 +40,7 @@ def _event(
         cluster_id=uuid.uuid4(),
         canonical_summary="something happened",
         event_type=event_type,
-        affected_asset_ids=assets if assets is not None else [AssetId.GOLD],
+        affected_asset_ids=assets if assets is not None else [AssetId.NEM_NYSE],
         first_seen_at=_NOW,
         last_seen_at=_NOW,
         extraction_method=ExtractionMethod.LOCAL,
@@ -54,7 +54,7 @@ def _edge(
     direction: Direction,
     weight: float,
     *,
-    asset: AssetId = AssetId.GOLD,
+    asset: AssetId = AssetId.NEM_NYSE,
     condition: ConditionCode | None = None,
 ) -> FiringEdge:
     return FiringEdge(
@@ -169,7 +169,7 @@ def _pipeline(
 def _context() -> ContextRecord:
     return ContextRecord(
         context_id=uuid.uuid4(),
-        asset_id=AssetId.GOLD,
+        asset_id=AssetId.NEM_NYSE,
         context_version=1,
         window_start=datetime(2026, 7, 27, 14, 0, tzinfo=UTC),
         window_end=datetime(2026, 7, 27, 15, 0, tzinfo=UTC),
@@ -180,8 +180,8 @@ def _context() -> ContextRecord:
 async def test_process_event_assigns_to_each_affected_asset() -> None:
     repo = _FakeRepo()
     pipeline = _pipeline(repo, _FakeGraph())
-    await pipeline.process_event(_event(assets=[AssetId.GOLD, AssetId.BRENT_OIL]))
-    assert {a["asset_id"] for a in repo.assigned} == {AssetId.GOLD, AssetId.BRENT_OIL}
+    await pipeline.process_event(_event(assets=[AssetId.NEM_NYSE, AssetId.XOM_NYSE]))
+    assert {a["asset_id"] for a in repo.assigned} == {AssetId.NEM_NYSE, AssetId.XOM_NYSE}
     expected_window = datetime(2026, 7, 27, 14, 30, tzinfo=UTC)
     assert all(a["window_start"] == expected_window for a in repo.assigned)
 
@@ -203,9 +203,9 @@ async def test_close_produces_graph_only_prediction() -> None:
     assert message.decision_method == DecisionMethod.GRAPH_ONLY
     assert message.llm_metadata is None
     assert message.direction == Direction.UP
-    assert message.asset_id == AssetId.GOLD
+    assert message.asset_id == AssetId.NEM_NYSE
     assert message.event_ids == [events[0].event_id]
-    assert key == "GOLD|2026-07-27T14:00:00+00:00|ONE_TRADING_DAY|1"
+    assert key == "NEM_NYSE|2026-07-27T14:00:00+00:00|ONE_TRADING_DAY|1"
 
 
 async def test_close_with_no_firing_edges_makes_no_prediction() -> None:
@@ -242,7 +242,7 @@ async def test_close_is_idempotent_when_store_reports_duplicate() -> None:
 def _oil_context() -> ContextRecord:
     return ContextRecord(
         context_id=uuid.uuid4(),
-        asset_id=AssetId.BRENT_OIL,
+        asset_id=AssetId.XOM_NYSE,
         context_version=1,
         window_start=datetime(2026, 7, 27, 14, 0, tzinfo=UTC),
         window_end=datetime(2026, 7, 27, 15, 0, tzinfo=UTC),
@@ -258,21 +258,21 @@ def _conditioned_conflict_graph() -> _FakeGraph:
                 EventType.MILITARY_CONFLICT,
                 Direction.UP,
                 0.65,
-                asset=AssetId.BRENT_OIL,
+                asset=AssetId.XOM_NYSE,
                 condition=ConditionCode.TRANSPORT_AFFECTED,
             ),
             _edge(
                 EventType.MILITARY_CONFLICT,
                 Direction.UP,
                 0.75,
-                asset=AssetId.GOLD,
+                asset=AssetId.NEM_NYSE,
                 condition=ConditionCode.TRANSPORT_AFFECTED,
             ),
             _edge(
                 EventType.MILITARY_CONFLICT,
                 Direction.UP,
                 0.70,
-                asset=AssetId.GOLD,
+                asset=AssetId.NEM_NYSE,
                 condition=ConditionCode.SAFE_HAVEN_ONLY,
             ),
         ]
@@ -309,12 +309,12 @@ async def test_transport_affected_resolution_flips_oil_up_to_down() -> None:
     ).close_ready_contexts()
     assert produced == 1
     message, _ = repo.stored[0]
-    assert message.asset_id == AssetId.BRENT_OIL
+    assert message.asset_id == AssetId.XOM_NYSE
     assert message.direction == Direction.DOWN
     # The contributing edge keeps the seeded triple identity even though its sign was flipped.
     assert (
         message.contributing_edges[0].edge_id
-        == "MILITARY_CONFLICT|TRANSPORT_AFFECTED->BRENT_OIL"
+        == "MILITARY_CONFLICT|TRANSPORT_AFFECTED->XOM_NYSE"
     )
 
 
@@ -354,7 +354,7 @@ async def test_transport_affected_occurrence_keeps_oil_up() -> None:
     produced = await _pipeline(repo, _conditioned_conflict_graph()).close_ready_contexts()
     assert produced == 1
     message, _ = repo.stored[0]
-    assert message.asset_id == AssetId.BRENT_OIL
+    assert message.asset_id == AssetId.XOM_NYSE
     assert message.direction == Direction.UP
 
 
@@ -376,7 +376,7 @@ async def test_occurrence_conflict_unaffected_by_elevated_price() -> None:
     ).close_ready_contexts()
     assert produced == 1
     message, _ = repo.stored[0]
-    assert message.asset_id == AssetId.BRENT_OIL
+    assert message.asset_id == AssetId.XOM_NYSE
     assert message.direction == Direction.UP
     ctx = _oil_context()
     events = [
@@ -452,7 +452,7 @@ async def test_market_open_uses_the_asset_own_market_calendar() -> None:
     # 23:00 UTC Friday is already Saturday 01:00 in Stockholm -> not a trading day there.
     assert await pipeline._is_market_open(AssetId.SAAB_B_STO, friday_late_utc) is False
     # The same instant is still Friday evening in New York -> a trading day.
-    assert await pipeline._is_market_open(AssetId.GOLD, friday_late_utc) is True
+    assert await pipeline._is_market_open(AssetId.NEM_NYSE, friday_late_utc) is True
 
 
 async def test_market_open_is_false_for_an_unregistered_asset() -> None:

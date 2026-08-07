@@ -35,15 +35,15 @@ def test_content_hash_is_stable_and_distinct() -> None:
     a = _observation(date(2026, 7, 13), "3290.25")
     b = _observation(date(2026, 7, 13), "3290.25")
     c = _observation(date(2026, 7, 13), "3291.00")
-    assert observation_content_hash(AssetId.GOLD, a) == observation_content_hash(AssetId.GOLD, b)
-    assert observation_content_hash(AssetId.GOLD, a) != observation_content_hash(AssetId.GOLD, c)
+    assert observation_content_hash(AssetId.NEM_NYSE, a) == observation_content_hash(AssetId.NEM_NYSE, b)
+    assert observation_content_hash(AssetId.NEM_NYSE, a) != observation_content_hash(AssetId.NEM_NYSE, c)
 
 
 def test_build_price_observed_carries_both_closes_and_ids() -> None:
     request = PendingRequest(
         request_id=uuid.uuid4(),
         prediction_id=uuid.uuid4(),
-        asset_id=AssetId.GOLD,
+        asset_id=AssetId.NEM_NYSE,
         baseline_session=date(2026, 7, 10),
         settlement_session=date(2026, 7, 13),
         market_calendar="COMEX",
@@ -60,6 +60,6 @@ def test_build_price_observed_carries_both_closes_and_ids() -> None:
     assert message.prediction_id == request.prediction_id
     assert message.correlation_id == request.correlation_id
     assert message.causation_id == request.request_id
-    assert message.asset_id == AssetId.GOLD
+    assert message.asset_id == AssetId.NEM_NYSE
     assert message.baseline.close == Decimal("3315.0")
     assert message.settlement.close == Decimal("3290.25")

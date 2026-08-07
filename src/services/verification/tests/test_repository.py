@@ -8,7 +8,7 @@ from verification.repository import _edges_to_json, _json_list
 def test_json_round_trip_preserves_conditioned_edge_id() -> None:
     # The JSONB (de)serialization used for verification.evaluations.contributing_edges must keep the
     # 3-part "FACTOR|CONDITION->ASSET" edge_id verbatim (no length limit, no reformatting).
-    conditioned = "MILITARY_CONFLICT|TRANSPORT_AFFECTED->BRENT_OIL"
+    conditioned = "MILITARY_CONFLICT|TRANSPORT_AFFECTED->XOM_NYSE"
     edge = ContributingEdge(
         edge_id=conditioned,
         direction=Direction.UP,

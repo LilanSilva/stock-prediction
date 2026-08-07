@@ -21,13 +21,13 @@ MERGE (a:Asset {id: 'LMT_NYSE'})
 SET a.name = 'Lockheed Martin', a.asset_class = 'equity', a.currency = 'USD', a.market = 'NYSE', a.timezone = 'America/New_York';
 MATCH (a:Asset {id: 'LMT_NYSE'}), (g:AssetGroup {id: 'WEAPON_INDUSTRY'})
 MERGE (a)-[:MEMBER_OF]->(g);
+MERGE (a:Asset {id: 'LMT_NYSE_YH'})
+SET a.name = 'Lockheed Martin (Yahoo fallback)', a.asset_class = 'equity', a.currency = 'USD', a.market = 'NYSE', a.timezone = 'America/New_York';
+MATCH (a:Asset {id: 'LMT_NYSE_YH'}), (g:AssetGroup {id: 'WEAPON_INDUSTRY'})
+MERGE (a)-[:MEMBER_OF]->(g);
 MERGE (a:Asset {id: 'SAAB_B_STO'})
 SET a.name = 'Saab AB', a.asset_class = 'equity', a.currency = 'SEK', a.market = 'STO', a.timezone = 'Europe/Stockholm';
 MATCH (a:Asset {id: 'SAAB_B_STO'}), (g:AssetGroup {id: 'WEAPON_INDUSTRY'})
-MERGE (a)-[:MEMBER_OF]->(g);
-MERGE (a:Asset {id: 'AM_EPA'})
-SET a.name = 'Dassault Aviation', a.asset_class = 'equity', a.currency = 'EUR', a.market = 'PAR', a.timezone = 'Europe/Paris';
-MATCH (a:Asset {id: 'AM_EPA'}), (g:AssetGroup {id: 'WEAPON_INDUSTRY'})
 MERGE (a)-[:MEMBER_OF]->(g);
 
 // --- Aerospace & aviation ---
@@ -53,10 +53,6 @@ MERGE (a:Asset {id: 'NOVO_B_CPH'})
 SET a.name = 'Novo Nordisk', a.asset_class = 'equity', a.currency = 'DKK', a.market = 'CPH', a.timezone = 'Europe/Copenhagen';
 MATCH (a:Asset {id: 'NOVO_B_CPH'}), (g:AssetGroup {id: 'PHARMA_INDUSTRY'})
 MERGE (a)-[:MEMBER_OF]->(g);
-MERGE (a:Asset {id: 'BNTX_NASDAQ'})
-SET a.name = 'BioNTech', a.asset_class = 'equity', a.currency = 'USD', a.market = 'NASDAQ', a.timezone = 'America/New_York';
-MATCH (a:Asset {id: 'BNTX_NASDAQ'}), (g:AssetGroup {id: 'PHARMA_INDUSTRY'})
-MERGE (a)-[:MEMBER_OF]->(g);
 MERGE (a:Asset {id: 'MRNA_NASDAQ'})
 SET a.name = 'Moderna', a.asset_class = 'equity', a.currency = 'USD', a.market = 'NASDAQ', a.timezone = 'America/New_York';
 MATCH (a:Asset {id: 'MRNA_NASDAQ'}), (g:AssetGroup {id: 'PHARMA_INDUSTRY'})
@@ -72,6 +68,10 @@ MERGE (a)-[:MEMBER_OF]->(g);
 MERGE (a:Asset {id: 'ASML_AMS'})
 SET a.name = 'ASML Holding', a.asset_class = 'equity', a.currency = 'EUR', a.market = 'AMS', a.timezone = 'Europe/Amsterdam';
 MATCH (a:Asset {id: 'ASML_AMS'}), (g:AssetGroup {id: 'SEMICONDUCTOR_INDUSTRY'})
+MERGE (a)-[:MEMBER_OF]->(g);
+MERGE (a:Asset {id: 'SIVE_STO'})
+SET a.name = 'Sivers Semiconductors', a.asset_class = 'equity', a.currency = 'SEK', a.market = 'STO', a.timezone = 'Europe/Stockholm';
+MATCH (a:Asset {id: 'SIVE_STO'}), (g:AssetGroup {id: 'SEMICONDUCTOR_INDUSTRY'})
 MERGE (a)-[:MEMBER_OF]->(g);
 
 // --- Software & cloud ---
@@ -97,6 +97,10 @@ MERGE (a:Asset {id: 'GOOGL_NASDAQ'})
 SET a.name = 'Alphabet', a.asset_class = 'equity', a.currency = 'USD', a.market = 'NASDAQ', a.timezone = 'America/New_York';
 MATCH (a:Asset {id: 'GOOGL_NASDAQ'}), (g:AssetGroup {id: 'INTERNET_PLATFORMS'})
 MERGE (a)-[:MEMBER_OF]->(g);
+MERGE (a:Asset {id: 'GOOGL_NASDAQ_YH'})
+SET a.name = 'Alphabet (Yahoo fallback)', a.asset_class = 'equity', a.currency = 'USD', a.market = 'NASDAQ', a.timezone = 'America/New_York';
+MATCH (a:Asset {id: 'GOOGL_NASDAQ_YH'}), (g:AssetGroup {id: 'INTERNET_PLATFORMS'})
+MERGE (a)-[:MEMBER_OF]->(g);
 MERGE (a:Asset {id: 'AMZN_NASDAQ'})
 SET a.name = 'Amazon', a.asset_class = 'equity', a.currency = 'USD', a.market = 'NASDAQ', a.timezone = 'America/New_York';
 MATCH (a:Asset {id: 'AMZN_NASDAQ'}), (g:AssetGroup {id: 'INTERNET_PLATFORMS'})
@@ -121,37 +125,33 @@ MERGE (a:Asset {id: 'TSLA_NASDAQ'})
 SET a.name = 'Tesla', a.asset_class = 'equity', a.currency = 'USD', a.market = 'NASDAQ', a.timezone = 'America/New_York';
 MATCH (a:Asset {id: 'TSLA_NASDAQ'}), (g:AssetGroup {id: 'AUTOMOTIVE_INDUSTRY'})
 MERGE (a)-[:MEMBER_OF]->(g);
+MERGE (a:Asset {id: 'TSLA_NASDAQ_YH'})
+SET a.name = 'Tesla (Yahoo fallback)', a.asset_class = 'equity', a.currency = 'USD', a.market = 'NASDAQ', a.timezone = 'America/New_York';
+MATCH (a:Asset {id: 'TSLA_NASDAQ_YH'}), (g:AssetGroup {id: 'AUTOMOTIVE_INDUSTRY'})
+MERGE (a)-[:MEMBER_OF]->(g);
 
 // --- Oil, gas & refining ---
 MERGE (g:AssetGroup {id: 'OIL_GAS'})
 SET g.name = 'Oil, gas & refining';
-MERGE (a:Asset {id: 'BRENT_OIL'})
-SET a.name = 'Brent crude oil', a.asset_class = 'commodity', a.currency = 'USD', a.market = 'NYMEX', a.timezone = 'America/New_York';
-MATCH (a:Asset {id: 'BRENT_OIL'}), (g:AssetGroup {id: 'OIL_GAS'})
-MERGE (a)-[:MEMBER_OF]->(g);
 MERGE (a:Asset {id: 'XOM_NYSE'})
 SET a.name = 'Exxon Mobil', a.asset_class = 'equity', a.currency = 'USD', a.market = 'NYSE', a.timezone = 'America/New_York';
 MATCH (a:Asset {id: 'XOM_NYSE'}), (g:AssetGroup {id: 'OIL_GAS'})
 MERGE (a)-[:MEMBER_OF]->(g);
-MERGE (a:Asset {id: 'FANG_NASDAQ'})
-SET a.name = 'Diamondback Energy', a.asset_class = 'equity', a.currency = 'USD', a.market = 'NASDAQ', a.timezone = 'America/New_York';
-MATCH (a:Asset {id: 'FANG_NASDAQ'}), (g:AssetGroup {id: 'OIL_GAS'})
-MERGE (a)-[:MEMBER_OF]->(g);
-MERGE (a:Asset {id: 'VLO_NYSE'})
-SET a.name = 'Valero Energy', a.asset_class = 'equity', a.currency = 'USD', a.market = 'NYSE', a.timezone = 'America/New_York';
-MATCH (a:Asset {id: 'VLO_NYSE'}), (g:AssetGroup {id: 'OIL_GAS'})
+MERGE (a:Asset {id: 'IPCO_STO'})
+SET a.name = 'International Petroleum Corp', a.asset_class = 'equity', a.currency = 'SEK', a.market = 'STO', a.timezone = 'Europe/Stockholm';
+MATCH (a:Asset {id: 'IPCO_STO'}), (g:AssetGroup {id: 'OIL_GAS'})
 MERGE (a)-[:MEMBER_OF]->(g);
 
 // --- Precious metals & mining ---
 MERGE (g:AssetGroup {id: 'PRECIOUS_METALS'})
 SET g.name = 'Precious metals & mining';
-MERGE (a:Asset {id: 'GOLD'})
-SET a.name = 'Gold', a.asset_class = 'commodity', a.currency = 'USD', a.market = 'COMEX', a.timezone = 'America/New_York';
-MATCH (a:Asset {id: 'GOLD'}), (g:AssetGroup {id: 'PRECIOUS_METALS'})
-MERGE (a)-[:MEMBER_OF]->(g);
 MERGE (a:Asset {id: 'LUG_STO'})
 SET a.name = 'Lundin Gold', a.asset_class = 'equity', a.currency = 'SEK', a.market = 'STO', a.timezone = 'Europe/Stockholm';
 MATCH (a:Asset {id: 'LUG_STO'}), (g:AssetGroup {id: 'PRECIOUS_METALS'})
+MERGE (a)-[:MEMBER_OF]->(g);
+MERGE (a:Asset {id: 'NEM_NYSE'})
+SET a.name = 'Newmont Corporation', a.asset_class = 'equity', a.currency = 'USD', a.market = 'NYSE', a.timezone = 'America/New_York';
+MATCH (a:Asset {id: 'NEM_NYSE'}), (g:AssetGroup {id: 'PRECIOUS_METALS'})
 MERGE (a)-[:MEMBER_OF]->(g);
 
 // --- Banking & investment ---
@@ -196,20 +196,4 @@ SET g.name = 'Food & ingredients';
 MERGE (a:Asset {id: 'AAK_STO'})
 SET a.name = 'AAK AB', a.asset_class = 'equity', a.currency = 'SEK', a.market = 'STO', a.timezone = 'Europe/Stockholm';
 MATCH (a:Asset {id: 'AAK_STO'}), (g:AssetGroup {id: 'FOOD_INGREDIENTS'})
-MERGE (a)-[:MEMBER_OF]->(g);
-
-// --- Real estate ---
-MERGE (g:AssetGroup {id: 'REAL_ESTATE'})
-SET g.name = 'Real estate';
-MERGE (a:Asset {id: 'SPG_NYSE'})
-SET a.name = 'Simon Property Group', a.asset_class = 'equity', a.currency = 'USD', a.market = 'NYSE', a.timezone = 'America/New_York';
-MATCH (a:Asset {id: 'SPG_NYSE'}), (g:AssetGroup {id: 'REAL_ESTATE'})
-MERGE (a)-[:MEMBER_OF]->(g);
-
-// --- Consumer fitness & leisure ---
-MERGE (g:AssetGroup {id: 'CONSUMER_FITNESS'})
-SET g.name = 'Consumer fitness & leisure';
-MERGE (a:Asset {id: 'PTON_NASDAQ'})
-SET a.name = 'Peloton Interactive', a.asset_class = 'equity', a.currency = 'USD', a.market = 'NASDAQ', a.timezone = 'America/New_York';
-MATCH (a:Asset {id: 'PTON_NASDAQ'}), (g:AssetGroup {id: 'CONSUMER_FITNESS'})
 MERGE (a)-[:MEMBER_OF]->(g);

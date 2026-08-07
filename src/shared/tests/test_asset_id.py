@@ -13,33 +13,33 @@ from shared.schemas.messages import AssetId
 
 
 def test_attribute_access_behaves_like_an_enum_member() -> None:
-    assert AssetId.GOLD == "GOLD"
-    assert AssetId.GOLD.value == "GOLD"
-    assert AssetId.GOLD.name == "GOLD"
+    assert AssetId.NEM_NYSE == "NEM_NYSE"
+    assert AssetId.NEM_NYSE.value == "NEM_NYSE"
+    assert AssetId.NEM_NYSE.name == "NEM_NYSE"
 
 
 def test_members_are_interned_so_identity_comparison_holds() -> None:
     # StrEnum members were singletons; call sites use `is` comparisons.
-    assert AssetId("GOLD") is AssetId.GOLD
-    assert AssetId(AssetId.GOLD) is AssetId.GOLD
+    assert AssetId("NEM_NYSE") is AssetId.NEM_NYSE
+    assert AssetId(AssetId.NEM_NYSE) is AssetId.NEM_NYSE
 
 
 def test_is_a_str_subclass() -> None:
-    assert isinstance(AssetId.GOLD, str)
-    assert f"{AssetId.GOLD}" == "GOLD"
-    assert AssetId.GOLD.lower() == "gold"
+    assert isinstance(AssetId.NEM_NYSE, str)
+    assert f"{AssetId.NEM_NYSE}" == "NEM_NYSE"
+    assert AssetId.NEM_NYSE.lower() == "nem_nyse"
 
 
 def test_usable_as_a_dict_key_alongside_plain_strings() -> None:
-    mapping = {AssetId.GOLD: 1}
-    assert mapping[AssetId("GOLD")] == 1
-    assert mapping["GOLD"] == 1
+    mapping = {AssetId.NEM_NYSE: 1}
+    assert mapping[AssetId("NEM_NYSE")] == 1
+    assert mapping["NEM_NYSE"] == 1
 
 
 def test_iteration_and_membership() -> None:
     assert len(AssetId) == len(supported_assets())
     assert set(AssetId) == {AssetId(a) for a in supported_assets()}
-    assert "GOLD" in AssetId
+    assert "NEM_NYSE" in AssetId
     assert "NOT_AN_ASSET" not in AssetId
 
 

@@ -41,14 +41,14 @@ class _FakePool:
 
 async def test_get_recent_closes_clamps_above_max() -> None:
     pool = _FakePool([])
-    await get_recent_closes(pool, AssetId.GOLD, 10_000)  # type: ignore[arg-type]
+    await get_recent_closes(pool, AssetId.NEM_NYSE, 10_000)  # type: ignore[arg-type]
     assert pool.last_limit == MAX_RECENT_SESSIONS
-    assert pool.last_asset_id == "GOLD"
+    assert pool.last_asset_id == "NEM_NYSE"
 
 
 async def test_get_recent_closes_clamps_below_min() -> None:
     pool = _FakePool([])
-    await get_recent_closes(pool, AssetId.BRENT_OIL, 0)  # type: ignore[arg-type]
+    await get_recent_closes(pool, AssetId.XOM_NYSE, 0)  # type: ignore[arg-type]
     assert pool.last_limit == MIN_RECENT_SESSIONS
 
 
@@ -59,7 +59,7 @@ async def test_get_recent_closes_returns_session_close_pairs() -> None:
             {"session": date(2026, 7, 10), "close": Decimal("3315.0")},
         ]
     )
-    pairs = await get_recent_closes(pool, AssetId.GOLD, 5)  # type: ignore[arg-type]
+    pairs = await get_recent_closes(pool, AssetId.NEM_NYSE, 5)  # type: ignore[arg-type]
     assert pairs == [
         (date(2026, 7, 13), Decimal("3290.25")),
         (date(2026, 7, 10), Decimal("3315.0")),
@@ -81,11 +81,11 @@ def test_prices_recent_serializes_closes_as_strings(
     app.state.ctx = SimpleNamespace(pool=object())
 
     client = TestClient(app)
-    resp = client.get("/prices/recent", params={"asset_id": "GOLD", "sessions": 5})
+    resp = client.get("/prices/recent", params={"asset_id": "NEM_NYSE", "sessions": 5})
 
     assert resp.status_code == 200
     assert resp.json() == {
-        "asset_id": "GOLD",
+        "asset_id": "NEM_NYSE",
         "closes": [
             {"session": "2026-07-13", "close": "3290.25"},
             {"session": "2026-07-10", "close": "3315.0"},
@@ -108,7 +108,7 @@ def test_prices_recent_defaults_to_twenty_sessions(
     app.state.ctx = SimpleNamespace(pool=object())
 
     client = TestClient(app)
-    resp = client.get("/prices/recent", params={"asset_id": "BRENT_OIL"})
+    resp = client.get("/prices/recent", params={"asset_id": "XOM_NYSE"})
 
     assert resp.status_code == 200
     assert captured["sessions"] == 20
@@ -123,5 +123,5 @@ def test_prices_recent_rejects_unknown_asset() -> None:
 @pytest.mark.parametrize("sessions", [0, MAX_RECENT_SESSIONS + 1])
 def test_prices_recent_rejects_out_of_range_sessions(sessions: int) -> None:
     client = TestClient(app)
-    resp = client.get("/prices/recent", params={"asset_id": "GOLD", "sessions": sessions})
+    resp = client.get("/prices/recent", params={"asset_id": "NEM_NYSE", "sessions": sessions})
     assert resp.status_code == 422

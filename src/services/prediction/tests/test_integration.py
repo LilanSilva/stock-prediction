@@ -8,7 +8,13 @@ import asyncpg
 import pytest
 from shared.graph import CausalGraphClient, Neo4jSettings
 from shared.messaging.client import RabbitMQClient
-from shared.schemas.messages import AssetId, EventDetected, EventType, ExtractionMethod
+from shared.schemas.messages import (
+    AssetId,
+    ConditionCode,
+    EventDetected,
+    EventType,
+    ExtractionMethod,
+)
 
 from prediction.config import PredictionSettings
 from prediction.context import window_bounds
@@ -34,7 +40,18 @@ class _StubPriceReader:
         return True
 
 
-def _event(asset: AssetId, event_type: EventType) -> EventDetected:
+def _event(
+    asset: AssetId,
+    event_type: EventType,
+    context_tags: list[ConditionCode] | None = None,
+) -> EventDetected:
+    """Build an EventDetected for the live-stack tests.
+
+    ``context_tags`` matters: the seeded ``MILITARY_CONFLICT`` edges are all **conditioned**
+    (`05-seed-conditioned-edges.cypher` deletes the blanket edge as superseded per ADR-006), and
+    `PRD-12` fires a conditioned edge only when its condition is in the active set. A bare event
+    with no tags therefore has no firing edge and correctly produces no prediction.
+    """
     now = datetime.now(UTC)
     return EventDetected(
         correlation_id=uuid.uuid4(),
@@ -44,9 +61,36 @@ def _event(asset: AssetId, event_type: EventType) -> EventDetected:
         canonical_summary="itest event",
         event_type=event_type,
         affected_asset_ids=[asset],
+        context_tags=context_tags or [],
         first_seen_at=now,
         last_seen_at=now,
         extraction_method=ExtractionMethod.LOCAL,
+    )
+
+
+async def _isolate_stance(pool: asyncpg.Pool, asset_id: AssetId) -> list[uuid.UUID]:
+    """Park the asset's active predictions so stance rules cannot suppress this test's decision.
+
+    `PRD-31` marks a context PREDICTED and emits nothing when the new decision matches the latest
+    active prediction on (direction, magnitude). Against a live database the asset already carries
+    real PENDING predictions, so a test asserting "a prediction was produced" would fail on correct
+    behaviour. Returns the parked ids so the test can restore them.
+    """
+    rows = await pool.fetch(
+        "UPDATE prediction.predictions SET status = 'WITHDRAWN' "
+        "WHERE asset_id = $1 AND status = 'PENDING' RETURNING prediction_id",
+        asset_id.value,
+    )
+    return [r["prediction_id"] for r in rows]
+
+
+async def _restore_stance(pool: asyncpg.Pool, prediction_ids: list[uuid.UUID]) -> None:
+    """Undo _isolate_stance so the live pipeline's own state is left exactly as it was."""
+    if not prediction_ids:
+        return
+    await pool.execute(
+        "UPDATE prediction.predictions SET status = 'PENDING' WHERE prediction_id = ANY($1::uuid[])",
+        prediction_ids,
     )
 
 
@@ -84,20 +128,35 @@ async def test_assign_and_close_produces_graph_only_prediction() -> None:
             PredictionRepository(pool), graph, _StubPriceReader(), settings
         )
 
-        event = _event(AssetId.GOLD, EventType.MILITARY_CONFLICT)
+        parked = await _isolate_stance(pool, AssetId.NEM_NYSE)
+
+        # SAFE_HAVEN_ONLY is required: every seeded MILITARY_CONFLICT edge is conditioned, so a
+        # tagless event has nothing to fire (see _event's docstring).
+        event = _event(
+            AssetId.NEM_NYSE,
+            EventType.MILITARY_CONFLICT,
+            [ConditionCode.SAFE_HAVEN_ONLY],
+        )
         await pipeline.process_event(event)
 
         window_start, _ = window_bounds(event.first_seen_at, settings.context_window_minutes)
+        # ORDER BY context_version DESC picks the context THIS test just created. Against a live
+        # database the same (asset, window_start) can already hold older versions from real traffic;
+        # an unordered SELECT could return one of those, which is already PREDICTED and therefore not
+        # claimable, so the test would back-date a stale row and see nothing produced.
         context_id = await pool.fetchval(
-            "SELECT context_id FROM prediction.contexts WHERE asset_id = $1 AND window_start = $2",
-            AssetId.GOLD.value,
+            "SELECT context_id FROM prediction.contexts "
+            "WHERE asset_id = $1 AND window_start = $2 "
+            "ORDER BY context_version DESC LIMIT 1",
+            AssetId.NEM_NYSE.value,
             window_start,
         )
         assert context_id is not None
-        # Force the window closed regardless of wall clock.
+        # Force the window closed regardless of wall clock, and ensure the state is claimable:
+        # claim_ready_contexts only takes OPEN/READY rows.
         await pool.execute(
-            "UPDATE prediction.contexts SET window_end = now() - interval '10 minutes' "
-            "WHERE context_id = $1",
+            "UPDATE prediction.contexts SET state = 'OPEN', "
+            "window_end = now() - interval '10 minutes' WHERE context_id = $1",
             context_id,
         )
 
@@ -123,6 +182,7 @@ async def test_assign_and_close_produces_graph_only_prediction() -> None:
         assert outbox_count == 1
 
         await _cleanup(pool, [context_id])
+        await _restore_stance(pool, parked)
     finally:
         await graph.close()
         await pool.close()
@@ -146,17 +206,23 @@ async def test_outbox_relay_publishes_prediction_made() -> None:
             PredictionRepository(pool), graph, _StubPriceReader(), settings
         )
 
-        event = _event(AssetId.BRENT_OIL, EventType.SUPPLY_DISRUPTION)
+        parked = await _isolate_stance(pool, AssetId.XOM_NYSE)
+
+        event = _event(AssetId.XOM_NYSE, EventType.SUPPLY_DISRUPTION)
         await pipeline.process_event(event)
         window_start, _ = window_bounds(event.first_seen_at, settings.context_window_minutes)
+        # Newest version, and force it claimable — see the note in the test above.
         context_id = await pool.fetchval(
-            "SELECT context_id FROM prediction.contexts WHERE asset_id = $1 AND window_start = $2",
-            AssetId.BRENT_OIL.value,
+            "SELECT context_id FROM prediction.contexts "
+            "WHERE asset_id = $1 AND window_start = $2 "
+            "ORDER BY context_version DESC LIMIT 1",
+            AssetId.XOM_NYSE.value,
             window_start,
         )
+        assert context_id is not None
         await pool.execute(
-            "UPDATE prediction.contexts SET window_end = now() - interval '10 minutes' "
-            "WHERE context_id = $1",
+            "UPDATE prediction.contexts SET state = 'OPEN', "
+            "window_end = now() - interval '10 minutes' WHERE context_id = $1",
             context_id,
         )
         await pipeline.close_ready_contexts()
@@ -166,6 +232,7 @@ async def test_outbox_relay_publishes_prediction_made() -> None:
         assert delivered >= 1
 
         await _cleanup(pool, [context_id])
+        await _restore_stance(pool, parked)
     finally:
         await rabbit.close()
         await graph.close()

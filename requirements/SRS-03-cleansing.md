@@ -35,7 +35,7 @@
 |---|---|
 | Author | Feed Analyzer project |
 | Created | 2026-08-05 |
-| Last updated | 2026-08-05 |
+| Last updated | 2026-08-07 |
 | Replaces | `docs/functional-documents/cleansing-service-functional-document.md` (deleted 2026-08-06) |
 | Source code | `src/services/cleansing/` |
 | Config class | `cleansing.config.CleansingSettings` |
@@ -155,6 +155,8 @@ Specific responsibilities:
 | CLN-13 | The service shall support two extraction backends: `keyword` (deterministic taxonomy scan) and `spacy` (per-language spaCy pipelines for English and Swedish) | Implemented |
 | CLN-14 | The active NLP backend shall be controlled by `CLEANSING_NLP_BACKEND` (default `keyword`) | Implemented |
 | CLN-15 | When an action lemma cannot be mapped to any canonical event type, the type shall be `OTHER` | Implemented |
+| CLN-61 | The keyword scan shall select the earliest positional match, and on a positional tie the longest keyword, so a specific phrase wins over a generic token that starts at the same word (e.g. `"appoints new cfo"` → `EXECUTIVE_CHANGE`, not `"appoint"` → `POLITICAL_TRANSITION`) | Implemented |
+| CLN-62 | Taxonomy keywords shall be declared in the punctuation-normalised form the scanner sees, since normalisation replaces punctuation with spaces (`"spin off"`, never `"spin-off"`) | Implemented |
 | CLN-16 | The service shall resolve the news scope and affected asset IDs using the precedence: COMPANY → INDUSTRY → EVENT_TYPE → NONE (see 7.5 for the full algorithm) | Implemented |
 | CLN-17 | The service shall assign a polarity (`OCCURRENCE` or `RESOLUTION`) by scanning for de-escalation cues (see 7.6) | Implemented |
 | CLN-18 | The service shall infer context tags (`TRANSPORT_AFFECTED`, `SAFE_HAVEN_ONLY`) by scanning for transport cues and checking the event type (see 7.7); `RISK_PREMIUM_ELEVATED` is added later by the Prediction Service, never here | Implemented |
@@ -260,7 +262,7 @@ This runs once per incoming `ArticleIngested` message from the `cleansing.articl
 
 **Step 4 — Action extraction**
 - Call the configured NLP backend with `(text, language)`:
-  - `keyword` backend: punctuation-normalise and lowercase the text; scan for taxonomy keywords using suffix-tolerant word-boundary matching; take the earliest positional match; unmapped → `OTHER`
+  - `keyword` backend: punctuation-normalise and lowercase the text; scan for taxonomy keywords using suffix-tolerant word-boundary matching; take the earliest positional match, and on a positional tie the **longest** keyword; unmapped → `OTHER`
   - `spacy` backend: load `en_core_web_sm` or `sv_core_news_sm`; extract subject/verb/object via dependency tags; map verb lemma to event type; fall back to keyword scan if unmapped
 - After extraction, call `resolve_scope`, `classify_polarity`, and `infer_conditions` to complete the `ExtractedAction`
 
@@ -732,6 +734,8 @@ When using `bge-m3`, the `ml` Python extra must be installed (`pip install .[ml]
 | CLN-35 – CLN-41 (merge) | `tests/test_merge.py` | Local merge (no conflict); LLM merge path; conflict detection; error on empty summary |
 | CLN-47 – CLN-52 (LLM token policy) | `tests/test_merge.py` | Excerpt count and length limits; output schema; type never from LLM |
 | CLN-12 (taxonomy completeness) | `tests/test_taxonomy.py` | All 32 event types reachable from taxonomy keywords |
+| CLN-61 (tie → longest keyword) | `tests/test_taxonomy.py` | `test_classify_text_executive_change_english` — "Board appoints new CFO" → `EXECUTIVE_CHANGE`; "Prime minister appoints new cabinet" stays `POLITICAL_TRANSITION` |
+| CLN-62 (normalised keywords) | `tests/test_taxonomy.py` | `test_classify_text_restructuring_english` — both "spin-off" and "spin off" → `RESTRUCTURING` |
 | End-to-end | `tests/test_integration.py` | Full article → event path using in-memory fakes |
 
 ---
@@ -814,3 +818,4 @@ Update this document whenever any of the following changes:
 | Date | Description |
 |---|---|
 | 2026-08-05 | Initial as-built specification for E03 (Cleansing Service); CLN-1 through CLN-60 |
+| 2026-08-07 | **Defect fix.** Two taxonomy keywords were unreachable: `"spin-off"` could never match because normalisation turns punctuation into spaces, and `"appoints new cfo"` always lost to the generic `"appoint"` because single-token positions were compared one character early. Both event types are in REF-01 (`RESTRUCTURING`: spin-off; `EXECUTIVE_CHANGE`: appointed), so the code was the defect. CLN-61 and CLN-62 added; §7 step 4 updated |

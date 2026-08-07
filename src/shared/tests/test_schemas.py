@@ -90,7 +90,7 @@ def test_only_canonical_assets_are_accepted() -> None:
     base["asset_id"] = "GC=F"
     with pytest.raises(ValidationError):
         PredictionMade.model_validate(base)
-    assert make_prediction().asset_id is AssetId.GOLD
+    assert make_prediction().asset_id is AssetId.NEM_NYSE
 
 
 def test_routing_keys_match_contract() -> None:

@@ -138,18 +138,25 @@ async def test_null_close_is_skipped_not_zero_filled() -> None:
     assert all(o.close > 0 for o in obs)
 
 
-async def test_todays_still_forming_bar_is_excluded() -> None:
-    # Yahoo has no isOpen flag, so an unsettled last tick must be excluded by the market's own
-    # closing clock rather than stored as a settled daily close.
+async def test_still_forming_bar_is_excluded() -> None:
+    # Yahoo has no isOpen flag, so an unsettled tick must be excluded by the market's own closing
+    # clock rather than stored as a settled daily close.
+    #
+    # The unsettled bar is dated TOMORROW, not today: SAAB completes at 18:00 Europe/Stockholm
+    # (16:00 UTC), so a bar dated today is genuinely settled once that clock passes and this test
+    # would flip from pass to fail purely on the time of day it ran.
     now = datetime.now(UTC)
-    today_bar = datetime.combine(now.date(), datetime.min.time(), tzinfo=UTC) + timedelta(hours=7)
-    payload = _chart(timestamps=[int(_WED.timestamp()), int(today_bar.timestamp())],
+    future_session = now.date() + timedelta(days=1)
+    future_bar = datetime.combine(future_session, datetime.min.time(), tzinfo=UTC) + timedelta(
+        hours=7
+    )
+    payload = _chart(timestamps=[int(_WED.timestamp()), int(future_bar.timestamp())],
                      closes=[591.30, 626.30])
     obs = await _adapter_returning(payload).fetch_observations(_SAAB, date(2026, 7, 29))
-    assert now.date() not in [o.session for o in obs]
+    assert future_session not in [o.session for o in obs]
 
     with pytest.raises(PriceNotYetAvailableError):
-        await _adapter_returning(payload).get_close(_SAAB, now.date())
+        await _adapter_returning(payload).get_close(_SAAB, future_session)
 
 
 @pytest.mark.parametrize("bad_close", [0, -1.5, "not-a-number", True, {}])

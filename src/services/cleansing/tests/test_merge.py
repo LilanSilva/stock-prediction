@@ -69,7 +69,7 @@ def _action(
 def test_build_local_event_is_deterministic_and_local() -> None:
     record = _record(EventType.SANCTIONS)
     articles: list[Any] = [_article("EU imposes sanctions on exports", "reuters")]
-    actions: list[Any] = [_action("EU", "sanction", ["BRENT_OIL"])]
+    actions: list[Any] = [_action("EU", "sanction", ["XOM_NYSE"])]
     event = build_local_event(ClusterInputs(record=record, articles=articles, actions=actions))
 
     assert event.extraction_method == ExtractionMethod.LOCAL
@@ -77,7 +77,7 @@ def test_build_local_event_is_deterministic_and_local() -> None:
     assert event.event_type == EventType.SANCTIONS
     assert event.cluster_id == record.cluster_id
     assert event.canonical_summary == "EU imposes sanctions on exports"
-    assert [a.value for a in event.affected_asset_ids] == ["BRENT_OIL"]
+    assert [a.value for a in event.affected_asset_ids] == ["XOM_NYSE"]
     assert len(event.sources) == 1
     assert event.fact_conflicts == []
     # correlation_id is propagated from the first source article.
@@ -110,7 +110,7 @@ def test_build_local_event_without_articles_uses_record_window() -> None:
 def test_build_local_event_defaults_polarity_and_no_tags() -> None:
     record = _record(EventType.SANCTIONS)
     articles: list[Any] = [_article("EU sanctions exports", "reuters")]
-    actions: list[Any] = [_action("EU", "sanction", ["BRENT_OIL"])]
+    actions: list[Any] = [_action("EU", "sanction", ["XOM_NYSE"])]
     event = build_local_event(ClusterInputs(record=record, articles=articles, actions=actions))
     assert event.polarity == EventPolarity.OCCURRENCE
     assert event.context_tags == []
@@ -158,7 +158,7 @@ def test_build_local_event_asset_fallback_from_event_type() -> None:
     record = _record(EventType.MILITARY_CONFLICT)
     actions: list[Any] = [_action("USA", "attack", [])]
     event = build_local_event(ClusterInputs(record=record, articles=[], actions=actions))
-    assert {AssetId.GOLD, AssetId.BRENT_OIL} <= set(event.affected_asset_ids)
+    assert {AssetId.NEM_NYSE, AssetId.XOM_NYSE} <= set(event.affected_asset_ids)
     assert set(members_of("WEAPON_INDUSTRY")) <= set(event.affected_asset_ids)
 
 
@@ -238,7 +238,7 @@ async def test_llm_merge_success_produces_llm_assisted_event() -> None:
     )
     record = _record(EventType.SANCTIONS)
     articles: list[Any] = [_article("EU sanctions", "reuters"), _article("US sanctions", "ap")]
-    actions: list[Any] = [_action("EU", "sanction", ["BRENT_OIL"]), _action("US", "sanction", [])]
+    actions: list[Any] = [_action("EU", "sanction", ["XOM_NYSE"]), _action("US", "sanction", [])]
     event = await _merger(gateway).merge(
         ClusterInputs(record=record, articles=articles, actions=actions)
     )
