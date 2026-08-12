@@ -166,3 +166,91 @@ def test_output_is_sorted_deterministically() -> None:
     ]
     estimates = estimate_edges(samples, deadband=0.002, min_samples=2)
     assert [e.factor for e in estimates] == [EventType.MILITARY_CONFLICT, EventType.SANCTIONS]
+
+
+# --- estimate_correlation_edges tests ---
+
+from credibility.learning.estimator import estimate_correlation_edges  # noqa: E402
+from credibility.learning.models import CorrelationSample  # noqa: E402
+
+
+def _corr_sample(
+    ret: float,
+    *,
+    source: AssetId = AssetId.XOM_NYSE,
+    condition: ConditionCode = ConditionCode.UPSTREAM_UP,
+    target: AssetId = AssetId.NEM_NYSE,
+    is_abnormal: bool = False,
+    asset_volatility: float = 0.0,
+) -> CorrelationSample:
+    return CorrelationSample(
+        source_asset=source,
+        condition=condition,
+        target_asset=target,
+        actual_return=ret,
+        is_abnormal=is_abnormal,
+        asset_volatility=asset_volatility,
+    )
+
+
+def test_corr_positive_returns_yield_up_edge() -> None:
+    samples = [_corr_sample(0.03), _corr_sample(0.02), _corr_sample(0.04)]
+    (estimate,) = estimate_correlation_edges(samples, deadband=0.002, min_samples=3)
+    assert estimate.direction is Direction.UP
+    assert estimate.sample_count == 3
+    assert estimate.alpha == 4.0  # 3 agreeing + prior 1.0
+    assert estimate.beta == 1.0
+
+
+def test_corr_negative_returns_yield_down_edge() -> None:
+    samples = [_corr_sample(-0.03), _corr_sample(-0.02), _corr_sample(-0.05)]
+    (estimate,) = estimate_correlation_edges(samples, deadband=0.002, min_samples=3)
+    assert estimate.direction is Direction.DOWN
+    assert estimate.alpha == 4.0
+    assert estimate.beta == 1.0
+
+
+def test_corr_neutral_group_is_not_dropped_but_returns_neutral_direction() -> None:
+    samples = [_corr_sample(0.001), _corr_sample(-0.001), _corr_sample(0.0005)]
+    (estimate,) = estimate_correlation_edges(samples, deadband=0.002, min_samples=3)
+    assert estimate.direction is Direction.NEUTRAL
+
+
+def test_corr_below_min_samples_is_dropped() -> None:
+    samples = [_corr_sample(0.03), _corr_sample(0.02)]
+    assert estimate_correlation_edges(samples, deadband=0.002, min_samples=3) == []
+
+
+def test_corr_single_abnormal_sample_bypasses_min_samples() -> None:
+    samples = [_corr_sample(0.15, is_abnormal=True, asset_volatility=0.01)]
+    (estimate,) = estimate_correlation_edges(samples, deadband=0.002, min_samples=5)
+    assert estimate.direction is Direction.UP
+    assert estimate.sample_count == 1
+
+
+def test_corr_groups_split_by_source_condition_target() -> None:
+    samples = [
+        _corr_sample(0.03, source=AssetId.XOM_NYSE, target=AssetId.NEM_NYSE),
+        _corr_sample(0.04, source=AssetId.XOM_NYSE, target=AssetId.NEM_NYSE),
+        _corr_sample(-0.02, source=AssetId.XOM_NYSE, target=AssetId.LUG_STO),
+        _corr_sample(-0.03, source=AssetId.XOM_NYSE, target=AssetId.LUG_STO),
+    ]
+    estimates = estimate_correlation_edges(samples, deadband=0.002, min_samples=2)
+    keys = {(e.source_asset, e.condition, e.target_asset) for e in estimates}
+    assert keys == {
+        (AssetId.XOM_NYSE, ConditionCode.UPSTREAM_UP, AssetId.NEM_NYSE),
+        (AssetId.XOM_NYSE, ConditionCode.UPSTREAM_UP, AssetId.LUG_STO),
+    }
+
+
+def test_corr_output_sorted_deterministically() -> None:
+    samples = [
+        _corr_sample(0.03, target=AssetId.NEM_NYSE),
+        _corr_sample(0.03, target=AssetId.NEM_NYSE),
+        _corr_sample(-0.03, target=AssetId.LUG_STO, condition=ConditionCode.UPSTREAM_DOWN),
+        _corr_sample(-0.03, target=AssetId.LUG_STO, condition=ConditionCode.UPSTREAM_DOWN),
+    ]
+    estimates = estimate_correlation_edges(samples, deadband=0.002, min_samples=2)
+    # UPSTREAM_DOWN < UPSTREAM_UP alphabetically
+    assert estimates[0].condition is ConditionCode.UPSTREAM_DOWN
+    assert estimates[1].condition is ConditionCode.UPSTREAM_UP

@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from shared.graph import CausalGraphClient, FiringEdge, Neo4jSettings
+from shared.graph import CausalGraphClient, CorrelationEdge, FiringEdge, Neo4jSettings
 from shared.graph.exceptions import GraphConfigurationError, GraphTransportError
 from shared.schemas.messages import AssetId, ConditionCode, Direction, EventType
 
@@ -244,6 +244,174 @@ async def test_verify_connectivity_false_without_driver() -> None:
     client = CausalGraphClient(Neo4jSettings())
     assert client.is_connected is False
     assert await client.verify_connectivity() is False
+
+
+# --- CorrelationEdge model tests ---
+
+
+def test_correlation_edge_reliability() -> None:
+    edge = CorrelationEdge(
+        source_asset_id=AssetId.XOM_NYSE,
+        target_asset_id=AssetId.NEM_NYSE,
+        condition=ConditionCode.UPSTREAM_UP,
+        direction=Direction.DOWN,
+        weight=0.45,
+        confidence=0.8,
+        alpha=3.0,
+        beta=1.0,
+    )
+    assert edge.reliability == pytest.approx(0.75)
+
+
+def test_correlation_edge_edge_id() -> None:
+    edge = CorrelationEdge(
+        source_asset_id=AssetId.XOM_NYSE,
+        target_asset_id=AssetId.NEM_NYSE,
+        condition=ConditionCode.UPSTREAM_UP,
+        direction=Direction.DOWN,
+        weight=0.45,
+        confidence=0.8,
+        alpha=1.0,
+        beta=1.0,
+    )
+    assert edge.edge_id == "XOM_NYSE|UPSTREAM_UP->NEM_NYSE"
+
+
+# --- get_correlation_edges tests ---
+
+
+async def test_get_correlation_edges_parses_row() -> None:
+    driver = _FakeDriver(
+        [
+            {
+                "source_asset_id": "XOM_NYSE",
+                "target_asset_id": "NEM_NYSE",
+                "condition": "UPSTREAM_UP",
+                "direction": "DOWN",
+                "weight": 0.45,
+                "confidence": 0.8,
+                "alpha": 2.0,
+                "beta": 1.0,
+            }
+        ]
+    )
+    client = _client_with(driver)
+    edges = await client.get_correlation_edges(AssetId.XOM_NYSE, ConditionCode.UPSTREAM_UP)
+    assert len(edges) == 1
+    assert edges[0].source_asset_id is AssetId.XOM_NYSE
+    assert edges[0].target_asset_id is AssetId.NEM_NYSE
+    assert edges[0].direction is Direction.DOWN
+    assert edges[0].weight == 0.45
+    assert driver.last_session is not None
+    _, params = driver.last_session.run_calls[0]
+    assert params == {"source_asset_id": "XOM_NYSE", "condition": "UPSTREAM_UP"}
+
+
+async def test_get_correlation_edges_empty_returns_empty_list() -> None:
+    client = _client_with(_FakeDriver([]))
+    result = await client.get_correlation_edges(AssetId.XOM_NYSE, ConditionCode.UPSTREAM_DOWN)
+    assert result == []
+
+
+async def test_get_correlation_edges_transport_error_is_normalized() -> None:
+    client = _client_with(_FakeDriver([], raise_exc=RuntimeError("bolt down")))
+    with pytest.raises(GraphTransportError, match="correlation-edge query failed"):
+        await client.get_correlation_edges(AssetId.XOM_NYSE, ConditionCode.UPSTREAM_UP)
+
+
+# --- get_correlation_edge_counts tests ---
+
+
+async def test_get_correlation_edge_counts_returns_tuple_when_present() -> None:
+    driver = _FakeDriver([{"alpha": 3.0, "beta": 2.0}])
+    client = _client_with(driver)
+    counts = await client.get_correlation_edge_counts(
+        AssetId.XOM_NYSE, AssetId.NEM_NYSE, ConditionCode.UPSTREAM_UP
+    )
+    assert counts == (3.0, 2.0)
+    assert driver.last_session is not None
+    _, params = driver.last_session.run_calls[0]
+    assert params == {
+        "source_asset_id": "XOM_NYSE",
+        "target_asset_id": "NEM_NYSE",
+        "condition": "UPSTREAM_UP",
+    }
+
+
+async def test_get_correlation_edge_counts_returns_none_when_absent() -> None:
+    client = _client_with(_FakeDriver([]))
+    result = await client.get_correlation_edge_counts(
+        AssetId.XOM_NYSE, AssetId.NEM_NYSE, ConditionCode.UPSTREAM_UP
+    )
+    assert result is None
+
+
+# --- update_correlation_weight tests ---
+
+
+async def test_update_correlation_weight_sends_correct_params() -> None:
+    driver = _FakeDriver([{"alpha": 4.0, "beta": 1.0}])
+    client = _client_with(driver)
+    await client.update_correlation_weight(
+        AssetId.XOM_NYSE,
+        AssetId.NEM_NYSE,
+        ConditionCode.UPSTREAM_UP,
+        alpha=4.0,
+        beta=1.0,
+    )
+    assert driver.last_session is not None
+    cypher, params = driver.last_session.run_calls[0]
+    assert "CORRELATES_WITH" in cypher
+    assert params == {
+        "source_asset_id": "XOM_NYSE",
+        "target_asset_id": "NEM_NYSE",
+        "condition": "UPSTREAM_UP",
+        "alpha": 4.0,
+        "beta": 1.0,
+    }
+
+
+async def test_update_correlation_weight_missing_edge_raises() -> None:
+    client = _client_with(_FakeDriver([]))
+    with pytest.raises(GraphTransportError, match="no CORRELATES_WITH edge"):
+        await client.update_correlation_weight(
+            AssetId.XOM_NYSE,
+            AssetId.NEM_NYSE,
+            ConditionCode.UPSTREAM_UP,
+            alpha=1.0,
+            beta=1.0,
+        )
+
+
+# --- upsert_correlation_edge tests ---
+
+
+async def test_upsert_correlation_edge_sends_correct_params() -> None:
+    driver = _FakeDriver([{"alpha": 3.0, "beta": 1.0}])
+    client = _client_with(driver)
+    await client.upsert_correlation_edge(
+        AssetId.XOM_NYSE,
+        ConditionCode.UPSTREAM_UP,
+        AssetId.NEM_NYSE,
+        direction=Direction.DOWN,
+        weight=0.45,
+        confidence=0.8,
+        alpha=3.0,
+        beta=1.0,
+    )
+    assert driver.last_session is not None
+    cypher, params = driver.last_session.run_calls[0]
+    assert "CORRELATES_WITH" in cypher
+    assert params == {
+        "source_asset_id": "XOM_NYSE",
+        "target_asset_id": "NEM_NYSE",
+        "condition": "UPSTREAM_UP",
+        "direction": "DOWN",
+        "weight": 0.45,
+        "confidence": 0.8,
+        "alpha": 3.0,
+        "beta": 1.0,
+    }
 
 
 # --- industry-level edge inheritance (S4) --------------------------------------------------------

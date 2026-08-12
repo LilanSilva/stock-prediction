@@ -33,3 +33,6 @@ class LearningSettings(BaseSettings):
 
     db_pool_min_size: int = Field(default=1, ge=1)
     db_pool_max_size: int = Field(default=5, ge=1)
+
+    # Set to False to run only the CAUSES-edge path during rollout/debugging.
+    correlation_learning_enabled: bool = Field(default=True)

@@ -12,18 +12,29 @@ missing price data on either session are skipped.
 
 from __future__ import annotations
 
+import math
 from datetime import UTC, date, datetime, timedelta
+from typing import Protocol
 
 import asyncpg
 import structlog
 from pydantic import ValidationError
 from shared.calendar import NEW_YORK, resolve_baseline_settlement
+from shared.graph import CorrelationEdge
 from shared.reference import UnknownAssetError, resolve
-from shared.schemas.messages import AssetId, ConditionCode, EventDetected
+from shared.schemas.messages import AssetId, ConditionCode, Direction, EventDetected
 
-from credibility.learning.models import Sample
+from credibility.learning.models import CorrelationSample, Sample
 
 logger = structlog.get_logger(__name__)
+
+
+class CorrelationEdgeReader(Protocol):
+    """The subset of ``shared.graph.CausalGraphClient`` the correlation dataset builder needs."""
+
+    async def get_correlation_edges(
+        self, source_asset_id: AssetId, condition: ConditionCode
+    ) -> list[CorrelationEdge]: ...
 
 _EVENTS_QUERY = """
 SELECT event_id, payload
@@ -73,7 +84,7 @@ def _calculate_volatility(closes: list[float]) -> float:
     returns = [(closes[i] - closes[i - 1]) / closes[i - 1] for i in range(1, len(closes))]
     mean = sum(returns) / len(returns)
     variance = sum((r - mean) ** 2 for r in returns) / len(returns)
-    return variance ** 0.5
+    return math.sqrt(variance)
 
 
 async def _load_volatility(
@@ -153,7 +164,9 @@ async def build_samples(
                     continue
 
                 actual_return = (settlement_close - baseline_close) / baseline_close
-                volatility = await _load_volatility(conn, volatility_cache, asset, volatility_cutoff)
+                volatility = await _load_volatility(
+                    conn, volatility_cache, asset, volatility_cutoff
+                )
                 is_abnormal = (
                     volatility > 0.0 and abs(actual_return) >= abnormal_threshold * volatility
                 )
@@ -176,5 +189,107 @@ async def build_samples(
         events=len(rows),
         samples=len(samples),
         skipped_missing_price=skipped_missing_price,
+    )
+    return samples
+
+
+# Direct scored predictions within the lookback window.
+# Joins prediction.outbox_events to filter to propagation_depth=0 (direct predictions only).
+# Cross-schema read: prediction.*, verification.* — same analytics exception as build_samples.
+_DIRECT_SCORED_PREDICTIONS_QUERY = """
+SELECT
+    p.prediction_id,
+    p.asset_id                                          AS source_asset_id,
+    p.direction                                         AS predicted_direction,
+    e.settlement_session,
+    e.baseline_session
+FROM prediction.predictions  p
+JOIN prediction.outbox_events o ON o.aggregate_id = p.prediction_id
+JOIN verification.evaluations e USING (prediction_id)
+JOIN verification.scores      s USING (prediction_id)
+WHERE p.decision_at >= $1
+  AND p.direction  != 'NEUTRAL'
+  AND (o.payload::jsonb ->> 'propagation_depth')::int = 0
+ORDER BY p.decision_at
+"""
+
+
+async def build_correlation_samples(
+    pool: asyncpg.Pool,
+    graph: CorrelationEdgeReader,
+    *,
+    lookback_days: int,
+    volatility_lookback_days: int = 30,
+    abnormal_threshold: float = 2.0,
+) -> list[CorrelationSample]:
+    """Build correlation samples from scored direct predictions within lookback_days.
+
+    For each scored direct prediction of source_asset in direction D, queries
+    CORRELATES_WITH edges for that asset and condition, then looks up the target
+    asset's actual return in the same settlement session. Emits one CorrelationSample
+    per (source_asset, condition, target_asset) observation.
+    """
+    cutoff = datetime.now(UTC) - timedelta(days=lookback_days)
+    volatility_cutoff = (datetime.now(UTC) - timedelta(days=volatility_lookback_days)).date()
+    samples: list[CorrelationSample] = []
+    close_cache: dict[tuple[str, date], float | None] = {}
+    volatility_cache: dict[str, float] = {}
+    skipped = 0
+
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(_DIRECT_SCORED_PREDICTIONS_QUERY, cutoff)
+        for row in rows:
+            source_asset = AssetId(row["source_asset_id"])
+            direction = Direction(row["predicted_direction"])
+            condition = (
+                ConditionCode.UPSTREAM_UP
+                if direction is Direction.UP
+                else ConditionCode.UPSTREAM_DOWN
+            )
+            settlement: date = row["settlement_session"]
+            baseline: date = row["baseline_session"]
+
+            corr_edges = await graph.get_correlation_edges(source_asset, condition)
+            if not corr_edges:
+                continue
+
+            for edge in corr_edges:
+                target = edge.target_asset_id
+                try:
+                    resolve(target)
+                except UnknownAssetError:
+                    logger.warning("corr_learning_skip_unknown_asset", asset_id=str(target))
+                    continue
+
+                baseline_close = await _load_close(conn, close_cache, target, baseline)
+                settlement_close = await _load_close(conn, close_cache, target, settlement)
+                if baseline_close is None or settlement_close is None:
+                    skipped += 1
+                    continue
+
+                actual_return = (settlement_close - baseline_close) / baseline_close
+                volatility = await _load_volatility(
+                    conn, volatility_cache, target, volatility_cutoff
+                )
+                is_abnormal = (
+                    volatility > 0.0
+                    and abs(actual_return) >= abnormal_threshold * volatility
+                )
+                samples.append(
+                    CorrelationSample(
+                        source_asset=source_asset,
+                        condition=condition,
+                        target_asset=target,
+                        actual_return=actual_return,
+                        is_abnormal=is_abnormal,
+                        asset_volatility=volatility,
+                    )
+                )
+
+    logger.info(
+        "corr_learning_samples_built",
+        predictions=len(rows),
+        samples=len(samples),
+        skipped_missing_price=skipped,
     )
     return samples

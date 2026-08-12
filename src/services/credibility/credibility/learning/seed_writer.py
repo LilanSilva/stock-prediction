@@ -13,7 +13,7 @@ from typing import Protocol
 import structlog
 from shared.schemas.messages import AssetId, ConditionCode, Direction, EventType
 
-from credibility.learning.models import EdgeEstimate
+from credibility.learning.models import CorrelationEdgeEstimate, EdgeEstimate
 
 logger = structlog.get_logger(__name__)
 
@@ -53,4 +53,45 @@ async def write_estimates(graph: EdgeUpserter, estimates: list[EdgeEstimate]) ->
         )
         written += 1
     logger.info("learning_edges_written", written=written, estimates=len(estimates))
+    return written
+
+
+class CorrelationEdgeUpserter(Protocol):
+    """The subset of CausalGraphClient the correlation writer depends on."""
+
+    async def upsert_correlation_edge(
+        self,
+        source_asset_id: AssetId,
+        condition: ConditionCode,
+        target_asset_id: AssetId,
+        *,
+        direction: Direction,
+        weight: float,
+        confidence: float,
+        alpha: float,
+        beta: float,
+    ) -> None: ...
+
+
+async def write_correlation_estimates(
+    graph: CorrelationEdgeUpserter,
+    estimates: list[CorrelationEdgeEstimate],
+) -> int:
+    """Upsert each non-NEUTRAL correlation estimate; return the number of edges written."""
+    written = 0
+    for estimate in estimates:
+        if estimate.direction is Direction.NEUTRAL:
+            continue
+        await graph.upsert_correlation_edge(
+            estimate.source_asset,
+            estimate.condition,
+            estimate.target_asset,
+            direction=estimate.direction,
+            weight=estimate.weight,
+            confidence=estimate.confidence,
+            alpha=estimate.alpha,
+            beta=estimate.beta,
+        )
+        written += 1
+    logger.info("corr_learning_edges_written", written=written, estimates=len(estimates))
     return written

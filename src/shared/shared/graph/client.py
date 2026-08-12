@@ -12,7 +12,7 @@ from typing import Any, cast
 import structlog
 
 from shared.graph.exceptions import GraphConfigurationError, GraphTransportError
-from shared.graph.models import FiringEdge
+from shared.graph.models import CorrelationEdge, FiringEdge
 from shared.graph.settings import Neo4jSettings
 from shared.schemas.messages import AssetId, ConditionCode, Direction, EventType
 
@@ -93,6 +93,40 @@ MERGE (a:Asset {id: $asset_id})
 MERGE (cf)-[r:CAUSES {condition: $condition}]->(a)
 SET r.direction = $direction, r.weight = $weight, r.confidence = $confidence,
     r.alpha = $alpha, r.beta = $beta, r.last_updated = datetime()
+RETURN r.alpha AS alpha, r.beta AS beta
+"""
+
+_CORRELATION_EDGES_CYPHER = """
+MATCH (a1:Asset {id: $source_asset_id})-[r:CORRELATES_WITH]->(a2:Asset)
+WHERE r.condition = $condition
+RETURN a1.id AS source_asset_id, a2.id AS target_asset_id,
+       r.direction AS direction, r.weight AS weight, r.confidence AS confidence,
+       r.alpha AS alpha, r.beta AS beta, r.condition AS condition
+"""
+
+_UPDATE_CORRELATION_EDGE_CYPHER = """
+MATCH (a1:Asset {id: $source_asset_id})-[r:CORRELATES_WITH {condition: $condition}]->
+      (a2:Asset {id: $target_asset_id})
+SET r.alpha = $alpha, r.beta = $beta, r.last_updated = datetime()
+RETURN r.alpha AS alpha, r.beta AS beta
+"""
+
+_CORRELATION_EDGE_COUNTS_CYPHER = """
+MATCH (a1:Asset {id: $source_asset_id})-[r:CORRELATES_WITH {condition: $condition}]->
+      (a2:Asset {id: $target_asset_id})
+RETURN r.alpha AS alpha, r.beta AS beta
+"""
+
+_UPSERT_CORRELATION_EDGE_CYPHER = """
+MERGE (a1:Asset {id: $source_asset_id})
+MERGE (a2:Asset {id: $target_asset_id})
+MERGE (a1)-[r:CORRELATES_WITH {condition: $condition}]->(a2)
+SET r.direction    = $direction,
+    r.weight       = $weight,
+    r.confidence   = $confidence,
+    r.alpha        = $alpha,
+    r.beta         = $beta,
+    r.last_updated = datetime()
 RETURN r.alpha AS alpha, r.beta AS beta
 """
 
@@ -319,3 +353,146 @@ class CausalGraphClient:
                 await session.run(_UPSERT_CONDITIONED_EDGE_CYPHER, params)
         except Exception as exc:  # noqa: BLE001 - normalized to a typed transport error
             raise GraphTransportError(f"neo4j conditioned-edge upsert failed: {exc}") from exc
+
+    async def get_correlation_edges(
+        self,
+        source_asset_id: AssetId,
+        condition: ConditionCode,
+    ) -> list[CorrelationEdge]:
+        """Return CORRELATES_WITH edges from source_asset_id active under condition.
+
+        Used by the Prediction Service propagation pass to find downstream assets that
+        should receive a secondary prediction when source_asset_id is predicted in the
+        direction implied by condition (UPSTREAM_UP or UPSTREAM_DOWN).
+        """
+        driver = self._require_driver()
+        params = {
+            "source_asset_id": source_asset_id.value,
+            "condition": condition.value,
+        }
+        try:
+            async with driver.session() as session:
+                result = await session.run(_CORRELATION_EDGES_CYPHER, params)
+                records = await result.data()
+        except Exception as exc:  # noqa: BLE001 - normalized to a typed transport error
+            raise GraphTransportError(
+                f"neo4j correlation-edge query failed: {exc}"
+            ) from exc
+
+        edges: list[CorrelationEdge] = []
+        for row in cast(list[dict[str, Any]], records):
+            edges.append(
+                CorrelationEdge(
+                    source_asset_id=AssetId(row["source_asset_id"]),
+                    target_asset_id=AssetId(row["target_asset_id"]),
+                    condition=ConditionCode(row["condition"]),
+                    direction=Direction(row["direction"]),
+                    weight=float(row["weight"]),
+                    confidence=float(row["confidence"]),
+                    alpha=float(row["alpha"]),
+                    beta=float(row["beta"]),
+                )
+            )
+        return edges
+
+    async def get_correlation_edge_counts(
+        self,
+        source_asset_id: AssetId,
+        target_asset_id: AssetId,
+        condition: ConditionCode,
+    ) -> tuple[float, float] | None:
+        """Return ``(alpha, beta)`` for one CORRELATES_WITH edge, or ``None`` when absent.
+
+        Mirrors ``get_group_edge_counts``; used by Credibility to read current counts before
+        applying a Beta-Bernoulli update for a propagated prediction.
+        """
+        driver = self._require_driver()
+        params: dict[str, Any] = {
+            "source_asset_id": source_asset_id.value,
+            "target_asset_id": target_asset_id.value,
+            "condition": condition.value,
+        }
+        try:
+            async with driver.session() as session:
+                result = await session.run(_CORRELATION_EDGE_COUNTS_CYPHER, params)
+                row = await result.single()
+        except Exception as exc:  # noqa: BLE001 - normalized to a typed transport error
+            raise GraphTransportError(
+                f"neo4j correlation-edge count query failed: {exc}"
+            ) from exc
+        if row is None:
+            return None
+        return float(row["alpha"]), float(row["beta"])
+
+    async def update_correlation_weight(
+        self,
+        source_asset_id: AssetId,
+        target_asset_id: AssetId,
+        condition: ConditionCode,
+        *,
+        alpha: float,
+        beta: float,
+    ) -> None:
+        """Persist Beta-Bernoulli counts for a CORRELATES_WITH edge (used by Credibility).
+
+        Raises GraphTransportError when the edge does not exist.
+        """
+        driver = self._require_driver()
+        params: dict[str, Any] = {
+            "source_asset_id": source_asset_id.value,
+            "target_asset_id": target_asset_id.value,
+            "condition": condition.value,
+            "alpha": alpha,
+            "beta": beta,
+        }
+        edge_label = (
+            f"{source_asset_id.value}|{condition.value}->{target_asset_id.value}"
+        )
+        try:
+            async with driver.session() as session:
+                result = await session.run(_UPDATE_CORRELATION_EDGE_CYPHER, params)
+                updated = await result.single()
+        except Exception as exc:  # noqa: BLE001 - normalized to a typed transport error
+            raise GraphTransportError(
+                f"neo4j correlation-edge update failed: {exc}"
+            ) from exc
+        if updated is None:
+            raise GraphTransportError(
+                f"no CORRELATES_WITH edge for {edge_label}"
+            )
+
+    async def upsert_correlation_edge(
+        self,
+        source_asset_id: AssetId,
+        condition: ConditionCode,
+        target_asset_id: AssetId,
+        *,
+        direction: Direction,
+        weight: float,
+        confidence: float,
+        alpha: float,
+        beta: float,
+    ) -> None:
+        """Create or refine a CORRELATES_WITH edge (used by the offline structure learner).
+
+        Idempotent MERGE: keeps expert-seeded edges as the prior and overwrites their statistics
+        with data-derived values. Creates Asset nodes if absent.
+        """
+        driver = self._require_driver()
+        params = {
+            "source_asset_id": source_asset_id.value,
+            "target_asset_id": target_asset_id.value,
+            "condition": condition.value,
+            "direction": direction.value,
+            "weight": weight,
+            "confidence": confidence,
+            "alpha": alpha,
+            "beta": beta,
+        }
+        try:
+            async with driver.session() as session:
+                await session.run(_UPSERT_CORRELATION_EDGE_CYPHER, params)
+        except Exception as exc:  # noqa: BLE001 - normalized to a typed transport error
+            raise GraphTransportError(
+                f"neo4j correlation-edge upsert failed: {exc}"
+            ) from exc

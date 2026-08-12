@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Annotated
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -41,3 +43,6 @@ class PredictionSettings(BaseSettings):
 
     db_pool_min_size: int = Field(default=1, ge=1)
     db_pool_max_size: int = Field(default=5, ge=1)
+
+    # Cross-asset propagation depth cap (S03/T02). Depth 1 = one hop, 10 = safety ceiling.
+    max_propagation_depth: Annotated[int, Field(ge=1, le=10)] = 3

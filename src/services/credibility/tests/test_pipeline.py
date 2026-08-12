@@ -19,6 +19,7 @@ from shared.schemas.messages import (
     Magnitude,
     PredictionScored,
     PriceKind,
+    PropagationHop,
 )
 
 from credibility.exceptions import InvalidScoredMessageError
@@ -40,14 +41,22 @@ class FakeGraph:
         edges: dict[tuple[EventType, AssetId, ConditionCode | None], tuple[float, float]],
         group_edges: dict[tuple[EventType, str, ConditionCode | None], tuple[float, float]]
         | None = None,
+        corr_edges: dict[tuple[AssetId, AssetId, ConditionCode], tuple[float, float]]
+        | None = None,
     ) -> None:
         self._edges = edges
         self._group_edges = group_edges or {}
+        self._corr_edges: dict[tuple[AssetId, AssetId, ConditionCode], tuple[float, float]] = (
+            corr_edges or {}
+        )
         self.writes: list[
             tuple[EventType, AssetId | str, ConditionCode | None, float, float]
         ] = []
         self.group_writes: list[
             tuple[EventType, str, ConditionCode | None, float, float]
+        ] = []
+        self.corr_writes: list[
+            tuple[AssetId, AssetId, ConditionCode, float, float]
         ] = []
 
     async def get_group_edge_counts(
@@ -98,6 +107,26 @@ class FakeGraph:
         else:
             assert isinstance(asset_id, AssetId)
             self._edges[(factor_id, asset_id, condition)] = (alpha, beta)
+
+    async def get_correlation_edge_counts(
+        self,
+        source_asset_id: AssetId,
+        target_asset_id: AssetId,
+        condition: ConditionCode,
+    ) -> tuple[float, float] | None:
+        return self._corr_edges.get((source_asset_id, target_asset_id, condition))
+
+    async def update_correlation_weight(
+        self,
+        source_asset_id: AssetId,
+        target_asset_id: AssetId,
+        condition: ConditionCode,
+        *,
+        alpha: float,
+        beta: float,
+    ) -> None:
+        self.corr_writes.append((source_asset_id, target_asset_id, condition, alpha, beta))
+        self._corr_edges[(source_asset_id, target_asset_id, condition)] = (alpha, beta)
 
 
 class FakeRepo:
@@ -403,3 +432,259 @@ async def test_conditioned_edge_passes_condition_to_graph_and_keys_history_by_fu
     _, updates = repo.committed[0]
     edge_ids = {u.entity_id for u in updates if u.entity_type == "edge"}
     assert edge_ids == {edge_id}  # history keyed by the full conditioned edge id, not collapsed
+
+
+# --- E10 propagation branch ---
+
+
+def _scored_propagated(
+    *,
+    is_correct: bool,
+    source: AssetId = AssetId.XOM_NYSE,
+    target: AssetId = AssetId.NEM_NYSE,
+    condition: ConditionCode = ConditionCode.UPSTREAM_UP,
+) -> PredictionScored:
+    hop = PropagationHop(
+        source_asset_id=source,
+        target_asset_id=target,
+        condition=condition,
+        direction=Direction.DOWN,
+        edge_weight=0.45,
+    )
+    # Prediction reports the correlation edge in contributing_edges (that is what decide() saw),
+    # and Credibility routes credit from there; propagation_chain marks it as propagated.
+    edge_id = f"{source.value}|{condition.value}->{target.value}"
+    return PredictionScored(
+        correlation_id=uuid.uuid4(),
+        occurred_at=datetime.now(UTC),
+        prediction_id=uuid.uuid4(),
+        context_id=uuid.uuid4(),
+        asset_id=target,
+        predicted_direction=Direction.DOWN,
+        actual_direction=Direction.DOWN if is_correct else Direction.UP,
+        predicted_magnitude=Magnitude.MEDIUM,
+        actual_magnitude=Magnitude.MEDIUM,
+        confidence=0.7,
+        actual_return=-0.02 if is_correct else 0.02,
+        is_correct=is_correct,
+        score=1.0 if is_correct else 0.0,
+        contributing_edges=[
+            ContributingEdge(
+                edge_id=edge_id,
+                direction=Direction.DOWN,
+                current_weight=0.5,
+                influence_weight=1.0,
+                path=edge_id,
+            )
+        ],
+        source_ids=[],
+        baseline=_close(date(2026, 7, 27), "100.00"),
+        settlement=_close(date(2026, 7, 28), "98.00"),
+        scored_at=datetime.now(UTC),
+        propagation_chain=[hop],
+    )
+
+
+async def test_correct_propagated_prediction_increments_alpha() -> None:
+    graph = FakeGraph(
+        {},
+        corr_edges={(AssetId.XOM_NYSE, AssetId.NEM_NYSE, ConditionCode.UPSTREAM_UP): (2.0, 1.0)},
+    )
+    repo = FakeRepo()
+    pipeline = CredibilityPipeline(repo, graph, prior_floor=1.0)
+    msg = _scored_propagated(is_correct=True)
+
+    assert await pipeline.process(msg) is True
+    assert len(graph.corr_writes) == 1
+    src, tgt, cond, alpha, beta = graph.corr_writes[0]
+    assert (src, tgt, cond) == (AssetId.XOM_NYSE, AssetId.NEM_NYSE, ConditionCode.UPSTREAM_UP)
+    assert alpha > 2.0, "correct prediction must increment alpha"
+    assert beta == pytest.approx(1.0)
+
+
+async def test_wrong_propagated_prediction_increments_beta() -> None:
+    graph = FakeGraph(
+        {},
+        corr_edges={(AssetId.XOM_NYSE, AssetId.NEM_NYSE, ConditionCode.UPSTREAM_UP): (2.0, 1.0)},
+    )
+    repo = FakeRepo()
+    pipeline = CredibilityPipeline(repo, graph, prior_floor=1.0)
+    msg = _scored_propagated(is_correct=False)
+
+    assert await pipeline.process(msg) is True
+    assert len(graph.corr_writes) == 1
+    _, _, _, alpha, beta = graph.corr_writes[0]
+    assert alpha == pytest.approx(2.0)
+    assert beta > 1.0, "wrong prediction must increment beta"
+
+
+async def test_direct_prediction_does_not_call_update_correlation_weight() -> None:
+    # A PredictionScored with empty propagation_chain must NOT touch the correlation graph.
+    graph = FakeGraph(
+        {(EventType.MILITARY_CONFLICT, AssetId.NEM_NYSE, None): (1.0, 1.0)},
+        corr_edges={(AssetId.XOM_NYSE, AssetId.NEM_NYSE, ConditionCode.UPSTREAM_UP): (2.0, 1.0)},
+    )
+    repo = FakeRepo()
+    pipeline = CredibilityPipeline(repo, graph, prior_floor=1.0)
+    msg = _scored(
+        is_correct=True,
+        edges=[("MILITARY_CONFLICT->NEM_NYSE", 1.0)],
+        sources=[],
+    )
+
+    await pipeline.process(msg)
+    assert graph.corr_writes == [], "direct predictions must not touch CORRELATES_WITH edges"
+
+
+async def test_propagated_prediction_missing_corr_edge_returns_no_update() -> None:
+    # If the CORRELATES_WITH edge is absent from the graph, pipeline still completes (no crash),
+    # just no edge update written.
+    graph = FakeGraph({}, corr_edges={})
+    repo = FakeRepo()
+    pipeline = CredibilityPipeline(repo, graph, prior_floor=1.0)
+    msg = _scored_propagated(is_correct=True)
+
+    applied = await pipeline.process(msg)
+    assert applied is True
+    assert graph.corr_writes == []
+
+
+def _scored_converged(*, is_correct: bool) -> PredictionScored:
+    """A propagated prediction produced by TWO converging correlation edges."""
+    target = AssetId.SWED_A_STO
+    a = f"NEM_NYSE|{ConditionCode.UPSTREAM_DOWN.value}->{target.value}"
+    b = f"LUG_STO|{ConditionCode.UPSTREAM_DOWN.value}->{target.value}"
+    hops = [
+        PropagationHop(
+            source_asset_id=AssetId.NEM_NYSE,
+            target_asset_id=target,
+            condition=ConditionCode.UPSTREAM_DOWN,
+            direction=Direction.UP,
+            edge_weight=0.90,
+        ),
+        PropagationHop(
+            source_asset_id=AssetId.LUG_STO,
+            target_asset_id=target,
+            condition=ConditionCode.UPSTREAM_DOWN,
+            direction=Direction.UP,
+            edge_weight=0.20,
+        ),
+    ]
+    return PredictionScored(
+        correlation_id=uuid.uuid4(),
+        occurred_at=datetime.now(UTC),
+        prediction_id=uuid.uuid4(),
+        context_id=uuid.uuid4(),
+        asset_id=target,
+        predicted_direction=Direction.UP,
+        actual_direction=Direction.UP if is_correct else Direction.DOWN,
+        predicted_magnitude=Magnitude.MEDIUM,
+        actual_magnitude=Magnitude.MEDIUM,
+        confidence=0.6,
+        actual_return=0.02 if is_correct else -0.02,
+        is_correct=is_correct,
+        score=1.0 if is_correct else 0.0,
+        contributing_edges=[
+            ContributingEdge(
+                edge_id=a,
+                direction=Direction.UP,
+                current_weight=0.5,
+                influence_weight=0.90,
+                path=a,
+            ),
+            ContributingEdge(
+                edge_id=b,
+                direction=Direction.DOWN,
+                current_weight=0.5,
+                influence_weight=0.20,
+                path=b,
+            ),
+        ],
+        source_ids=[],
+        baseline=_close(date(2026, 7, 27), "100.00"),
+        settlement=_close(date(2026, 7, 28), "102.00"),
+        scored_at=datetime.now(UTC),
+        propagation_chain=hops,
+    )
+
+
+async def test_converging_edges_receive_proportional_credit() -> None:
+    # Both converging correlation edges are credited, split by influence_weight -- neither is
+    # treated as though it acted alone, and the heavier edge receives more evidence.
+    graph = FakeGraph(
+        {},
+        corr_edges={
+            (AssetId.NEM_NYSE, AssetId.SWED_A_STO, ConditionCode.UPSTREAM_DOWN): (1.0, 1.0),
+            (AssetId.LUG_STO, AssetId.SWED_A_STO, ConditionCode.UPSTREAM_DOWN): (1.0, 1.0),
+        },
+    )
+    repo = FakeRepo()
+    pipeline = CredibilityPipeline(repo, graph, prior_floor=1.0)
+
+    assert await pipeline.process(_scored_converged(is_correct=True)) is True
+
+    assert len(graph.corr_writes) == 2, "both converging edges must be credited"
+    by_source = {src: (alpha, beta) for src, _tgt, _c, alpha, beta in graph.corr_writes}
+    nem_alpha, nem_beta = by_source[AssetId.NEM_NYSE]
+    lug_alpha, lug_beta = by_source[AssetId.LUG_STO]
+    # Correct prediction -> alpha grows on both, beta untouched.
+    assert nem_alpha > 1.0 and nem_beta == pytest.approx(1.0)
+    assert lug_alpha > 1.0 and lug_beta == pytest.approx(1.0)
+    # Credit is proportional: 0.90 vs 0.20 influence.
+    assert nem_alpha > lug_alpha
+    # The two credits sum to the single full observation (1.0).
+    assert (nem_alpha - 1.0) + (lug_alpha - 1.0) == pytest.approx(1.0)
+
+
+async def test_converging_edges_share_the_blame_when_wrong() -> None:
+    graph = FakeGraph(
+        {},
+        corr_edges={
+            (AssetId.NEM_NYSE, AssetId.SWED_A_STO, ConditionCode.UPSTREAM_DOWN): (1.0, 1.0),
+            (AssetId.LUG_STO, AssetId.SWED_A_STO, ConditionCode.UPSTREAM_DOWN): (1.0, 1.0),
+        },
+    )
+    repo = FakeRepo()
+    pipeline = CredibilityPipeline(repo, graph, prior_floor=1.0)
+
+    assert await pipeline.process(_scored_converged(is_correct=False)) is True
+
+    assert len(graph.corr_writes) == 2
+    by_source = {src: (alpha, beta) for src, _tgt, _c, alpha, beta in graph.corr_writes}
+    for source in (AssetId.NEM_NYSE, AssetId.LUG_STO):
+        alpha, beta = by_source[source]
+        assert alpha == pytest.approx(1.0), f"{source} alpha must not grow on a miss"
+        assert beta > 1.0, f"{source} beta must grow on a miss"
+    assert by_source[AssetId.NEM_NYSE][1] > by_source[AssetId.LUG_STO][1]
+
+
+async def test_single_edge_propagation_still_gets_full_credit() -> None:
+    # Regression: the common one-edge case must be unchanged by the proportional split.
+    graph = FakeGraph(
+        {},
+        corr_edges={(AssetId.XOM_NYSE, AssetId.NEM_NYSE, ConditionCode.UPSTREAM_UP): (1.0, 1.0)},
+    )
+    repo = FakeRepo()
+    pipeline = CredibilityPipeline(repo, graph, prior_floor=1.0)
+    assert await pipeline.process(_scored_propagated(is_correct=True)) is True
+    _s, _t, _c, alpha, beta = graph.corr_writes[0]
+    assert alpha == pytest.approx(2.0)  # 1.0 prior + full 1.0 credit
+    assert beta == pytest.approx(1.0)
+
+
+def test_parse_correlation_edge_id_recognises_correlation_form() -> None:
+    from credibility.pipeline import parse_correlation_edge_id
+
+    assert parse_correlation_edge_id("XOM_NYSE|UPSTREAM_UP->NEM_NYSE") == (
+        AssetId.XOM_NYSE,
+        ConditionCode.UPSTREAM_UP,
+        AssetId.NEM_NYSE,
+    )
+
+
+def test_parse_correlation_edge_id_returns_none_for_causes_edges() -> None:
+    # A CAUSES edge id must fall through so parse_edge_id handles it.
+    from credibility.pipeline import parse_correlation_edge_id
+
+    assert parse_correlation_edge_id("MILITARY_CONFLICT->NEM_NYSE") is None
+    assert parse_correlation_edge_id("MILITARY_CONFLICT|TRANSPORT_AFFECTED->XOM_NYSE") is None

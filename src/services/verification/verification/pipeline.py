@@ -102,6 +102,7 @@ class VerificationPipeline:
             correlation_id=message.correlation_id,
             contributing_edges=list(message.contributing_edges),
             source_ids=[],
+            propagation_chain=list(message.propagation_chain),
         )
         created = await self._repo.create_evaluation_with_outbox(evaluation, request)
         logger.info(
@@ -187,6 +188,7 @@ class VerificationPipeline:
             baseline=message.baseline,
             settlement=message.settlement,
             scored_at=now,
+            propagation_chain=list(evaluation.propagation_chain),
         )
         produced = await self._repo.store_score_with_outbox(scored)
         logger.info(

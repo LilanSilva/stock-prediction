@@ -93,3 +93,100 @@ async def test_skips_neutral_and_unconditional_estimates() -> None:
     assert written == 1
     assert len(graph.calls) == 1
     assert graph.calls[0].condition is ConditionCode.TRANSPORT_AFFECTED
+
+
+# --- write_correlation_estimates tests ---
+
+from dataclasses import dataclass as _dc  # noqa: E402
+
+import pytest as _pytest  # noqa: E402
+
+from credibility.learning.models import CorrelationEdgeEstimate  # noqa: E402
+from credibility.learning.seed_writer import write_correlation_estimates  # noqa: E402
+
+
+@_dc
+class _CorrUpsert:
+    source_asset_id: AssetId
+    condition: ConditionCode
+    target_asset_id: AssetId
+    direction: Direction
+    weight: float
+    confidence: float
+    alpha: float
+    beta: float
+
+
+class _FakeCorrGraph:
+    def __init__(self) -> None:
+        self.calls: list[_CorrUpsert] = []
+
+    async def upsert_correlation_edge(
+        self,
+        source_asset_id: AssetId,
+        condition: ConditionCode,
+        target_asset_id: AssetId,
+        *,
+        direction: Direction,
+        weight: float,
+        confidence: float,
+        alpha: float,
+        beta: float,
+    ) -> None:
+        self.calls.append(
+            _CorrUpsert(
+                source_asset_id,
+                condition,
+                target_asset_id,
+                direction,
+                weight,
+                confidence,
+                alpha,
+                beta,
+            )
+        )
+
+
+def _corr_estimate(*, direction: Direction) -> CorrelationEdgeEstimate:
+    return CorrelationEdgeEstimate(
+        source_asset=AssetId.XOM_NYSE,
+        condition=ConditionCode.UPSTREAM_UP,
+        target_asset=AssetId.NEM_NYSE,
+        direction=direction,
+        weight=0.5,
+        confidence=0.8,
+        alpha=3.0,
+        beta=2.0,
+        sample_count=5,
+    )
+
+
+@_pytest.mark.asyncio
+async def test_write_correlation_estimates_skips_neutral() -> None:
+    graph = _FakeCorrGraph()
+    written = await write_correlation_estimates(
+        graph, [_corr_estimate(direction=Direction.NEUTRAL)]
+    )
+    assert written == 0
+    assert graph.calls == []
+
+
+@_pytest.mark.asyncio
+async def test_write_correlation_estimates_calls_upsert_for_directional() -> None:
+    graph = _FakeCorrGraph()
+    written = await write_correlation_estimates(
+        graph,
+        [
+            _corr_estimate(direction=Direction.DOWN),
+            _corr_estimate(direction=Direction.UP),
+        ],
+    )
+    assert written == 2
+    assert len(graph.calls) == 2
+
+
+@_pytest.mark.asyncio
+async def test_write_correlation_estimates_empty_input_returns_zero() -> None:
+    graph = _FakeCorrGraph()
+    written = await write_correlation_estimates(graph, [])
+    assert written == 0

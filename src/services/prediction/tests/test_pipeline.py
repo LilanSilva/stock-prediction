@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import cast
 
-from shared.graph import FiringEdge
+from shared.graph import CorrelationEdge, FiringEdge
 from shared.graph.exceptions import GraphTransportError
 from shared.schemas.messages import (
     AssetId,
@@ -114,9 +114,14 @@ class _FakeRepo:
 
 class _FakeGraph:
     def __init__(
-        self, *, edges: list[FiringEdge] | None = None, error: Exception | None = None
+        self,
+        *,
+        edges: list[FiringEdge] | None = None,
+        corr_edges: list[CorrelationEdge] | None = None,
+        error: Exception | None = None,
     ) -> None:
         self._edges = edges or []
+        self._corr_edges = corr_edges or []
         self._error = error
         self.calls: list[tuple[EventType, set[ConditionCode] | None]] = []
 
@@ -143,6 +148,17 @@ class _FakeGraph:
             matched.append(edge)
         return matched
 
+    async def get_correlation_edges(
+        self,
+        source_asset_id: AssetId,
+        condition: ConditionCode,
+    ) -> list[CorrelationEdge]:
+        return [
+            e
+            for e in self._corr_edges
+            if e.source_asset_id is source_asset_id and e.condition is condition
+        ]
+
 
 class _FakePriceReader:
     def __init__(self, *, elevated: bool = False, available: bool = True) -> None:
@@ -159,10 +175,16 @@ class _FakePriceReader:
 
 
 def _pipeline(
-    repo: _FakeRepo, graph: _FakeGraph, *, elevated: bool = False, available: bool = True
+    repo: _FakeRepo,
+    graph: _FakeGraph,
+    *,
+    elevated: bool = False,
+    available: bool = True,
+    max_propagation_depth: int = 3,
 ) -> PredictionPipeline:
+    settings = PredictionSettings(max_propagation_depth=max_propagation_depth)
     return PredictionPipeline(
-        repo, graph, _FakePriceReader(elevated=elevated, available=available), PredictionSettings()
+        repo, graph, _FakePriceReader(elevated=elevated, available=available), settings
     )
 
 
@@ -461,3 +483,248 @@ async def test_market_open_is_false_for_an_unregistered_asset() -> None:
     pipeline = _pipeline(_FakeRepo(), _FakeGraph())
     bogus = cast(AssetId, "NOT_IN_REGISTRY")
     assert await pipeline._is_market_open(bogus, datetime(2026, 7, 15, 12, 0, tzinfo=UTC)) is False
+
+
+# --- cross-asset propagation (E10) -----------------------------------------------------------
+
+
+def _corr_edge(
+    source: AssetId,
+    target: AssetId,
+    direction: Direction,
+    *,
+    condition: ConditionCode = ConditionCode.UPSTREAM_UP,
+    weight: float = 0.5,
+) -> CorrelationEdge:
+    return CorrelationEdge(
+        source_asset_id=source,
+        target_asset_id=target,
+        condition=condition,
+        direction=direction,
+        weight=weight,
+        confidence=0.7,
+        alpha=2.0,
+        beta=1.0,
+    )
+
+
+async def test_propagation_produces_downstream_prediction() -> None:
+    # XOM_NYSE is the direct asset; NEM_NYSE has a CORRELATES_WITH edge (DOWN when upstream UP).
+    ctx = ContextRecord(
+        context_id=uuid.uuid4(),
+        asset_id=AssetId.XOM_NYSE,
+        context_version=1,
+        window_start=datetime(2026, 7, 27, 14, 0, tzinfo=UTC),
+        window_end=datetime(2026, 7, 27, 15, 0, tzinfo=UTC),
+        state=ContextState.PREDICTING,
+    )
+    events = [ContextEvent(uuid.uuid4(), EventType.MILITARY_CONFLICT, _NOW)]
+    repo = _FakeRepo(claimed=[ctx], events={ctx.context_id: events})
+    graph = _FakeGraph(
+        edges=[_edge(EventType.MILITARY_CONFLICT, Direction.UP, 0.75, asset=AssetId.XOM_NYSE)],
+        corr_edges=[_corr_edge(AssetId.XOM_NYSE, AssetId.NEM_NYSE, Direction.DOWN)],
+    )
+    produced = await _pipeline(repo, graph).close_ready_contexts()
+    # direct + 1 propagated
+    assert produced == 2
+    stored_assets = {msg.asset_id for msg, _ in repo.stored}
+    assert AssetId.XOM_NYSE in stored_assets
+    assert AssetId.NEM_NYSE in stored_assets
+    # The propagated message carries depth > 0 and a non-empty chain.
+    prop_msg = next(msg for msg, _ in repo.stored if msg.asset_id is AssetId.NEM_NYSE)
+    assert prop_msg.propagation_depth == 1
+    assert len(prop_msg.propagation_chain) == 1
+    hop = prop_msg.propagation_chain[0]
+    assert hop.source_asset_id is AssetId.XOM_NYSE
+    assert hop.target_asset_id is AssetId.NEM_NYSE
+    assert hop.condition is ConditionCode.UPSTREAM_UP
+
+
+async def test_propagation_visited_set_prevents_cycle() -> None:
+    # A ↔ B: if A predicts UP -> B should predict DOWN, but if B also has A as a corr edge
+    # the visited set must prevent A from being predicted again.
+    ctx = ContextRecord(
+        context_id=uuid.uuid4(),
+        asset_id=AssetId.XOM_NYSE,
+        context_version=1,
+        window_start=datetime(2026, 7, 27, 14, 0, tzinfo=UTC),
+        window_end=datetime(2026, 7, 27, 15, 0, tzinfo=UTC),
+        state=ContextState.PREDICTING,
+    )
+    events = [ContextEvent(uuid.uuid4(), EventType.MILITARY_CONFLICT, _NOW)]
+    repo = _FakeRepo(claimed=[ctx], events={ctx.context_id: events})
+    graph = _FakeGraph(
+        edges=[_edge(EventType.MILITARY_CONFLICT, Direction.UP, 0.75, asset=AssetId.XOM_NYSE)],
+        corr_edges=[
+            _corr_edge(AssetId.XOM_NYSE, AssetId.NEM_NYSE, Direction.DOWN),
+            # Back-edge: NEM_NYSE -> XOM_NYSE. XOM_NYSE is already in visited, must be skipped.
+            _corr_edge(
+                AssetId.NEM_NYSE,
+                AssetId.XOM_NYSE,
+                Direction.DOWN,
+                condition=ConditionCode.UPSTREAM_DOWN,
+            ),
+        ],
+    )
+    await _pipeline(repo, graph).close_ready_contexts()
+    # Only XOM (direct) and NEM (1 hop) should be stored — XOM must not appear twice.
+    stored_assets = [msg.asset_id for msg, _ in repo.stored]
+    assert stored_assets.count(AssetId.XOM_NYSE) == 1
+
+
+async def test_propagation_depth_cap_stops_at_max() -> None:
+    # Chain: XOM -> NEM -> LUG_STO.  With max_propagation_depth=1 only the first hop fires.
+    ctx = ContextRecord(
+        context_id=uuid.uuid4(),
+        asset_id=AssetId.XOM_NYSE,
+        context_version=1,
+        window_start=datetime(2026, 7, 27, 14, 0, tzinfo=UTC),
+        window_end=datetime(2026, 7, 27, 15, 0, tzinfo=UTC),
+        state=ContextState.PREDICTING,
+    )
+    events = [ContextEvent(uuid.uuid4(), EventType.MILITARY_CONFLICT, _NOW)]
+    repo = _FakeRepo(claimed=[ctx], events={ctx.context_id: events})
+    graph = _FakeGraph(
+        edges=[_edge(EventType.MILITARY_CONFLICT, Direction.UP, 0.75, asset=AssetId.XOM_NYSE)],
+        corr_edges=[
+            _corr_edge(AssetId.XOM_NYSE, AssetId.NEM_NYSE, Direction.DOWN),
+            _corr_edge(
+                AssetId.NEM_NYSE,
+                AssetId.LUG_STO,
+                Direction.DOWN,
+                condition=ConditionCode.UPSTREAM_DOWN,
+            ),
+        ],
+    )
+    produced = await _pipeline(repo, graph, max_propagation_depth=1).close_ready_contexts()
+    stored_assets = {msg.asset_id for msg, _ in repo.stored}
+    # NEM should be present (hop 1), LUG should NOT (hop 2 exceeds depth 1).
+    assert AssetId.NEM_NYSE in stored_assets
+    assert AssetId.LUG_STO not in stored_assets
+    # Total = 1 direct + 1 propagated
+    assert produced == 2
+
+
+async def test_no_direct_prediction_skips_propagation() -> None:
+    # If the direct context yields no firing edges, no propagation should happen either.
+    ctx = _context()
+    events = [ContextEvent(uuid.uuid4(), EventType.CORPORATE_EARNINGS, _NOW)]
+    repo = _FakeRepo(claimed=[ctx], events={ctx.context_id: events})
+    graph = _FakeGraph(
+        edges=[],
+        corr_edges=[_corr_edge(AssetId.NEM_NYSE, AssetId.XOM_NYSE, Direction.UP)],
+    )
+    produced = await _pipeline(repo, graph).close_ready_contexts()
+    assert produced == 0
+    assert repo.stored == []
+
+async def test_converging_edges_at_same_depth_sum_forces() -> None:
+    # Force summation across converging correlation edges (ADR-008). XOM fans out to NEM and
+    # LUG at depth 1; both then point at SWED_A_STO at depth 2, with OPPOSING directions.
+    # Because both arrive in the same depth level they are collected first and decided together,
+    # so the heavier edge determines the net direction rather than whichever was reached first.
+    ctx = _oil_context()  # direct asset = XOM_NYSE
+    events = [ContextEvent(uuid.uuid4(), EventType.MILITARY_CONFLICT, _NOW)]
+    repo = _FakeRepo(claimed=[ctx], events={ctx.context_id: events})
+    graph = _FakeGraph(
+        edges=[_edge(EventType.MILITARY_CONFLICT, Direction.UP, 0.75, asset=AssetId.XOM_NYSE)],
+        corr_edges=[
+            # Depth 1: XOM -> NEM (DOWN) and XOM -> LUG (DOWN).
+            _corr_edge(AssetId.XOM_NYSE, AssetId.NEM_NYSE, Direction.DOWN, weight=0.45),
+            _corr_edge(AssetId.XOM_NYSE, AssetId.LUG_STO, Direction.DOWN, weight=0.35),
+            # Depth 2: both NEM and LUG point at SWED_A_STO, in opposite directions.
+            # NEM's edge is much heavier, so the net must be UP.
+            _corr_edge(
+                AssetId.NEM_NYSE,
+                AssetId.SWED_A_STO,
+                Direction.UP,
+                condition=ConditionCode.UPSTREAM_DOWN,
+                weight=0.90,
+            ),
+            _corr_edge(
+                AssetId.LUG_STO,
+                AssetId.SWED_A_STO,
+                Direction.DOWN,
+                condition=ConditionCode.UPSTREAM_DOWN,
+                weight=0.20,
+            ),
+        ],
+    )
+    await _pipeline(repo, graph).close_ready_contexts()
+
+    swed = [msg for msg, _ in repo.stored if msg.asset_id is AssetId.SWED_A_STO]
+    assert len(swed) == 1, "the converging target must be decided exactly once"
+    # Net of +0.90 and -0.20 is UP. Under the old first-wins behaviour this depended purely on
+    # dict ordering, and a DOWN result was equally likely.
+    assert swed[0].direction is Direction.UP
+    assert swed[0].propagation_depth == 2
+    # Provenance records BOTH contributing edges, not just one.
+    final_hops = [h for h in swed[0].propagation_chain if h.target_asset_id is AssetId.SWED_A_STO]
+    assert {h.source_asset_id for h in final_hops} == {AssetId.NEM_NYSE, AssetId.LUG_STO}
+    # Both contributing edges are reported for explainability, with distinct edge ids.
+    edge_ids = {e.edge_id for e in swed[0].contributing_edges}
+    assert edge_ids == {
+        "NEM_NYSE|UPSTREAM_DOWN->SWED_A_STO",
+        "LUG_STO|UPSTREAM_DOWN->SWED_A_STO",
+    }
+
+
+async def test_converging_edges_cancelling_below_deadband_produce_no_prediction() -> None:
+    # Two equal-and-opposite converging forces cancel: net ratio 0 is inside the deadband, so no
+    # downstream prediction is emitted at all. Under first-wins one would have been.
+    ctx = _oil_context()
+    events = [ContextEvent(uuid.uuid4(), EventType.MILITARY_CONFLICT, _NOW)]
+    repo = _FakeRepo(claimed=[ctx], events={ctx.context_id: events})
+    graph = _FakeGraph(
+        edges=[_edge(EventType.MILITARY_CONFLICT, Direction.UP, 0.75, asset=AssetId.XOM_NYSE)],
+        corr_edges=[
+            _corr_edge(AssetId.XOM_NYSE, AssetId.NEM_NYSE, Direction.DOWN, weight=0.45),
+            _corr_edge(AssetId.XOM_NYSE, AssetId.LUG_STO, Direction.DOWN, weight=0.35),
+            # Identical weight, opposing directions -> net 0.
+            _corr_edge(
+                AssetId.NEM_NYSE,
+                AssetId.SWED_A_STO,
+                Direction.UP,
+                condition=ConditionCode.UPSTREAM_DOWN,
+                weight=0.50,
+            ),
+            _corr_edge(
+                AssetId.LUG_STO,
+                AssetId.SWED_A_STO,
+                Direction.DOWN,
+                condition=ConditionCode.UPSTREAM_DOWN,
+                weight=0.50,
+            ),
+        ],
+    )
+    await _pipeline(repo, graph).close_ready_contexts()
+    assert not [msg for msg, _ in repo.stored if msg.asset_id is AssetId.SWED_A_STO]
+
+
+async def test_first_wins_still_applies_across_different_depths() -> None:
+    # Summation is scoped to ONE depth level. A target decided at depth 1 is marked visited, so a
+    # heavier edge arriving at depth 2 cannot revise it -- that is what the cycle guard requires.
+    ctx = _oil_context()
+    events = [ContextEvent(uuid.uuid4(), EventType.MILITARY_CONFLICT, _NOW)]
+    repo = _FakeRepo(claimed=[ctx], events={ctx.context_id: events})
+    graph = _FakeGraph(
+        edges=[_edge(EventType.MILITARY_CONFLICT, Direction.UP, 0.75, asset=AssetId.XOM_NYSE)],
+        corr_edges=[
+            _corr_edge(AssetId.XOM_NYSE, AssetId.NEM_NYSE, Direction.DOWN, weight=0.45),
+            # Reaches LUG at depth 1 and wins, despite being the lighter edge.
+            _corr_edge(AssetId.XOM_NYSE, AssetId.LUG_STO, Direction.DOWN, weight=0.35),
+            _corr_edge(
+                AssetId.NEM_NYSE,
+                AssetId.LUG_STO,
+                Direction.UP,
+                condition=ConditionCode.UPSTREAM_DOWN,
+                weight=0.90,
+            ),
+        ],
+    )
+    await _pipeline(repo, graph).close_ready_contexts()
+
+    lug = [msg for msg, _ in repo.stored if msg.asset_id is AssetId.LUG_STO]
+    assert len(lug) == 1
+    assert lug[0].direction is Direction.DOWN
+    assert lug[0].propagation_depth == 1

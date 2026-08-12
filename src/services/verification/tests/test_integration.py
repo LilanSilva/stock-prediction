@@ -203,3 +203,79 @@ async def test_outbox_relay_publishes_price_requested() -> None:
     finally:
         await rabbit.close()
         await pool.close()
+
+
+# --- E10: propagation_chain JSONB column round-trip ---
+
+
+def _propagated_prediction() -> PredictionMade:
+    from shared.schemas.messages import ConditionCode, PropagationHop
+
+    hop = PropagationHop(
+        source_asset_id=AssetId.XOM_NYSE,
+        target_asset_id=AssetId.NEM_NYSE,
+        condition=ConditionCode.UPSTREAM_UP,
+        direction=Direction.DOWN,
+        edge_weight=0.45,
+    )
+    return PredictionMade(
+        correlation_id=uuid.uuid4(),
+        occurred_at=_DECISION_AT,
+        prediction_id=uuid.uuid4(),
+        context_id=uuid.uuid4(),
+        context_version=1,
+        event_ids=[uuid.uuid4()],
+        asset_id=AssetId.NEM_NYSE,
+        direction=Direction.DOWN,
+        magnitude=Magnitude.MEDIUM,
+        confidence=0.7,
+        horizon=Horizon.ONE_TRADING_DAY,
+        rationale="propagation itest",
+        contributing_edges=[],
+        decision_at=_DECISION_AT,
+        decision_method=DecisionMethod.GRAPH_ONLY,
+        propagation_depth=1,
+        propagation_chain=[hop],
+    )
+
+
+@pytest.mark.skipif(DATABASE_URL is None, reason="DATABASE_URL not set")
+async def test_propagation_chain_round_trips_through_repository() -> None:
+    """propagation_chain JSONB column is written and read back correctly (E10)."""
+
+    assert DATABASE_URL is not None
+    pool = await create_pool(DATABASE_URL, min_size=1, max_size=2)
+    try:
+        await apply_schema(pool)
+        from verification.pipeline import VerificationPipeline
+        from verification.repository import VerificationRepository
+
+        pipeline = VerificationPipeline(VerificationRepository(pool), VerificationSettings())
+        prediction = _propagated_prediction()
+        await pipeline.process_prediction(prediction)
+
+        row = await pool.fetchrow(
+            "SELECT propagation_chain FROM verification.evaluations WHERE prediction_id = $1",
+            prediction.prediction_id,
+        )
+        assert row is not None
+        chain = row["propagation_chain"]
+        # asyncpg may return a str or a list depending on driver version
+        import json as _json
+        if isinstance(chain, str):
+            chain = _json.loads(chain)
+        assert len(chain) == 1
+        hop = chain[0]
+        assert hop["source_asset_id"] == "XOM_NYSE"
+        assert hop["target_asset_id"] == "NEM_NYSE"
+        assert hop["condition"] == "UPSTREAM_UP"
+        assert hop["direction"] == "DOWN"
+        assert hop["edge_weight"] == 0.45
+
+        request_id = await pool.fetchval(
+            "SELECT request_id FROM verification.evaluations WHERE prediction_id = $1",
+            prediction.prediction_id,
+        )
+        await _cleanup(pool, prediction.prediction_id, request_id)
+    finally:
+        await pool.close()

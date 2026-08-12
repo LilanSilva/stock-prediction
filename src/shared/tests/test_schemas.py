@@ -98,3 +98,59 @@ def test_routing_keys_match_contract() -> None:
     assert ROUTING_KEY_BY_MESSAGE[PredictionMade] is RoutingKey.PREDICTION_MADE
     # Every message type has a registered routing key.
     assert len(ROUTING_KEY_BY_MESSAGE) == 6
+
+
+# --- PropagationHop tests ---
+
+from shared.schemas.messages import ConditionCode, Direction, PropagationHop  # noqa: E402
+
+
+def _hop() -> PropagationHop:
+    from shared.schemas.messages import AssetId
+    return PropagationHop(
+        source_asset_id=AssetId.XOM_NYSE,
+        target_asset_id=AssetId.NEM_NYSE,
+        condition=ConditionCode.UPSTREAM_UP,
+        direction=Direction.DOWN,
+        edge_weight=0.45,
+    )
+
+
+def test_propagation_hop_is_frozen() -> None:
+    hop = _hop()
+    with pytest.raises((ValidationError, TypeError)):
+        hop.edge_weight = 0.9  # type: ignore[misc]
+
+
+def test_propagation_hop_round_trips_via_model_dump() -> None:
+    hop = _hop()
+    restored = PropagationHop.model_validate(hop.model_dump(mode="json"))
+    assert restored == hop
+
+
+def test_upstream_up_down_are_valid_condition_codes() -> None:
+    assert ConditionCode.UPSTREAM_UP.value == "UPSTREAM_UP"
+    assert ConditionCode.UPSTREAM_DOWN.value == "UPSTREAM_DOWN"
+
+
+def test_prediction_made_propagation_fields_default_to_zero_and_empty() -> None:
+    msg = make_prediction()
+    assert msg.propagation_depth == 0
+    assert msg.propagation_chain == []
+
+
+def test_prediction_made_accepts_non_zero_propagation_depth() -> None:
+    base = make_prediction().model_dump()
+    base["propagation_depth"] = 2
+    base["propagation_chain"] = [_hop().model_dump(mode="json")]
+    msg = PredictionMade.model_validate(base)
+    assert msg.propagation_depth == 2
+    assert len(msg.propagation_chain) == 1
+    assert msg.propagation_chain[0].condition is ConditionCode.UPSTREAM_UP
+
+
+def test_prediction_made_rejects_negative_propagation_depth() -> None:
+    base = make_prediction().model_dump()
+    base["propagation_depth"] = -1
+    with pytest.raises(ValidationError):
+        PredictionMade.model_validate(base)

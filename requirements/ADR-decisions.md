@@ -6,10 +6,10 @@
 |---|---|
 | Document ID | `ADR` |
 | Type | Decision record |
-| Status | `Implemented` (ADR-001 … ADR-007 all Accepted) |
-| Version | `1.0.0` |
+| Status | `Implemented` (ADR-001 … ADR-008 all Accepted) |
+| Version | `1.1.0` |
 | Diagrams | [docs/architectural-documents/](../docs/architectural-documents/) |
-| Last verified against code | `2026-08-06` |
+| Last verified against code | `2026-08-12` |
 
 This document records **why** the system is shaped the way it is. It contains no `shall` statements —
 the binding requirements live in [SyRS-system.md](SyRS-system.md) and the SRS documents, which state
@@ -33,6 +33,7 @@ An ADR is **never rewritten to match a later decision.** A superseded ADR keeps 
 | ADR-005 | Token-efficient conditional LLM use | Accepted | [`SYS-29` … `SYS-38`](SyRS-system.md#55-llm-usage-policy) |
 | ADR-006 | Conditional causal graph with event polarity and offline structure learning | Accepted | [SyRS §9.2](SyRS-system.md#92-neo4j-graph-model), [SRS-07](SRS-07-credibility.md) |
 | ADR-007 | Multi-market coverage via a file-driven asset registry | Accepted | [`SYS-9` … `SYS-14`](SyRS-system.md#52-identity-and-reference-data), [REF-02](REF-02-asset-registry.md) |
+| ADR-008 | Cross-asset `CORRELATES_WITH` propagation with visited-set cycle guard | Accepted | [SRS-04](SRS-04-prediction.md), [SRS-07](SRS-07-credibility.md) |
 
 ## ADR-001: Multi-event context before prediction
 
@@ -130,6 +131,57 @@ company-specific news is the case this feature exists for and that factor previo
 all. Inheritance without a seeded prior is inert — the mechanism resolves to nothing — so the two
 belong together.
 
+## ADR-008: Cross-asset `CORRELATES_WITH` propagation with visited-set cycle guard
+
+The existing `(:CausalFactor)-[:CAUSES]->(:Asset)` graph cannot model second-order price causation —
+a directional move in one asset that reliably causes a directional move in another. The
+capital-rotation scenario (oil UP → gold DOWN) requires this: it is not a news event directly causing
+gold to move, it is oil's price move that causes money to rotate out of gold. Adding a direct
+`CAUSES` edge from `MILITARY_CONFLICT` to `GOLD DOWN` would be wrong: it would predict gold down for
+every military conflict regardless of whether oil was involved.
+
+**Decision.** A new `(:Asset)-[:CORRELATES_WITH {condition, direction, weight, confidence, alpha,
+beta, last_updated}]->(:Asset)` edge type is added, mirroring the `CAUSES` contract of ADR-006. The
+condition is always set (`UPSTREAM_UP` or `UPSTREAM_DOWN`) — there is no unconditional form — and it
+gates the edge on the upstream asset's predicted direction in the same pipeline run. The Prediction
+Service runs pass 0 for direct `CAUSES` predictions, then a propagation pass: for each asset
+predicted directional, it queries `CORRELATES_WITH` edges for the matching condition and runs
+`decide()` for the downstream targets. The loop repeats up to `PREDICTION_MAX_PROPAGATION_DEPTH`
+(default 3, range 1…10) hops. A `visited: set[AssetId]` per pipeline run prevents cycles.
+
+`decide()` is not changed — it remains single-asset and stateless, and a net ratio below the
+deadband produces no prediction. Force summation is preserved on the propagated hop by processing
+each depth level in two phases: **collect** every correlation edge reaching each target, then
+**decide** each target once with the full edge list. A target joins the visited set only after it is
+decided, so two upstream assets converging on it in the same level combine (and can cancel to no
+prediction) instead of the first-traversed edge winning. Summation is scoped to one level:
+a target already decided at depth *n* is not revised by an edge arriving at depth *n+1*, which is
+what the cycle guard requires. Each propagated `PredictionMade` is independently scored by
+Verification and independently learned by Credibility: every `CORRELATES_WITH` edge reported in
+`contributing_edges` is credited in proportion to its influence, so converging edges share the
+evidence rather than each being treated as the sole cause. Direct predictions keep the existing
+`CAUSES` credit path unchanged.
+
+The one-edge-per-`(source, target, condition)` triple invariant is enforced by the `MERGE` pattern in
+the seed and by application code, **not** by the database. A relationship property existence
+constraint (`REQUIRE r.condition IS NOT NULL`) requires Neo4j Enterprise Edition and this stack runs
+`neo4j:5.20-community`; an attempt to add one aborted the seed outright. Only a lookup index on
+`r.condition` is created, for the propagation query.
+
+Verified live: a `MILITARY_CONFLICT`/`TRANSPORT_AFFECTED` context produced `XOM_NYSE` UP at depth 0,
+then `NEM_NYSE` DOWN and `LUG_STO` DOWN at depth 1, with the seeded `NEM_NYSE → XOM_NYSE` back-edge
+correctly silenced by the visited set.
+
+**Cost accepted.** Two new graph methods and a propagation loop in the pipeline increase code
+surface. The visited-set guard is simple but must be per-run (not global), or it would prevent the
+same asset from ever being predicted twice in different runs. Setting
+`PREDICTION_MAX_PROPAGATION_DEPTH` too high on a dense graph could increase pipeline latency; the
+default of 3 is conservative. Credibility
+now has two update paths (`CAUSES` and `CORRELATES_WITH`); they are structurally identical
+(Beta-Bernoulli increment) but address different edge types in the graph. And because no DB
+constraint backs the condition property, a hand-written Cypher edit could introduce an
+unconditioned edge that the propagation query would never match.
+
 ## 3. How to update this document
 
 **When to add an ADR** — a decision that changes the system's shape and whose reasoning would not be
@@ -138,7 +190,7 @@ messaging-topology change, or the reversal of an earlier ADR.
 
 **Steps**
 
-1. Add the record with the next free number (`ADR-008`). Never reuse a number.
+1. Add the record with the next free number (`ADR-009`). Never reuse a number.
 2. State the problem that forced the decision, then the decision, then the cost accepted. An ADR with
    no stated cost is usually incomplete.
 3. Add a row to the section 2 index, naming the requirements the decision binds to.
@@ -153,3 +205,4 @@ messaging-topology change, or the reversal of an earlier ADR.
 | Date | Version | Change | Driver |
 |---|---|---|---|
 | `2026-08-06` | `1.0.0` | Moved into `requirements/` from `docs/decisions/README.md`. Added ADR-007 to the index (present in the body but missing from the table), requirement-ID cross-references, and update rules | Requirements consolidation |
+| `2026-08-12` | `1.1.0` | Added ADR-008: cross-asset `CORRELATES_WITH` propagation | E10 epic |

@@ -151,6 +151,8 @@ class ConditionCode(StrEnum):
     TRANSPORT_AFFECTED = "TRANSPORT_AFFECTED"
     SAFE_HAVEN_ONLY = "SAFE_HAVEN_ONLY"
     RISK_PREMIUM_ELEVATED = "RISK_PREMIUM_ELEVATED"
+    UPSTREAM_UP = "UPSTREAM_UP"    # source asset predicted UP in this pipeline run
+    UPSTREAM_DOWN = "UPSTREAM_DOWN"  # source asset predicted DOWN in this pipeline run
 
 
 def _assume_utc_for_naive(value: object) -> object:
@@ -220,6 +222,22 @@ class ContributingEdge(BaseModel):
     current_weight: Annotated[float, Field(ge=0.0, le=1.0)]
     influence_weight: Annotated[float, Field(ge=0.0, le=1.0)]
     path: NonEmptyStr
+
+
+class PropagationHop(BaseModel):
+    """One fired (:Asset)-[:CORRELATES_WITH]->(:Asset) edge in a propagation chain.
+
+    Carried in PredictionMade.propagation_chain so Credibility can update the correct
+    CORRELATES_WITH edge when the prediction is scored.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    source_asset_id: AssetId
+    target_asset_id: AssetId
+    condition: ConditionCode          # UPSTREAM_UP or UPSTREAM_DOWN
+    direction: Direction              # direction contributed to the target (after force summation)
+    edge_weight: float                # expert weight of the fired edge
 
 
 class CloseObservation(BaseModel):
@@ -327,6 +345,9 @@ class PredictionMade(FeedMessage):
     supersedes_prediction_id: uuid.UUID | None = None
     decision_method: DecisionMethod
     llm_metadata: LlmMetadata | None = None
+    # Propagation fields (backward-compatible defaults; 0/[] preserves existing message parsing).
+    propagation_depth: Annotated[int, Field(ge=0)] = 0
+    propagation_chain: list[PropagationHop] = Field(default_factory=list)
 
 
 class PriceRequested(FeedMessage):
@@ -369,6 +390,8 @@ class PredictionScored(FeedMessage):
     baseline: CloseObservation
     settlement: CloseObservation
     scored_at: UtcDatetime
+    # Propagation fields forwarded from PredictionMade (backward-compatible defaults).
+    propagation_chain: list[PropagationHop] = Field(default_factory=list)
 
 
 # Map each message model to the routing key it is published with.

@@ -83,6 +83,42 @@ def test_rabbitmq_topology_matches_canonical_contract() -> None:
         assert ("feed.events", queue_name, routing_key) in bindings
 
 
+def _asset_ids(registry: dict[str, Any]) -> set[str]:
+    grouped = {
+        asset["asset_id"]
+        for group in registry.get("groups", [])
+        for asset in group.get("assets", [])
+    }
+    return grouped | {asset["asset_id"] for asset in registry.get("standalone_assets", [])}
+
+
+def test_deployed_asset_registry_matches_the_shared_source_of_truth() -> None:
+    """``infra/assets/assets.json`` must not drift from the packaged registry.
+
+    Regression: the deployed file is mounted at ``/config/assets.json`` and ``ASSET_REGISTRY_PATH``
+    makes it override the wheel-packaged copy. It had drifted to an older generation still naming
+    ``GOLD``/``BRENT_OIL`` while the code had migrated to the ``NEM_NYSE``/``XOM_NYSE`` equity
+    proxies, so every service that imported an asset constant by name crashed on startup
+    (``'NEM_NYSE' is not a canonical asset id``) as soon as its image was rebuilt. Nothing caught it
+    because the running containers predated the migration.
+    """
+    deployed = cast(
+        dict[str, Any],
+        json.loads((INFRA / "assets/assets.json").read_text(encoding="utf-8")),
+    )
+    source = cast(
+        dict[str, Any],
+        json.loads(
+            (REPO_ROOT / "src/shared/shared/reference/assets.json").read_text(encoding="utf-8")
+        ),
+    )
+    assert deployed["registry_version"] == source["registry_version"]
+    assert _asset_ids(deployed) == _asset_ids(source), (
+        "infra/assets/assets.json has drifted from src/shared/shared/reference/assets.json; "
+        "copy the shared registry over the deployed one so mounted config matches the code"
+    )
+
+
 def test_compose_does_not_embed_example_passwords() -> None:
     compose = (INFRA / "docker-compose.yml").read_text(encoding="utf-8")
     assert "changeme" not in compose

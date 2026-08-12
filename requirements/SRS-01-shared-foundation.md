@@ -8,10 +8,10 @@
 | Component | Shared Python library (`shared`) and local infrastructure |
 | Requirement ID prefix | `SHR` |
 | Status | `Implemented` |
-| Version | `1.1.0` |
+| Version | `1.2.0` |
 | Source code | [src/shared/shared/](../src/shared/shared/), [infra/](../infra/) |
 | Tests | [src/shared/tests/](../src/shared/tests/) |
-| Last verified against code | `2026-08-05` |
+| Last verified against code | `2026-08-12` |
 
 ## 2. Purpose and scope
 
@@ -58,7 +58,9 @@ Two parts:
 | `FeedMessage` | The frozen Pydantic base class all six messages inherit |
 | `AssetId` | A `str` subclass validated against the loaded registry |
 | Registry version | A label identifying one snapshot of the asset registry, e.g. `multi-market-v2` |
-| Firing edge | A `CAUSES` edge returned by the graph query because its condition is satisfied |
+| Firing edge | A `CAUSES` or `CORRELATES_WITH` edge returned by the graph query because its condition is satisfied |
+| Correlation edge | A `CORRELATES_WITH` edge between two assets, expressing second-order price causation |
+| Propagation hop | One fired `CORRELATES_WITH` edge recorded on a propagated prediction |
 | Reliability | An edge's learned `alpha / (alpha + beta)` |
 | Session | One trading day on a specific market's calendar |
 | Structured output | An LLM response validated against a caller-supplied JSON schema |
@@ -118,6 +120,10 @@ Two parts:
 | `SHR-10` | The library **shall** constrain `confidence`, `current_weight`, and `influence_weight` to `[0.0, 1.0]`. | Must | Implemented |
 | `SHR-11` | The library **shall** constrain a `CloseObservation.close` to a positive decimal. | Must | Implemented |
 | `SHR-12` | The library **shall** bound `PredictionMade.rationale` to 2000 characters. | Must | Implemented |
+| `SHR-79` | The library **shall** define `PropagationHop` as a frozen value model carrying `source_asset_id`, `target_asset_id`, `condition`, `direction`, and `edge_weight`. | Must | Implemented |
+| `SHR-80` | `PredictionMade` **shall** carry `propagation_depth`, constrained to `>= 0` and defaulting to `0`, and `propagation_chain`, defaulting to empty. | Must | Implemented |
+| `SHR-81` | `PredictionScored` **shall** carry `propagation_chain`, defaulting to empty, so Verification forwards the chain to Credibility unchanged. | Must | Implemented |
+| `SHR-82` | The propagation fields **shall** be additive with defaults, so `schema_version` stays `"1.0"` and a message produced before E10 still parses. | Must | Implemented |
 
 ### 5.2 Asset registry
 
@@ -175,6 +181,13 @@ Two parts:
 | `SHR-76` | The weight update **shall** target either an `:Asset` or an `:AssetGroup` edge, selected by the caller, so credit for an inherited edge lands on the industry prior that fired (`SHR-43`). | Must | Implemented |
 | `SHR-77` | The client **shall** return the current `(alpha, beta)` of one group edge addressed directly by `(factor, group, condition)`, because a lookup through a member asset would miss a group edge that the member overrides. | Must | Implemented |
 | `SHR-78` | A weight update naming an edge that does not exist **shall** raise, identifying whether an `:Asset` or an `:AssetGroup` target was expected. | Must | Implemented |
+| `SHR-83` | The client **shall** define `CorrelationEdge` as a frozen value model carrying `source_asset_id`, `target_asset_id`, `condition`, `direction`, `weight`, `confidence`, `alpha`, and `beta`, and **shall** compute its reliability as `alpha / (alpha + beta)`. | Must | Implemented |
+| `SHR-84` | The client **shall** return the `CORRELATES_WITH` edges leaving one asset that are active under a given `ConditionCode`, and **shall** return an empty list for a condition with no edges. | Must | Implemented |
+| `SHR-85` | The client **shall** return the current `(alpha, beta)` of one `CORRELATES_WITH` edge addressed by `(source, target, condition)`, or `null` when that edge does not exist. | Must | Implemented |
+| `SHR-86` | The client **shall** support an idempotent `CORRELATES_WITH` weight update for Credibility, and **shall** raise when the addressed edge does not exist rather than silently creating one. | Must | Implemented |
+| `SHR-87` | The client **shall** upsert a `CORRELATES_WITH` edge idempotently by `MERGE` on `(source, condition, target)`, so re-running the offline structure learner refines an edge instead of duplicating it. | Must | Implemented |
+| `SHR-88` | `FiringEdge.factor_id` **shall** be optional, `null` for a propagated `CORRELATES_WITH` edge, and the resulting `edge_id` **shall** use the literal `CORRELATION` in place of the factor. | Must | Implemented |
+| `SHR-89` | Every `CORRELATES_WITH` edge **shall** carry a `condition`; the invariant is enforced by the `MERGE` pattern and by application code, because a relationship property existence constraint is Neo4j Enterprise-only. | Must | Implemented |
 
 ### 5.6 Session calendar
 
@@ -212,6 +225,8 @@ Two parts:
 | `SHR-66` | Infrastructure initialisation **shall** seed asset nodes, group nodes, `MEMBER_OF` relationships, causal factor nodes, and `CAUSES` edges. | Must | Implemented |
 | `SHR-67` | Every seeded `CAUSES` edge **shall** start at `alpha = 1.0`, `beta = 1.0`. | Must | Implemented |
 | `SHR-68` | The Neo4j asset seed **shall** be generated from the asset registry, so the two cannot drift. | Must | Implemented |
+| `SHR-90` | Infrastructure initialisation **shall** seed `CORRELATES_WITH` edges between assets, each with a `condition`, at `alpha = 1.0`, `beta = 1.0`, using `MERGE` so re-running the seed is idempotent. | Must | Implemented |
+| `SHR-91` | Infrastructure initialisation **shall** create an index on the `CORRELATES_WITH` relationship's `condition` property, so the propagation lookup does not scan every edge. | Must | Implemented |
 
 ## 6. Non-functional requirements
 
@@ -366,6 +381,28 @@ the topology reviewable.
 - An unmapped event type returns no edges. `OTHER` has no `CausalFactor` node, so it produces no
   prediction — intentionally, since it is a catch-all for events with no modelled causal path.
 
+**Correlation lookup** — a second, separate query answers a different question: given an asset that
+has just been predicted, which other assets move because of it?
+
+1. Take the source asset ID and one `ConditionCode` — `UPSTREAM_UP` or `UPSTREAM_DOWN`, chosen by
+   the direction the source was predicted in.
+2. Match `CORRELATES_WITH` edges leaving that asset whose `condition` equals the supplied code.
+3. Return a `CorrelationEdge` per match, carrying the target asset, direction, expert weight,
+   confidence, and `alpha`/`beta`.
+
+**Rules:**
+
+- `CORRELATES_WITH` has **no unconditional form**. A `CAUSES` edge with no `condition` always fires;
+  a correlation edge always names the upstream direction that arms it, so a correlation can never
+  fire on its own.
+- A correlation edge is asset-to-asset. There is no group-level inheritance and therefore no
+  override resolution — the group rules above apply to `CAUSES` only.
+- A propagated edge has **no causal factor**. `FiringEdge.factor_id` is `null` for one, and its
+  `edge_id` substitutes the literal `CORRELATION` for the factor, so a propagated contribution stays
+  distinguishable from a direct one in `contributing_edges` and in the learned-weight store.
+- The client never invents a correlation edge. A weight update naming an absent edge raises rather
+  than creating it, because a per-run edge would gain reliability that no expert ever asserted.
+
 ### 7.6 Session resolution
 
 **Purpose:** decide which two closes score a prediction, using the asset's own market calendar.
@@ -433,7 +470,7 @@ Defined on `FeedMessage`, inherited by all six messages.
 | `PriceKind` | `PROVIDER_DAILY_CLOSE`, `OFFICIAL_SETTLEMENT` |
 | `LlmStatus` | `SUCCESS`, `FAILED` |
 | `EventPolarity` | `OCCURRENCE`, `RESOLUTION` |
-| `ConditionCode` | `TRANSPORT_AFFECTED`, `SAFE_HAVEN_ONLY`, `RISK_PREMIUM_ELEVATED` |
+| `ConditionCode` | `TRANSPORT_AFFECTED`, `SAFE_HAVEN_ONLY`, `RISK_PREMIUM_ELEVATED`, `UPSTREAM_UP`, `UPSTREAM_DOWN` |
 | `EventType` | 32 values — see [REF-01-event-taxonomy.md](REF-01-event-taxonomy.md) |
 | `RoutingKey` | `article.ingested`, `event.detected`, `prediction.made`, `price.requested`, `price.observed`, `prediction.scored` |
 
@@ -474,11 +511,35 @@ Defined on `FeedMessage`, inherited by all six messages.
 
 | Field | Type | Constraint |
 |---|---|---|
-| `edge_id` | non-empty string | `FACTOR->TARGET` or `FACTOR\|CONDITION->TARGET` |
+| `edge_id` | non-empty string | `FACTOR->TARGET` or `FACTOR\|CONDITION->TARGET`; a propagated edge substitutes `CORRELATION` for `FACTOR` |
 | `direction` | `Direction` | |
 | `current_weight` | float | `[0,1]` — the edge's learned reliability |
 | `influence_weight` | float | `[0,1]` — the edge's expert weight |
 | `path` | non-empty string | Compact provenance |
+
+**`PropagationHop`** — one fired `CORRELATES_WITH` edge in a propagation chain. Carried in
+`PredictionMade.propagation_chain` and `PredictionScored.propagation_chain` so Credibility can update
+the correlation edge that actually fired.
+
+| Field | Type | Constraint |
+|---|---|---|
+| `source_asset_id` | `AssetId` | The upstream asset |
+| `target_asset_id` | `AssetId` | The downstream asset that received the propagated prediction |
+| `condition` | `ConditionCode` | `UPSTREAM_UP` or `UPSTREAM_DOWN` |
+| `direction` | `Direction` | Direction contributed to the target, after force summation |
+| `edge_weight` | float | The fired edge's expert weight |
+
+The message fields that carry it. All are additive with defaults, so `schema_version` stays `"1.0"`
+and a message produced before propagation existed still parses.
+
+| Message | Field | Type | Default | Meaning |
+|---|---|---|---|---|
+| `PredictionMade` | `propagation_depth` | integer, `>= 0` | `0` | `0` = direct, from a `CausalFactor`→`Asset` edge; `1` or more = hop count through the `CORRELATES_WITH` chain |
+| `PredictionMade` | `propagation_chain` | list of `PropagationHop` | `[]` | The fired `CORRELATES_WITH` edges in order; empty for a direct prediction |
+| `PredictionScored` | `propagation_chain` | list of `PropagationHop` | `[]` | Forwarded unchanged from the scored `PredictionMade`, so Credibility can find the edges to update |
+
+`PredictionScored` carries no `propagation_depth`: the chain length already gives it, and one field
+cannot disagree with the other.
 
 **`CloseObservation`** — one immutable closing price with full provenance.
 
@@ -527,6 +588,7 @@ Gateway live queues are non-durable and auto-delete because REST supplies catch-
 | [05-seed-conditioned-edges.cypher](../infra/neo4j/init/05-seed-conditioned-edges.cypher) | Condition-qualified edges |
 | [06-seed-group-edges.cypher](../infra/neo4j/init/06-seed-group-edges.cypher) | Industry priors, inherited by members |
 | [07-seed-new-event-type-edges.cypher](../infra/neo4j/init/07-seed-new-event-type-edges.cypher) | Edges for later taxonomy additions |
+| [08-seed-correlation-edges.cypher](../infra/neo4j/init/08-seed-correlation-edges.cypher) | Asset-to-asset `CORRELATES_WITH` edges, plus the index on their `condition` |
 
 ### 8.6 Helper scripts
 
@@ -538,6 +600,54 @@ Gateway live queues are non-durable and auto-delete because REST supplies catch-
 | `python scripts/validate-assets.py --offline` | Structure only, for CI |
 | `python scripts/generate-asset-seed.py` | Regenerate the Neo4j asset seed from the registry |
 | `python scripts/generate-asset-seed.py --check` | Assert the seed matches the registry |
+
+### 8.7 Graph client models and methods
+
+Value objects in [graph/models.py](../src/shared/shared/graph/models.py). Both are frozen.
+
+**`FiringEdge`** — one `CAUSES` edge that fired, or one propagated `CORRELATES_WITH` edge.
+
+| Field | Type | Constraint |
+|---|---|---|
+| `factor_id` | `EventType` or null | `null` for a propagated `CORRELATES_WITH` edge |
+| `asset_id` | `AssetId` | The asset the edge applies to |
+| `direction` | `Direction` | |
+| `weight` | float | `[0,1]` — expert-assigned influence |
+| `confidence` | float | `[0,1]` — expert confidence |
+| `alpha` | float | `> 0` — Beta-Bernoulli success count |
+| `beta` | float | `> 0` — Beta-Bernoulli failure count |
+| `condition` | `ConditionCode` or null | `null` for an unconditional `CAUSES` edge |
+| `inherited_from` | string or null | The group an edge was inherited from; provenance only |
+
+`reliability` is the derived `alpha / (alpha + beta)`. `edge_id` is derived as
+`PREFIX->TARGET`, or `PREFIX|CONDITION->TARGET` when a condition is present, where `TARGET` is
+`inherited_from` if set and otherwise `asset_id`, and `PREFIX` is `factor_id` — or the literal
+`CORRELATION` when `factor_id` is `null`.
+
+**`CorrelationEdge`** — one active `CORRELATES_WITH` edge.
+
+| Field | Type | Constraint |
+|---|---|---|
+| `source_asset_id` | `AssetId` | The upstream asset |
+| `target_asset_id` | `AssetId` | The downstream asset |
+| `condition` | `ConditionCode` | Always present — there is no unconditional correlation edge |
+| `direction` | `Direction` | The direction expected on the target |
+| `weight` | float | `[0,1]` — expert-assigned influence |
+| `confidence` | float | `[0,1]` — expert confidence |
+| `alpha` | float | `> 0` — Beta-Bernoulli success count |
+| `beta` | float | `> 0` — Beta-Bernoulli failure count |
+
+`reliability` is the derived `alpha / (alpha + beta)`. `edge_id` is derived as
+`SOURCE|CONDITION->TARGET`.
+
+**`CausalGraphClient` correlation methods** → [graph/client.py](../src/shared/shared/graph/client.py)
+
+| Method | Returns | Purpose |
+|---|---|---|
+| `get_correlation_edges(source_asset_id, condition)` | `list[CorrelationEdge]` | The edges leaving one asset active under one condition. Empty list when none match |
+| `get_correlation_edge_counts(source_asset_id, target_asset_id, condition)` | `(alpha, beta)` or `null` | Current counts for one edge; `null` when the edge does not exist |
+| `update_correlation_weight(source_asset_id, target_asset_id, condition, *, alpha, beta)` | — | Persists learned counts. Raises `GraphTransportError` naming the edge when it does not exist |
+| `upsert_correlation_edge(source_asset_id, condition, target_asset_id, *, direction, weight, confidence, alpha, beta)` | — | Idempotent `MERGE` on `(source, condition, target)`, used by the offline structure learner. Creates `:Asset` nodes if absent |
 
 ## 9. Data design
 
@@ -574,6 +684,9 @@ idempotently at startup, so a service's schema evolves with the service that own
 (:CausalFactor {id})-[:CAUSES {...}]->(:AssetGroup {id})
 
 (:Asset {id})-[:MEMBER_OF]->(:AssetGroup {id})
+
+(:Asset {id})-[:CORRELATES_WITH {condition, direction, weight, confidence,
+                                 alpha, beta, last_updated}]->(:Asset {id})
 ```
 
 **`CAUSES` edge properties:**
@@ -590,6 +703,29 @@ idempotently at startup, so a service's schema evolves with the service that own
 
 Each `(factor, target, condition)` triple is a distinct edge with its own weight and its own
 `alpha`/`beta`, so evidence for a conditioned edge is never collapsed into the unconditional one.
+
+**`CORRELATES_WITH` edge properties:**
+
+| Property | Meaning |
+|---|---|
+| `condition` | A `ConditionCode` — always present. `UPSTREAM_UP` or `UPSTREAM_DOWN` names the direction the source must have been predicted in for this edge to fire |
+| `direction` | The direction expected on the **target** asset |
+| `weight` | Expert-assigned influence in `[0,1]`; carries no sign |
+| `confidence` | Expert confidence in the edge |
+| `alpha` | Beta-Bernoulli success count, starts at `1.0` |
+| `beta` | Beta-Bernoulli failure count, starts at `1.0` |
+| `last_updated` | When learning last touched this edge |
+
+Each `(source, target, condition)` triple is a distinct edge. Unlike `CAUSES`, there is **no
+unconditional form** — a correlation edge without a `condition` would fire on every prediction for
+the source asset.
+
+The invariant is enforced by the seed's `MERGE` pattern, which includes `condition` in the matched
+relationship properties, and by `CausalGraphClient.upsert_correlation_edge`, which always supplies
+one. It is **not** backed by a database constraint: a relationship property existence constraint
+(`REQUIRE r.condition IS NOT NULL`) is Neo4j Enterprise-only and this stack runs
+`neo4j:5.20-community`, where attempting it aborts the seed. An index on the relationship's
+`condition` property is created instead, which the propagation lookup uses.
 
 ### 9.3 Asset registry file
 
@@ -692,6 +828,7 @@ Current version `multi-market-v2`: 16 groups, 37 assets (34 primary + 3 fallback
 | Requirement | Method | Evidence |
 |---|---|---|
 | `SHR-1`…`SHR-12` | Test | [test_schemas.py](../src/shared/tests/test_schemas.py) — all six models, round trip, frozen, envelope, constraints |
+| `SHR-79`…`SHR-82` | Test | [test_schemas.py](../src/shared/tests/test_schemas.py) — `PropagationHop` frozen and round-tripping, propagation defaults of `0`/`[]`, non-zero depth accepted, negative depth rejected |
 | `SHR-13`, `SHR-14`, `SHR-17`, `SHR-18`, `SHR-19` | Test | [test_asset_loader.py](../src/shared/tests/test_asset_loader.py) — JSON loading, malformed-file refusal, each validation rule |
 | `SHR-15`, `SHR-16` | Test | [test_asset_id.py](../src/shared/tests/test_asset_id.py) — registry validation, `str` behaviour, unknown ID rejected |
 | `SHR-20`, `SHR-21`, `SHR-22` | Test | [test_asset_registry.py](../src/shared/tests/test_asset_registry.py) — group membership, accessors, required fields |
@@ -699,6 +836,8 @@ Current version `multi-market-v2`: 16 groups, 37 assets (34 primary + 3 fallback
 | `SHR-28`…`SHR-38` | Test | [test_llm_gateway.py](../src/shared/tests/test_llm_gateway.py) — provider selection, budget enforcement, schema validation, single retry, cache hit with zero calls, usage metadata |
 | `SHR-39`…`SHR-46` | Test | [test_graph_client.py](../src/shared/tests/test_graph_client.py) — firing edges, condition gating, asset-over-group override, reliability, weight update |
 | `SHR-76`…`SHR-78` | Test | [test_graph_client.py](../src/shared/tests/test_graph_client.py) — group-targeted update (conditional and unconditional), direct group count read, missing-edge error names the target label |
+| `SHR-83`…`SHR-88` | Test | [test_graph_client.py](../src/shared/tests/test_graph_client.py) — `CorrelationEdge` reliability and `edge_id`, row parsing, empty result, count read present and absent, update parameters, missing-edge raise, upsert parameters |
+| `SHR-84`…`SHR-86`, `SHR-89`…`SHR-91` | Test | [test_integration_graph_correlation.py](../src/shared/tests/test_integration_graph_correlation.py) — against live Neo4j: seeded edges found, condition filter proven by a non-empty `UPSTREAM_UP` and empty `UPSTREAM_DOWN` result, weight update read back |
 | `SHR-47`, `SHR-48`, `SHR-54` | Test | [test_calendar.py](../src/shared/tests/test_calendar.py) — IANA resolution, unknown zone rejected, DST from tz database |
 | `SHR-49`…`SHR-53` | Test | [test_calendar_us_baseline.py](../src/shared/tests/test_calendar_us_baseline.py) — weekday sessions, completion clock, no look-ahead |
 | `SHR-47`, `SHR-50` | Test | [test_calendar_multi_market.py](../src/shared/tests/test_calendar_multi_market.py) — Stockholm and New York resolve on their own clocks |
@@ -720,6 +859,8 @@ Current version `multi-market-v2`: 16 groups, 37 assets (34 primary + 3 fallback
 | Unknown timezone in the registry | `UnsupportedTimezoneError` | Correct the registry entry |
 | PostgreSQL unavailable | Pool creation fails; readiness fails | Automatic on reconnection |
 | Neo4j unavailable | Bounded connection timeout, then error — no hang | Automatic on reconnection |
+| Correlation weight update names an absent edge | `GraphTransportError` naming `SOURCE\|CONDITION->TARGET`; nothing is created | Seed the edge, or fix the `propagation_chain` producer |
+| Correlation edge present with no `condition` | Invisible to every propagation query, which filters on `condition` | Rewrite it through `upsert_correlation_edge`, which always supplies one |
 | RabbitMQ unavailable | Publish fails; the caller's outbox retains the row | Outbox relay drains on reconnection |
 | LLM provider not configured | `LLMConfigurationError` before any network call | Set `LLM_PROVIDER`, `LLM_MODEL`, `LLM_API_KEY` |
 | LLM input over budget | `LLMConfigurationError` before any provider call | Reduce excerpt count or length |
@@ -746,6 +887,9 @@ Current version `multi-market-v2`: 16 groups, 37 assets (34 primary + 3 fallback
 | Messages are frozen | A mutable message could be changed between the database write and the publish |
 | Queues are declared by infrastructure, not by services | Two services declaring one queue with different arguments would fail at runtime |
 | Malformed-output retries are capped at 1 in the type itself | Makes an expensive misconfiguration impossible rather than merely discouraged |
+| `FiringEdge.factor_id` was relaxed from required to optional | A propagated `CORRELATES_WITH` edge has no causal factor. Making it optional reuses one firing-edge type for both paths instead of forking the decision code. Trade-off accepted: `mypy` can no longer prove a factor is present, so `edge_id` substitutes the literal `CORRELATION` |
+| Propagation fields are additive with defaults, so `schema_version` stays `"1.0"` | A consumer that ignores them reads a propagated message unchanged; a pre-E10 message parses with `propagation_depth = 0` and an empty chain |
+| The `CORRELATES_WITH` `condition` invariant is enforced by `MERGE` and application code, not a constraint | Relationship property existence constraints are Neo4j Enterprise-only; declaring one aborts the seed on `neo4j:5.20-community` |
 
 ### 13.3 Known limitations
 
@@ -756,6 +900,7 @@ Current version `multi-market-v2`: 16 groups, 37 assets (34 primary + 3 fallback
 | The LLM cache is in-memory | A restart loses cache entries, so a replayed request after restart calls the provider again |
 | `mypy --strict` cannot prove exhaustive asset coverage | Accepted trade-off of the data-driven registry |
 | Default embedding and NLP backends are deterministic stand-ins | `hashing` and `keyword` let tests run without multi-gigabyte models; real models need the `ml` extra |
+| No database constraint requires a `condition` on a `CORRELATES_WITH` edge | A hand-written Cypher edit could create one without a condition; it would then be invisible to every propagation query, which filters on `condition`. Write correlation edges through `upsert_correlation_edge` |
 
 ## 14. How to update this document
 
@@ -773,6 +918,9 @@ Component-specific notes:
   [SyRS §7.1](SyRS-system.md#71-routing-topology).
 - **Adding an LLM provider** means a new adapter plus a registry entry in `shared.llm.providers`;
   update section 10.4 if it needs new configuration.
+- **Adding a `CORRELATES_WITH` edge** is a seed edit, not a change to this document — but the edge
+  **must** carry a `condition`, because no database constraint enforces it and the propagation query
+  filters on it. Adding a new `ConditionCode` value does change this document: update section 8.2.
 - **Changing session or calendar logic** affects both Verification and Market Data. Update
   [SRS-05](SRS-05-market-data.md) and [SRS-06](SRS-06-verification.md) together — the semantics must
   stay identical, which is why the logic lives here once.
@@ -783,3 +931,4 @@ Component-specific notes:
 |---|---|---|---|
 | `2026-08-05` | `1.0.0` | Initial specification, written from the implemented code | E01 complete; replaces the E01 epic and task files |
 | `2026-08-07` | `1.1.0` | Added `SHR-76`…`SHR-78`: the graph client's weight update can target an `:AssetGroup`, and group counts are readable directly. `update_edge_weight`'s Cypher parameter renamed `asset_id` → `target_id` | Credibility could not apply learning from inherited group edges (see SRS-07 change history) |
+| `2026-08-12` | `1.2.0` | Cross-asset propagation. `ConditionCode` gains `UPSTREAM_UP` and `UPSTREAM_DOWN` (§8.2). Added `SHR-79`…`SHR-82`: `PropagationHop`, and `propagation_depth`/`propagation_chain` on `PredictionMade` plus `propagation_chain` on `PredictionScored`, all additive so `schema_version` stays `"1.0"`. Added `SHR-83`…`SHR-89`: `CorrelationEdge` and four `CORRELATES_WITH` client methods; `FiringEdge.factor_id` relaxed to optional, with `edge_id` using the literal `CORRELATION` when it is absent. Added `SHR-90`, `SHR-91`: the `CORRELATES_WITH` seed and its `condition` index (§8.5, §9.2) | E10 — a directional move in one asset causes a directional move in another, which the `CausalFactor`→`Asset` graph alone cannot express |

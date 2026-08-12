@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import StrEnum
 
-from shared.schemas.messages import AssetId, ContributingEdge, Direction, Magnitude
+from shared.schemas.messages import AssetId, ContributingEdge, Direction, Magnitude, PropagationHop
 
 
 class EvaluationStatus(StrEnum):
@@ -38,6 +38,7 @@ class EvaluationRecord:
     correlation_id: uuid.UUID
     contributing_edges: list[ContributingEdge] = field(default_factory=list)
     source_ids: list[str] = field(default_factory=list)
+    propagation_chain: list[PropagationHop] = field(default_factory=list)
     status: EvaluationStatus = EvaluationStatus.PENDING
 
 

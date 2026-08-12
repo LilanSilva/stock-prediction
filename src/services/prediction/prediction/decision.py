@@ -34,12 +34,26 @@ def _flip(direction: Direction) -> Direction:
     return Direction.NEUTRAL
 
 
+def _is_resolution(
+    edge: FiringEdge, polarity_by_type: Mapping[EventType, EventPolarity]
+) -> bool:
+    """True when this edge's factor resolved (negating it).
+
+    A propagated ``CORRELATES_WITH`` edge has no ``factor_id`` and therefore no event polarity, so
+    it is never a resolution — it always keeps the graph's stored sign.
+    """
+    if edge.factor_id is None:
+        return False
+    return polarity_by_type.get(edge.factor_id) is EventPolarity.RESOLUTION
+
+
 def _effective_direction(
     edge: FiringEdge, polarity_by_type: Mapping[EventType, EventPolarity]
 ) -> Direction:
     # A RESOLUTION event negates its factor (e.g. "war called off" turns an oil-UP edge into a
     # DOWN force); OCCURRENCE keeps the graph's stored sign.
-    if polarity_by_type.get(edge.factor_id) is EventPolarity.RESOLUTION:
+    # Propagated edges (factor_id is None) have no polarity — always OCCURRENCE semantics.
+    if _is_resolution(edge, polarity_by_type):
         return _flip(edge.direction)
     return edge.direction
 
@@ -51,8 +65,7 @@ def _resolved_direction(
     # actually elevated (a risk premium to unwind). With a flat price there is nothing to revert, so
     # the edge's contribution is dropped entirely rather than counted as a DOWN force.
     direction = _effective_direction(edge, polarity_by_type)
-    is_resolution = polarity_by_type.get(edge.factor_id) is EventPolarity.RESOLUTION
-    if is_resolution and direction is Direction.DOWN and not elevated:
+    if _is_resolution(edge, polarity_by_type) and direction is Direction.DOWN and not elevated:
         return None
     return direction
 
@@ -75,11 +88,16 @@ def _magnitude(avg_weight: float, small_max: float, medium_max: float) -> Magnit
     return Magnitude.LARGE
 
 
+def _factor_label(edge: FiringEdge) -> str:
+    """Rationale label for an edge: its factor id, or ``CORRELATION`` for a propagated edge."""
+    return edge.factor_id.value if edge.factor_id is not None else "CORRELATION"
+
+
 def _rationale(
     asset_id: AssetId, direction: Direction, magnitude: Magnitude, confidence: float,
     edges: list[tuple[FiringEdge, Direction]],
 ) -> str:
-    parts = [f"{e.factor_id.value}{_ARROW[eff]}{e.weight:.2f}" for e, eff in edges]
+    parts = [f"{_factor_label(e)}{_ARROW[eff]}{e.weight:.2f}" for e, eff in edges]
     text = (
         f"{asset_id.value} {direction.value} ({magnitude.value}, conf {confidence:.2f}) "
         f"from {len(edges)} causal edge(s): " + ", ".join(parts)

@@ -12,6 +12,7 @@ from shared.schemas.messages import (
     PredictionScored,
     PriceObserved,
     PriceRequested,
+    PropagationHop,
 )
 
 from verification.models import EvaluationRecord, EvaluationStatus
@@ -55,9 +56,10 @@ class VerificationRepository:
                         (prediction_id, context_id, asset_id, predicted_direction,
                          predicted_magnitude, confidence, decision_at, baseline_session,
                          settlement_session, market_calendar, registry_version, request_id,
-                         correlation_id, contributing_edges, source_ids, status)
+                         correlation_id, contributing_edges, source_ids, propagation_chain,
+                         status)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-                            $14::jsonb, $15::jsonb, 'PENDING')
+                            $14::jsonb, $15::jsonb, $16::jsonb, 'PENDING')
                     ON CONFLICT (prediction_id) DO NOTHING
                     RETURNING prediction_id
                     """,
@@ -76,6 +78,9 @@ class VerificationRepository:
                     evaluation.correlation_id,
                     _edges_to_json(evaluation.contributing_edges),
                     json.dumps(evaluation.source_ids),
+                    json.dumps(
+                        [hop.model_dump(mode="json") for hop in evaluation.propagation_chain]
+                    ),
                 )
                 if inserted is None:
                     return False
@@ -119,7 +124,7 @@ class VerificationRepository:
             SELECT prediction_id, context_id, asset_id, predicted_direction, predicted_magnitude,
                    confidence, decision_at, baseline_session, settlement_session, market_calendar,
                    registry_version, request_id, correlation_id, contributing_edges, source_ids,
-                   status
+                   propagation_chain, status
             FROM verification.evaluations
             WHERE request_id = $1
             """,
@@ -148,6 +153,10 @@ class VerificationRepository:
                 for item in _json_list(row["contributing_edges"])
             ],
             source_ids=[str(item) for item in _json_list(row["source_ids"])],
+            propagation_chain=[
+                PropagationHop.model_validate(item)
+                for item in _json_list(row["propagation_chain"])
+            ],
             status=EvaluationStatus(row["status"]),
         )
 

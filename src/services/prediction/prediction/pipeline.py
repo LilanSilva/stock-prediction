@@ -3,31 +3,55 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Protocol
 
 import structlog
 from shared.calendar import is_trading_day, local_date_in
-from shared.graph import FiringEdge
+from shared.graph import CorrelationEdge, FiringEdge
 from shared.graph.exceptions import GraphError
 from shared.reference import UnknownAssetError, resolve
 from shared.schemas.messages import (
     AssetId,
     ConditionCode,
     DecisionMethod,
+    Direction,
     EventDetected,
     EventPolarity,
     EventType,
     Horizon,
     PredictionMade,
+    PropagationHop,
 )
 
 from prediction.config import PredictionSettings
 from prediction.context import window_bounds
 from prediction.decision import decide
-from prediction.models import ActivePrediction, ContextEvent, ContextRecord, ContextState
+from prediction.models import ActivePrediction, ContextEvent, ContextRecord, ContextState, Decision
 
 logger = structlog.get_logger(__name__)
+
+
+class _ProxyRecord:
+    """Re-targets a ContextRecord to a different asset_id for a propagated prediction.
+
+    Propagated predictions belong to the source context but concern a downstream asset, so only
+    ``asset_id`` differs; every other field is copied verbatim.
+    """
+
+    __slots__ = (
+        "asset_id", "context_id", "context_version", "window_start",
+        "window_end", "state",
+    )
+
+    def __init__(self, source: ContextRecord, asset_id: AssetId) -> None:
+        self.asset_id = asset_id
+        self.context_id = source.context_id
+        self.context_version = source.context_version
+        self.window_start = source.window_start
+        self.window_end = source.window_end
+        self.state = source.state
 
 
 class PipelineRepository(Protocol):
@@ -72,6 +96,12 @@ class GraphSource(Protocol):
         asset_ids: list[AssetId] | None = None,
         conditions: set[ConditionCode] | None = None,
     ) -> list[FiringEdge]: ...
+
+    async def get_correlation_edges(
+        self,
+        source_asset_id: AssetId,
+        condition: ConditionCode,
+    ) -> list[CorrelationEdge]: ...
 
 
 class PriceSource(Protocol):
@@ -185,6 +215,213 @@ class PredictionPipeline:
             return False
         return await self._price_reader.is_price_available(asset_id)
 
+    async def _store_prediction(
+        self,
+        record: ContextRecord,
+        decision: Decision,
+        now: datetime,
+        events: list[ContextEvent],
+        *,
+        propagation_depth: int = 0,
+        propagation_chain: list[PropagationHop] | None = None,
+    ) -> bool:
+        """Persist one prediction (direct or propagated) via the outbox; True when stored."""
+        active = await self._repo.latest_active_prediction(record.asset_id)
+        market_open = await self._is_market_open(record.asset_id, now)
+
+        if market_open:
+            if active is not None and (
+                active.direction == decision.direction
+                and active.magnitude == decision.magnitude
+            ):
+                logger.info(
+                    "prediction_unchanged",
+                    context_id=str(record.context_id),
+                    asset_id=record.asset_id.value,
+                    direction=decision.direction.value,
+                )
+                return False
+            supersedes = None
+            withdraw = False
+        else:
+            supersedes = active.prediction_id if active is not None else None
+            withdraw = supersedes is not None
+
+        chain = propagation_chain or []
+        message = PredictionMade(
+            correlation_id=uuid.uuid4(),
+            occurred_at=now,
+            prediction_id=uuid.uuid4(),
+            context_id=record.context_id,
+            context_version=record.context_version,
+            event_ids=[e.event_id for e in events],
+            asset_id=record.asset_id,
+            direction=decision.direction,
+            magnitude=decision.magnitude,
+            confidence=decision.confidence,
+            horizon=Horizon.ONE_TRADING_DAY,
+            rationale=decision.rationale,
+            contributing_edges=decision.contributing_edges,
+            decision_at=now,
+            supersedes_prediction_id=supersedes,
+            decision_method=DecisionMethod.GRAPH_ONLY,
+            llm_metadata=None,
+            propagation_depth=propagation_depth,
+            propagation_chain=chain,
+        )
+        key = (
+            f"{record.asset_id.value}|{record.window_start.isoformat()}"
+            f"|{Horizon.ONE_TRADING_DAY.value}|{record.context_version}"
+            + (f"|prop{propagation_depth}" if propagation_depth > 0 else "")
+        )
+        stored = await self._repo.store_prediction_with_outbox(
+            message, idempotency_key=key, withdraw_superseded=withdraw
+        )
+        if stored:
+            logger.info(
+                "prediction_made",
+                prediction_id=str(message.prediction_id),
+                asset_id=record.asset_id.value,
+                direction=decision.direction.value,
+                magnitude=decision.magnitude.value,
+                confidence=decision.confidence,
+                context_version=record.context_version,
+                propagation_depth=propagation_depth,
+                edges=len(decision.contributing_edges),
+            )
+        return stored
+
+    async def _run_propagation(
+        self,
+        record: ContextRecord,
+        # Mapping, not dict: dict is invariant in its value type, so a narrowed
+        # dict[AssetId, Literal[UP, DOWN]] from the caller would not be accepted.
+        direct_decisions: Mapping[AssetId, Direction],
+        visited: set[AssetId],
+        now: datetime,
+        events: list[ContextEvent],
+    ) -> int:
+        """Propagate direct decisions through CORRELATES_WITH edges; return count stored.
+
+        Each depth level is processed in two phases so that force summation works across
+        converging edges (ADR-008):
+
+          1. **Collect** — walk every source asset in the level and gather *all* correlation edges
+             that reach each target, without deciding anything yet.
+          2. **Decide** — for each target, call ``decide()`` once with the full edge list, so two
+             upstream assets pushing on the same downstream asset combine (and can cancel below
+             the deadband) instead of the first-reached edge winning outright.
+
+        A target is added to ``visited`` only after its decision, so a second edge arriving in the
+        *same* level can still contribute; cycle protection across levels is unchanged.
+        """
+        produced = 0
+        current_pass: dict[AssetId, tuple[Direction, list[PropagationHop]]] = {
+            asset: (direction, []) for asset, direction in direct_decisions.items()
+        }
+        depth = 0
+        while current_pass and depth < self._settings.max_propagation_depth:
+            depth += 1
+            inbound = await self._collect_inbound(current_pass, visited, depth)
+
+            next_pass: dict[AssetId, tuple[Direction, list[PropagationHop]]] = {}
+            for target, arrivals in inbound.items():
+                visited.add(target)
+                decision = decide(
+                    target,
+                    [firing for firing, _, _ in arrivals],
+                    deadband=self._settings.decision_deadband,
+                    small_max=self._settings.magnitude_small_max,
+                    medium_max=self._settings.magnitude_medium_max,
+                )
+                if decision is None or decision.direction is Direction.NEUTRAL:
+                    logger.info(
+                        "propagation_no_prediction",
+                        target_asset=target.value,
+                        depth=depth,
+                        inbound_edges=len(arrivals),
+                        reason="neutral_or_immaterial",
+                    )
+                    continue
+
+                # Provenance: one hop per contributing edge, each recording the net decided
+                # direction. The chain is seeded from the longest parent chain so depth still
+                # reflects how far the signal travelled.
+                parent_chain = max((chain for _, _, chain in arrivals), key=len)
+                hops = [
+                    PropagationHop(
+                        source_asset_id=source,
+                        target_asset_id=target,
+                        condition=firing.condition or ConditionCode.UPSTREAM_UP,
+                        direction=decision.direction,
+                        edge_weight=firing.weight,
+                    )
+                    for firing, source, _ in arrivals
+                ]
+                chain = [*parent_chain, *hops]
+                # Use a proxy ContextRecord with the propagated asset_id for _store_prediction.
+                proxy = _ProxyRecord(record, target)
+                stored = await self._store_prediction(
+                    proxy,  # type: ignore[arg-type]
+                    decision,
+                    now,
+                    events,
+                    propagation_depth=depth,
+                    propagation_chain=chain,
+                )
+                if stored:
+                    produced += 1
+                    next_pass[target] = (decision.direction, chain)
+            current_pass = next_pass
+        return produced
+
+    async def _collect_inbound(
+        self,
+        current_pass: Mapping[AssetId, tuple[Direction, list[PropagationHop]]],
+        visited: set[AssetId],
+        depth: int,
+    ) -> dict[AssetId, list[tuple[FiringEdge, AssetId, list[PropagationHop]]]]:
+        """Gather every correlation edge reaching each unvisited target at this depth level.
+
+        Returns ``target -> [(synthesised FiringEdge, source asset, that source's parent chain)]``.
+        Deciding is deliberately deferred to the caller so all inbound forces are known first.
+        """
+        inbound: dict[AssetId, list[tuple[FiringEdge, AssetId, list[PropagationHop]]]] = {}
+        for source_asset, (source_direction, parent_chain) in current_pass.items():
+            condition = (
+                ConditionCode.UPSTREAM_UP
+                if source_direction is Direction.UP
+                else ConditionCode.UPSTREAM_DOWN
+            )
+            try:
+                corr_edges = await self._graph.get_correlation_edges(source_asset, condition)
+            except GraphError as exc:
+                logger.warning(
+                    "propagation_graph_error",
+                    source_asset=source_asset.value,
+                    depth=depth,
+                    error=str(exc),
+                )
+                continue
+            for corr_edge in corr_edges:
+                target = corr_edge.target_asset_id
+                if target in visited:
+                    continue
+                # Synthesise a FiringEdge so decide() can be reused unchanged.
+                firing = FiringEdge(
+                    factor_id=None,  # propagated edge — no causal factor
+                    asset_id=target,
+                    direction=corr_edge.direction,
+                    weight=corr_edge.weight,
+                    confidence=corr_edge.confidence,
+                    alpha=corr_edge.alpha,
+                    beta=corr_edge.beta,
+                    condition=condition,
+                    correlation_source_id=source_asset,
+                )
+                inbound.setdefault(target, []).append((firing, source_asset, parent_chain))
+        return inbound
+
     async def close_ready_contexts(self, now: datetime | None = None) -> int:
         """Close all due contexts into predictions. Returns the number of predictions produced."""
         now = now or datetime.now(UTC)
@@ -208,13 +445,14 @@ class PredictionPipeline:
                 )
                 continue
 
+            polarity_by_type = self._polarity_by_type(events)
             decision = decide(
                 record.asset_id,
                 edges,
                 deadband=self._settings.decision_deadband,
                 small_max=self._settings.magnitude_small_max,
                 medium_max=self._settings.magnitude_medium_max,
-                polarity_by_type=self._polarity_by_type(events),
+                polarity_by_type=polarity_by_type,
                 elevated=elevated,
             )
             if decision is None:
@@ -226,67 +464,19 @@ class PredictionPipeline:
                 )
                 continue
 
-            active = await self._repo.latest_active_prediction(record.asset_id)
-            market_open = await self._is_market_open(record.asset_id, now)
-
-            if market_open:
-                # Weekday: skip a duplicate signal; otherwise add a new independent prediction that
-                # accumulates (no supersede, both scored on their own).
-                if active is not None and (
-                    active.direction == decision.direction
-                    and active.magnitude == decision.magnitude
-                ):
-                    await self._repo.set_context_state(record.context_id, ContextState.PREDICTED)
-                    logger.info(
-                        "prediction_unchanged",
-                        context_id=str(record.context_id),
-                        asset_id=record.asset_id.value,
-                        direction=decision.direction.value,
-                    )
-                    continue
-                supersedes = None
-                withdraw = False
-            else:
-                # Weekend/closed market: collapse to one active prediction per asset by superseding
-                # and withdrawing the prior stance (it never gets its own price outcome).
-                supersedes = active.prediction_id if active is not None else None
-                withdraw = supersedes is not None
-
-            message = PredictionMade(
-                correlation_id=uuid.uuid4(),
-                occurred_at=now,
-                prediction_id=uuid.uuid4(),
-                context_id=record.context_id,
-                context_version=record.context_version,
-                event_ids=[e.event_id for e in events],
-                asset_id=record.asset_id,
-                direction=decision.direction,
-                magnitude=decision.magnitude,
-                confidence=decision.confidence,
-                horizon=Horizon.ONE_TRADING_DAY,
-                rationale=decision.rationale,
-                contributing_edges=decision.contributing_edges,
-                decision_at=now,
-                supersedes_prediction_id=supersedes,
-                decision_method=DecisionMethod.GRAPH_ONLY,
-                llm_metadata=None,
-            )
-            key = (
-                f"{record.asset_id.value}|{record.window_start.isoformat()}"
-                f"|{Horizon.ONE_TRADING_DAY.value}|{record.context_version}"
-            )
-            if await self._repo.store_prediction_with_outbox(
-                message, idempotency_key=key, withdraw_superseded=withdraw
-            ):
+            # Pass 0: direct prediction from CAUSES edges.
+            # Visited set is seeded with the direct asset so propagation cannot loop back to it.
+            visited: set[AssetId] = {record.asset_id}
+            stored = await self._store_prediction(record, decision, now, events)
+            if stored:
                 produced += 1
-                logger.info(
-                    "prediction_made",
-                    prediction_id=str(message.prediction_id),
-                    asset_id=record.asset_id.value,
-                    direction=decision.direction.value,
-                    magnitude=decision.magnitude.value,
-                    confidence=decision.confidence,
-                    context_version=record.context_version,
-                    edges=len(decision.contributing_edges),
+
+            # Passes 1+: propagate through CORRELATES_WITH edges when decision is directional.
+            if decision.direction in (Direction.UP, Direction.DOWN):
+                direct_decisions = {record.asset_id: decision.direction}
+                produced += await self._run_propagation(
+                    record, direct_decisions, visited, now, events
                 )
+
+            await self._repo.set_context_state(record.context_id, ContextState.PREDICTED)
         return produced

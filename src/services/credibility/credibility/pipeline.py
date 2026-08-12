@@ -21,7 +21,12 @@ from typing import Protocol
 import structlog
 from shared.graph.models import FiringEdge
 from shared.reference.asset_registry import groups
-from shared.schemas.messages import AssetId, ConditionCode, EventType, PredictionScored
+from shared.schemas.messages import (
+    AssetId,
+    ConditionCode,
+    EventType,
+    PredictionScored,
+)
 
 from credibility.exceptions import InvalidScoredMessageError
 from credibility.updater import (
@@ -63,6 +68,23 @@ class GraphClient(Protocol):
         target_is_group: bool = False,
     ) -> None: ...
 
+    async def get_correlation_edge_counts(
+        self,
+        source_asset_id: AssetId,
+        target_asset_id: AssetId,
+        condition: ConditionCode,
+    ) -> tuple[float, float] | None: ...
+
+    async def update_correlation_weight(
+        self,
+        source_asset_id: AssetId,
+        target_asset_id: AssetId,
+        condition: ConditionCode,
+        *,
+        alpha: float,
+        beta: float,
+    ) -> None: ...
+
 
 class Repository(Protocol):
     """Structural type for the credibility repository."""
@@ -74,6 +96,33 @@ class Repository(Protocol):
     async def commit_updates(
         self, prediction_id: uuid.UUID, updates: list[WeightUpdate]
     ) -> bool: ...
+
+
+def parse_correlation_edge_id(edge_id: str) -> tuple[AssetId, ConditionCode, AssetId] | None:
+    """Parse a CORRELATES_WITH ``edge_id`` (``'SOURCE|UPSTREAM_*->TARGET'``), else ``None``.
+
+    Returns ``None`` — rather than raising — when the id is not a correlation edge id, so the
+    caller can fall through to :func:`parse_edge_id` for the ``CAUSES`` forms. Only the two
+    ``UPSTREAM_*`` conditions identify a correlation edge; every other condition belongs to a
+    ``CAUSES`` edge whose prefix is an ``EventType``.
+    """
+    left, sep, target_str = edge_id.partition("->")
+    if not sep:
+        return None
+    source_str, cond_sep, condition_str = left.partition("|")
+    if not cond_sep or condition_str not in (
+        ConditionCode.UPSTREAM_UP.value,
+        ConditionCode.UPSTREAM_DOWN.value,
+    ):
+        return None
+    try:
+        source = AssetId(source_str)
+        target = AssetId(target_str)
+    except ValueError as exc:
+        raise InvalidScoredMessageError(
+            f"correlation edge_id {edge_id!r} names an unknown asset"
+        ) from exc
+    return source, ConditionCode(condition_str), target
 
 
 def parse_edge_id(edge_id: str) -> tuple[EventType, ConditionCode | None, AssetId | str]:
@@ -127,8 +176,95 @@ class CredibilityPipeline:
         self._graph = graph
         self._floor = prior_floor
 
+    async def _update_correlation_edge(
+        self,
+        source: AssetId,
+        target: AssetId,
+        condition: ConditionCode,
+        credit: float,
+        *,
+        is_correct: bool,
+    ) -> WeightUpdate | None:
+        """Apply ``credit`` of Beta-Bernoulli evidence to one CORRELATES_WITH edge."""
+        counts = await self._graph.get_correlation_edge_counts(source, target, condition)
+        if counts is None:
+            logger.warning(
+                "correlation_edge_missing_in_graph",
+                source_asset=source.value,
+                target_asset=target.value,
+                condition=condition.value,
+            )
+            return None
+        alpha_before, beta_before = counts
+        alpha_after, beta_after = apply_bernoulli(
+            alpha_before, beta_before, credit, is_correct=is_correct, floor=self._floor
+        )
+        await self._graph.update_correlation_weight(
+            source, target, condition, alpha=alpha_after, beta=beta_after
+        )
+        return WeightUpdate(
+            entity_id=f"{source.value}|{condition.value}->{target.value}",
+            entity_type="edge",
+            alpha_before=alpha_before,
+            beta_before=beta_before,
+            alpha_after=alpha_after,
+            beta_after=beta_after,
+        )
+
+    async def _update_correlation_edges(
+        self, message: PredictionScored
+    ) -> list[WeightUpdate]:
+        """Credit every CORRELATES_WITH edge that contributed to this propagated prediction.
+
+        Credit is proportional to each edge's influence, so when two upstream assets converged on
+        one target neither is credited as though it acted alone. A single-edge propagation still
+        receives the full 1.0, matching the previous behaviour.
+
+        ``contributing_edges`` is the source of truth for *which* edges fired (it is what
+        ``decide()`` reported). ``propagation_chain`` only marks the message as propagated and
+        carries provenance/depth.
+        """
+        correlation_edges = [
+            edge
+            for edge in message.contributing_edges
+            if parse_correlation_edge_id(edge.edge_id) is not None
+        ]
+        if not correlation_edges:
+            # A propagated prediction whose contributing edges are all CAUSES edges should not
+            # happen; log rather than silently crediting the wrong edge type.
+            logger.warning(
+                "propagated_prediction_without_correlation_edges",
+                prediction_id=str(message.prediction_id),
+                edge_ids=[e.edge_id for e in message.contributing_edges],
+            )
+            return []
+
+        credits = compute_proportional_credits(correlation_edges)
+        updates: list[WeightUpdate] = []
+        for edge in correlation_edges:
+            parsed = parse_correlation_edge_id(edge.edge_id)
+            assert parsed is not None  # filtered above
+            source, condition, target = parsed
+            update = await self._update_correlation_edge(
+                source,
+                target,
+                condition,
+                credits[edge.edge_id],
+                is_correct=message.is_correct,
+            )
+            if update is not None:
+                updates.append(update)
+        return updates
+
     async def _update_edges(self, message: PredictionScored) -> list[WeightUpdate]:
         """Apply proportional credit to each contributing edge in Neo4j; return the transitions."""
+        # Propagated predictions: credit flows to the CORRELATES_WITH edge(s) that produced them,
+        # not to the originating CAUSES edges (which belong to the direct/source prediction).
+        # Where two upstream assets converged on this target, every contributing correlation edge
+        # is credited in proportion to its influence — the same rule used for CAUSES edges.
+        if message.propagation_chain:
+            return await self._update_correlation_edges(message)
+
         credits = compute_proportional_credits(list(message.contributing_edges))
         updates: list[WeightUpdate] = []
         for edge in message.contributing_edges:

@@ -35,11 +35,12 @@
 |---|---|
 | Author | Feed Analyzer project |
 | Created | 2026-08-05 |
-| Last updated | 2026-08-07 |
+| Last updated | 2026-08-12 |
+| Version | 1.2.0 |
 | Replaces | `docs/functional-documents/credibility-service-functional-document.md` (deleted 2026-08-06) |
 | Source code | `src/services/credibility/` |
 | Config class | `credibility.config.CredibilitySettings`, `credibility.learning.config.LearningSettings` |
-| DB schema | `credibility` (owned by this service; the offline learner reads `cleansing` and `market_data` in read-only mode) |
+| DB schema | `credibility` (owned by this service; the offline learner reads `cleansing`, `market_data`, `prediction` and `verification` in read-only mode) |
 
 ---
 
@@ -53,7 +54,8 @@ Specific responsibilities:
 
 **Online consumer (always-on):**
 - Consume `PredictionScored` messages
-- Apply proportional Beta-Bernoulli credit to each contributing CAUSES edge in Neo4j
+- Apply proportional Beta-Bernoulli credit to each contributing CAUSES edge in Neo4j — for a *direct* prediction
+- When the scored prediction is a *propagated* one (`propagation_chain` is non-empty), apply proportional Beta-Bernoulli credit instead to **every** `CORRELATES_WITH` edge listed in `contributing_edges` — that is, every contributing edge whose `edge_id` has the correlation form `SOURCE_ASSET|UPSTREAM_UP->TARGET_ASSET` (or `UPSTREAM_DOWN`). A target that two upstream assets converged on has more than one contributing correlation edge, so each edge earns a share of one observation proportional to its `influence_weight`; a single-edge propagation still earns the full 1.0. The CAUSES edges in the chain already earned their credit from the direct prediction that started it, so they are not credited again
 - Apply equal Beta-Bernoulli credit to each contributing news source in PostgreSQL
 - Write an immutable history row per updated entity for auditing and 95% confidence-interval tracking
 - Guard idempotency: each `prediction_id` is processed at most once
@@ -62,6 +64,7 @@ Specific responsibilities:
 - Mine historical events and price outcomes from the database
 - Estimate (factor, condition, asset) edge parameters from aggregated sample statistics
 - Write or update conditioned CAUSES edges in Neo4j with data-derived direction, weight, and Beta-Bernoulli counts
+- Run a **second data path in the same batch** for `CORRELATES_WITH` edges: read historical *direct* scored predictions (`propagation_depth = 0`) from `prediction.predictions` joined to `verification.evaluations`/`verification.scores`, derive the upstream condition from the predicted direction, measure each correlated target asset's actual return over the same baseline/settlement sessions, and upsert `CORRELATES_WITH` edges via MERGE — refining expert-seeded edges and discovering new ones where the data supports them
 
 ### 2.2 What it does not do
 
@@ -88,6 +91,14 @@ Specific responsibilities:
 | Abnormal sample | A sample where `|actual_return| >= abnormal_threshold × historical_volatility`; bypasses the `min_samples` threshold |
 | EdgeEstimate | Estimated direction, weight, confidence, alpha, beta for one (factor, condition, asset) group |
 | WEIGHT_RETURN_SCALE | 0.05 (5%); a 5% mean signed daily move maps to expert weight = 1.0 |
+| CORRELATES_WITH edge learning | Beta-Bernoulli update of the `(:Asset)-[:CORRELATES_WITH]->(:Asset)` edge counts; performed online when a *propagated* prediction is scored, and offline by the correlation path of the structure learner |
+| propagation_chain | The ordered list of `PropagationHop` values carried on `PredictionMade` and forwarded on `PredictionScored`; each hop records the provenance of one `CORRELATES_WITH` edge that contributed to the prediction, plus its depth. Empty for a direct prediction. It **marks** a message as propagated; it does not select which edge is credited |
+| Converged target | A target asset reached by more than one inbound `CORRELATES_WITH` edge at the same propagation depth. Prediction sums the forces and decides once, then emits one `PropagationHop` *per* contributing edge — so `propagation_chain` can hold several hops sharing one `target_asset_id`, and "the last hop" is not a meaningful selector |
+| Correlation-form edge_id | A `contributing_edges` `edge_id` of the form `"SOURCE_ASSET\|UPSTREAM_UP->TARGET_ASSET"` or `"SOURCE_ASSET\|UPSTREAM_DOWN->TARGET_ASSET"`. Only these two conditions identify a `CORRELATES_WITH` edge; every other condition prefix belongs to a CAUSES edge |
+| Upstream condition | `UPSTREAM_UP` when the source asset was predicted UP, `UPSTREAM_DOWN` when DOWN; a `CORRELATES_WITH` edge is always conditioned on one of the two |
+| CorrelationSample | One offline observation: (source_asset, upstream condition, target_asset) → the target's actual return over the source prediction's own baseline/settlement sessions |
+| CorrelationEdgeEstimate | Estimated direction, weight, confidence, alpha, beta for one (source_asset, condition, target_asset) group |
+| Correlation edge entity_id | Business key format for a correlation-edge history row: `"SOURCE_ASSET\|CONDITION->TARGET_ASSET"` (`entity_type = "edge"`) |
 
 ---
 
@@ -101,23 +112,29 @@ Specific responsibilities:
        v
 [Credibility Service (online consumer)]
   - idempotency check (processed_predictions)
-  - proportional credit → each contributing edge in Neo4j
+  - propagation_chain empty  → proportional credit → each contributing CAUSES edge in Neo4j
+  - propagation_chain present → proportional credit → each correlation-form edge in
+                                contributing_edges → CORRELATES_WITH edges in Neo4j
   - equal credit → each source in PostgreSQL
   - commit Postgres (idempotency guard + upserts + history)
        |
-       ├── writes → Neo4j (CAUSES edge alpha/beta)
+       ├── writes → Neo4j (CAUSES or CORRELATES_WITH edge alpha/beta)
        └── writes → PostgreSQL (credibility.credibility upsert + credibility_history append)
 
-[Offline structure learner]  ← runs on schedule or via CLI
-  - reads: cleansing.events + market_data.close_observations
+[Offline structure learner]  ← runs on schedule or via CLI, two data paths in one pass
+  - path 1 (CAUSES):          reads cleansing.events + market_data.close_observations
+  - path 2 (CORRELATES_WITH): reads prediction.predictions + prediction.outbox_events
+                              + verification.evaluations + verification.scores
+                              + market_data.close_observations, and the existing
+                              CORRELATES_WITH edges from Neo4j
   - estimates edge parameters from historical data
-  - writes conditioned edges → Neo4j (MERGE)
+  - writes conditioned CAUSES edges and CORRELATES_WITH edges → Neo4j (MERGE)
 ```
 
 - Consumes from: `credibility.scored`
 - No outbound messages (no outbox)
-- Writes: Neo4j (CAUSES edge alpha/beta updates), PostgreSQL (credibility + credibility_history tables)
-- The offline learner: reads `cleansing.events` and `market_data.close_observations` (read-only cross-schema), writes Neo4j conditioned edges
+- Writes: Neo4j (CAUSES and CORRELATES_WITH edge alpha/beta updates), PostgreSQL (credibility + credibility_history tables)
+- The offline learner: reads `cleansing.events`, `market_data.close_observations`, `prediction.*` and `verification.*` (read-only cross-schema), writes Neo4j conditioned CAUSES edges and CORRELATES_WITH edges
 
 ---
 
@@ -146,6 +163,13 @@ Specific responsibilities:
 | CRD-45 | A `TARGET` that is neither a declared asset nor a declared asset group shall raise `InvalidScoredMessageError` (terminal) | Implemented |
 | CRD-46 | When `TARGET` is a group ID, the service shall read and update the `(:CausalFactor)-[:CAUSES]->(:AssetGroup)` edge itself, **not** a per-asset edge — an inherited edge's credit belongs to the industry prior that fired | Implemented |
 | CRD-47 | The current `(alpha, beta)` for a group edge shall be read by matching `(factor, group, condition)` directly, never through a member asset | Implemented |
+| CRD-48 | When the `PredictionScored` carries a non-empty `propagation_chain`, the service shall apply credit to the `CORRELATES_WITH` edges named by `contributing_edges`: every contributing edge whose `edge_id` parses as a correlation-form id, and only those. `propagation_chain` marks the message as propagated; it does not select the edge to credit | Implemented |
+| CRD-49 | The credit for those correlation edges shall be computed with the same `compute_proportional_credits(...)` helper used for CAUSES edges, keyed on each edge's `influence_weight`: the shares sum to one full observation (`1.0`), so two edges converging on one target each receive a proportional part and a single-edge propagation still receives the full `1.0`. `alpha += credit` when `is_correct = True`, `beta += credit` when False, both floored at `prior_floor` | Implemented |
+| CRD-50 | The current `(alpha, beta)` for a correlation edge shall be read via `get_correlation_edge_counts(source_asset_id, target_asset_id, condition)` and written back via `update_correlation_weight` | Implemented |
+| CRD-51 | If a contributing correlation edge is absent from Neo4j, a WARNING `correlation_edge_missing_in_graph` shall be logged and that edge's update skipped; this is not fatal — the remaining correlation edges, the source updates, and the Postgres commit still proceed | Implemented |
+| CRD-52 | When the `PredictionScored` carries an empty `propagation_chain` (a direct prediction), the CAUSES path of `CRD-4` – `CRD-11` shall run unchanged and no `CORRELATES_WITH` edge shall be updated. The two paths are mutually exclusive: a propagated prediction never updates a CAUSES edge, because the CAUSES edges upstream of it already earned credit from the direct prediction that started the chain | Implemented |
+| CRD-64 | `parse_correlation_edge_id(edge_id)` shall return `(source_asset_id, condition, target_asset_id)` for the correlation form `"SOURCE_ASSET\|UPSTREAM_UP->TARGET_ASSET"` / `"…\|UPSTREAM_DOWN->…"`, and shall return `None` for any other form — notably every CAUSES form — so the caller falls through to `parse_edge_id`. Only a correlation-form id that names an asset unknown to the registry shall raise `InvalidScoredMessageError` (terminal) | Implemented |
+| CRD-65 | If a propagated prediction's `contributing_edges` contains no correlation-form `edge_id` at all, a WARNING `propagated_prediction_without_correlation_edges` shall be logged with the `prediction_id` and the offending `edge_ids`, and no edge update shall be made; crediting a CAUSES edge for a propagated prediction is never correct. This is not expected to occur in practice | Implemented |
 
 ### 5.3 Online consumer: source credit (PostgreSQL)
 
@@ -172,6 +196,7 @@ Specific responsibilities:
 | CRD-20 | For each updated entity, the service shall append one row to `credibility_history` with `alpha_before`, `beta_before`, `alpha_after`, `beta_after`, `credibility_before`, `credibility_after`, `ci_lower`, and `ci_upper` | Implemented |
 | CRD-21 | `ci_lower` and `ci_upper` shall be the 95% Wilson score confidence interval for the Bernoulli proportion `alpha / (alpha + beta)` | Implemented |
 | CRD-22 | The `credibility_history` table is append-only and never modified; it provides a complete audit trail of every credibility change | Implemented |
+| CRD-53 | A correlation-edge update shall be recorded with `entity_id = "SOURCE_ASSET\|CONDITION->TARGET_ASSET"` and `entity_type = "edge"`, so correlation and causal edges share one audit trail and one current-state table | Implemented |
 
 ### 5.6 Offline structure learner
 
@@ -194,7 +219,24 @@ Specific responsibilities:
 | CRD-37 | Estimates shall be written to Neo4j using `upsert_conditioned_edge` (MERGE semantics): creates the edge if absent, updates existing weights | Implemented |
 | CRD-38 | NEUTRAL estimated edges are not written to Neo4j (no neutral CAUSES edges in the graph) | Implemented |
 
-### 5.7 Health and readiness
+### 5.7 Offline structure learner: CORRELATES_WITH path
+
+This is a second data path inside the existing learner, not a separate service or process. One
+`run_with()` pass performs the CAUSES path first, then this one, and reports the sum of edges written.
+
+| ID | Requirement | Status |
+|---|---|---|
+| CRD-54 | The correlation path shall run in the same learning pass as the CAUSES path and shall be skipped when `CREDIBILITY_LEARNING_CORRELATION_LEARNING_ENABLED=false` (default `true`); the pass shall return the total number of edges written by both paths | Implemented |
+| CRD-55 | The correlation sample builder shall read only **direct** scored predictions: `propagation_depth = 0` (read from the prediction outbox payload) and `direction != 'NEUTRAL'`, joining `prediction.predictions`, `prediction.outbox_events`, `verification.evaluations`, and `verification.scores`, restricted to predictions decided within the last `lookback_days` days | Implemented |
+| CRD-56 | For each such prediction the condition shall be derived from the predicted direction: UP → `UPSTREAM_UP`, DOWN → `UPSTREAM_DOWN` | Implemented |
+| CRD-57 | For each `CORRELATES_WITH` target of that (source asset, condition) pair, the learner shall compute the target's `actual_return` over the **same** baseline and settlement sessions as the source prediction; a target with a missing close on either session shall be skipped, and a target unknown to the asset registry shall be skipped with a WARNING | Implemented |
+| CRD-58 | A `CorrelationSample` shall be flagged `is_abnormal=True` when `abs(actual_return) >= abnormal_threshold × target_volatility`, using the same volatility window as the CAUSES path | Implemented |
+| CRD-59 | The correlation estimator shall group samples by `(source_asset, condition, target_asset)` and shall **not** invert the return sign for polarity — unlike `CRD-36`, the condition already encodes the upstream direction | Implemented |
+| CRD-60 | Correlation direction shall be UP when the mean `actual_return > deadband`, DOWN when `< -deadband`, NEUTRAL otherwise; `weight = min(1.0, abs(mean) / 0.05)`, `confidence = agreeing / total`, `alpha = agreeing + 1.0`, `beta = disagreeing + 1.0` | Implemented |
+| CRD-61 | A correlation group with fewer than `min_samples` observations shall be dropped, unless any sample in the group is flagged abnormal (in which case the effective minimum is 1) | Implemented |
+| CRD-62 | NEUTRAL correlation estimates shall not be written; every other estimate shall be written with `upsert_correlation_edge` (idempotent MERGE), so re-running the batch refines existing edges rather than duplicating them | Implemented |
+
+### 5.8 Health and readiness
 
 | ID | Requirement | Status |
 |---|---|---|
@@ -211,6 +253,7 @@ Specific responsibilities:
 | CRD-42 | The service shall bind to the local environment only | Implemented |
 | CRD-43 | The update sequence (Neo4j first, then Postgres) is documented; the dual-write gap is an accepted POC limitation, not a silent risk | Implemented |
 | CRD-44 | The offline learner shall produce a deterministic output for the same input data (same samples → same EdgeEstimate values, sorted by `(factor, condition, asset)`) | Implemented |
+| CRD-63 | The correlation path of the offline learner shall likewise be deterministic: the same correlation samples shall yield the same `CorrelationEdgeEstimate` values, sorted by `(source_asset, condition, target_asset)` | Implemented |
 
 ---
 
@@ -223,7 +266,27 @@ Specific responsibilities:
   ↓
 CRD-2: Check processed_predictions — if found, skip (return False)
   ↓
-CRD-4–CRD-10: _update_edges(message)
+_update_edges(message) — branches on propagation_chain
+  ↓
+CRD-48–CRD-52, CRD-64–CRD-65: propagated prediction (propagation_chain non-empty)
+                              — CORRELATES_WITH branch, _update_correlation_edges(message)
+  corr_edges = [e for e in message.contributing_edges
+                  if parse_correlation_edge_id(e.edge_id) is not None]
+  if not corr_edges:                                                     # CRD-65
+      log propagated_prediction_without_correlation_edges(prediction_id, edge_ids)
+      return []   ← no edge updates
+  credits = compute_proportional_credits(corr_edges)   # same helper as the CAUSES path
+  For each edge in corr_edges:
+    source, condition, target = parse_correlation_edge_id(edge.edge_id)
+    alpha, beta = graph.get_correlation_edge_counts(source, target, condition)
+    if missing: log correlation_edge_missing_in_graph, skip this edge (not fatal)
+    alpha_after, beta_after = apply_bernoulli(alpha, beta, credits[edge.edge_id],
+                                             is_correct, floor)
+    graph.update_correlation_weight(source, target, condition, alpha_after, beta_after)
+    record WeightUpdate(entity_id="SOURCE|CONDITION->TARGET", entity_type="edge")
+  return  ← the CAUSES branch below is not entered
+  ↓
+CRD-4–CRD-10: direct prediction (propagation_chain empty) — CAUSES branch, unchanged
   For each edge in message.contributing_edges:
     credit = edge.influence_weight / total_influence
     factor, condition, asset = parse_edge_id(edge.edge_id)
@@ -319,6 +382,9 @@ lookup can miss the very edge that fired (`CRD-47`).
 **Invocation:** `python -m credibility.learning.run`  
 **Or:** triggered by APScheduler inside the service every `learning_interval_hours` hours.
 
+This is **path 1** of the pass (CAUSES edges). Path 2 (`CORRELATES_WITH`) is described in §7.10 and
+runs immediately afterwards in the same `run_with()` call.
+
 ```
 Step 1 — build_samples(pool, lookback_days=30)
   SELECT events from cleansing.events WHERE first_seen_at >= (now - 30 days)
@@ -403,6 +469,99 @@ edge because `LMT_NYSE` had no edge of its own for that `(factor, condition)` pa
 Every listing in the group therefore contributes evidence to one shared prior, which is what lets a
 newly listed company predict before it has company-specific history.
 
+### 7.9 Worked example (propagated prediction → CORRELATES_WITH edges)
+
+**Input:** `PredictionScored` for `NEM_NYSE`, `is_correct=True`,
+`contributing_edges=[ContributingEdge(edge_id="XOM_NYSE|UPSTREAM_UP->NEM_NYSE",
+influence_weight=1.0)]`, `propagation_chain=[PropagationHop(source_asset_id=XOM_NYSE,
+target_asset_id=NEM_NYSE, condition=UPSTREAM_UP, direction=DOWN, edge_weight=0.45)]`.
+
+1. `processed_predictions` check → not found → proceed
+2. `propagation_chain` is non-empty → the CAUSES path is not entered at all (`CRD-48`, `CRD-52`)
+3. `contributing_edges` filtered by `parse_correlation_edge_id` → one correlation edge,
+   `(XOM_NYSE, UPSTREAM_UP, NEM_NYSE)` (`CRD-64`)
+4. `compute_proportional_credits(...)` over that single edge → credit = 1.0 (`CRD-49`)
+5. `graph.get_correlation_edge_counts(XOM_NYSE, NEM_NYSE, UPSTREAM_UP)` → alpha=2.0, beta=1.0
+6. `apply_bernoulli(2.0, 1.0, 1.0, is_correct=True, floor=1.0)` → alpha=3.0, beta=1.0 — the full
+   observation, because this one edge produced the whole prediction
+7. `graph.update_correlation_weight(XOM_NYSE, NEM_NYSE, UPSTREAM_UP, alpha=3.0, beta=1.0)`
+8. Postgres commit: upsert `credibility("XOM_NYSE|UPSTREAM_UP->NEM_NYSE", edge, 3.0, 1.0, 0.75)` and
+   append the history row (`CRD-53`)
+
+If step 5 returns `None` (the edge was removed from the graph after the prediction was made), a
+WARNING `correlation_edge_missing_in_graph` is logged, no edge update is recorded for that edge, and
+processing continues to the source updates and the Postgres commit (`CRD-51`).
+
+**Second case — a converged target (two contributing correlation edges).**
+
+**Input:** `PredictionScored` for `SWED_A_STO`, `is_correct=True`, `contributing_edges=`
+[`NEM_NYSE|UPSTREAM_DOWN->SWED_A_STO` (influence_weight=0.90),
+`LUG_STO|UPSTREAM_DOWN->SWED_A_STO` (influence_weight=0.20)], with one `PropagationHop` per
+contributing edge — both hops naming the same `target_asset_id`.
+
+1. `processed_predictions` check → not found → proceed
+2. `propagation_chain` is non-empty → CORRELATES_WITH branch (`CRD-48`)
+3. Both `edge_id`s parse as correlation form → both are credited (`CRD-64`)
+4. `compute_proportional_credits(...)`: total = 1.10 → `NEM_NYSE` credit = 0.818,
+   `LUG_STO` credit = 0.182; the two sum to one full observation (`CRD-49`)
+5. Each edge starting at alpha=1.0, beta=1.0 → `NEM_NYSE` edge becomes alpha=1.818,
+   `LUG_STO` edge becomes alpha=1.182; both betas stay 1.0
+6. Two `update_correlation_weight` calls, two `WeightUpdate` rows, two history rows (`CRD-53`)
+
+Had the prediction been wrong, the same two credits would have landed on `beta` instead — the
+heavier edge takes the larger share of the blame. Crediting only one of the two (the old "last hop"
+rule) would have given that edge a full observation it did not earn alone, while the other edge
+learned nothing.
+
+### 7.10 Offline structure learner: CORRELATES_WITH path
+
+**Path 2** of the same `run_with()` pass, gated by `correlation_learning_enabled`. Note that this path
+learns from **direct** predictions only: it asks "when `XOM_NYSE` was predicted UP, what did the
+correlated assets actually do?", which is an unbiased question. Learning from propagated predictions
+instead would feed the learner its own prior output.
+
+```
+Step 1 — build_correlation_samples(pool, graph, lookback_days, volatility_lookback_days,
+                                   abnormal_threshold)
+  SELECT direct scored predictions decided within the lookback window:
+      prediction.predictions p
+      JOIN prediction.outbox_events   o ON o.aggregate_id = p.prediction_id
+      JOIN verification.evaluations   e USING (prediction_id)   -- baseline + settlement sessions
+      JOIN verification.scores        s USING (prediction_id)   -- scored only
+      WHERE p.direction != 'NEUTRAL'
+        AND (o.payload::jsonb ->> 'propagation_depth')::int = 0
+  For each prediction row:
+    condition = UPSTREAM_UP if predicted_direction == UP else UPSTREAM_DOWN
+    for each target in graph.get_correlation_edges(source_asset, condition):
+      if target unknown to the registry: log warning, skip
+      baseline_close, settlement_close = closes for TARGET on the SOURCE prediction's sessions
+      if either missing: skip
+      actual_return = (settlement_close - baseline_close) / baseline_close
+      volatility = std_dev(target's daily returns over the volatility window)
+      is_abnormal = (volatility > 0 AND |actual_return| >= abnormal_threshold × volatility)
+      emit CorrelationSample(source_asset, condition, target_asset, actual_return, ...)
+
+Step 2 — estimate_correlation_edges(samples, deadband=0.002, min_samples=5)
+  Group by (source_asset, condition, target_asset)
+  For each group:
+    if count < min_samples AND no abnormal samples: skip
+    mean = average(actual_return)          # NO polarity sign-flip: the condition carries direction
+    if mean >  deadband: direction=UP,   agreeing = count(return > 0)
+    elif mean < -deadband: direction=DOWN, agreeing = count(return < 0)
+    else: direction=NEUTRAL
+    weight = min(1.0, |mean| / 0.05); confidence = agreeing / total
+    alpha = agreeing + 1.0; beta = (total - agreeing) + 1.0
+  Sort by (source_asset, condition, target_asset)
+
+Step 3 — write_correlation_estimates(graph, estimates)
+  For each estimate with direction != NEUTRAL:
+    graph.upsert_correlation_edge(source_asset, condition, target_asset,
+        direction=..., weight=..., confidence=..., alpha=..., beta=...)
+  Returns count of edges written
+
+Step 4 — run_with returns written_causes + written_corr and logs learning_run_complete
+```
+
 ---
 
 ## 8. Interfaces
@@ -415,8 +574,9 @@ newly listed company predict before it has company-specific history.
 Key fields used:
 - `prediction_id` — idempotency key
 - `is_correct` — determines whether credit goes to alpha or beta
-- `contributing_edges` — list of `ContributingEdge`; `edge_id` and `influence_weight` used
+- `contributing_edges` — list of `ContributingEdge`; `edge_id` and `influence_weight` used. This is the source of truth for which edges fired on **both** paths: CAUSES edge ids for a direct prediction, correlation-form edge ids for a propagated one
 - `source_ids` — list of news source domain strings (equal credit)
+- `propagation_chain` — list of `PropagationHop` forwarded from `PredictionMade`; empty for a direct prediction. A non-empty chain only **marks** the message as propagated (and carries provenance/depth), routing credit to the correlation-form entries of `contributing_edges`; it does not itself select an edge. A converged target contributes one hop per inbound edge, so several hops may share one `target_asset_id`
 
 ### 8.2 Published messages
 
@@ -433,13 +593,13 @@ None. The Credibility Service only writes to Neo4j and PostgreSQL; it does not p
 
 | Job | Interval | What it does |
 |---|---|---|
-| `offline_learner` | `learning_interval_hours` (default 24 h) | Runs one build → estimate → write pass; only if `learning_enabled=true` |
+| `offline_learner` | `learning_interval_hours` (default 24 h) | Runs one build → estimate → write pass over both edge paths (CAUSES, then CORRELATES_WITH); only if `learning_enabled=true` |
 
 ### 8.5 CLI
 
 | Command | What it does |
 |---|---|
-| `python -m credibility.learning.run` | Runs one offline learning pass using the current database state |
+| `python -m credibility.learning.run` | Runs one offline learning pass (both edge paths) using the current database state |
 
 ---
 
@@ -449,7 +609,7 @@ None. The Credibility Service only writes to Neo4j and PostgreSQL; it does not p
 
 | Column | Type | Notes |
 |---|---|---|
-| `entity_id` | TEXT NOT NULL | `"FACTOR->ASSET"`, `"FACTOR|COND->ASSET"`, or a domain string |
+| `entity_id` | TEXT NOT NULL | `"FACTOR->ASSET"`, `"FACTOR|COND->ASSET"`, `"SOURCE_ASSET\|COND->TARGET_ASSET"` (correlation edge), or a domain string |
 | `entity_type` | TEXT NOT NULL | `"edge"` or `"source"` |
 | `alpha` | DOUBLE PRECISION DEFAULT 1.0 | Success count + prior |
 | `beta` | DOUBLE PRECISION DEFAULT 1.0 | Failure count + prior |
@@ -518,11 +678,15 @@ Neo4j connection variables: `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`, `NEO4J_
 | `LOG_LEVEL` | `INFO` | Logging verbosity (no prefix) |
 | `CREDIBILITY_LEARNING_DEADBAND` | `0.002` | Mean signed return must exceed ±0.2% for a directional edge |
 | `CREDIBILITY_LEARNING_MIN_SAMPLES` | `5` | Minimum observations per group (bypassed for abnormal samples) |
-| `CREDIBILITY_LEARNING_LOOKBACK_DAYS` | `30` | How far back in `cleansing.events` to look |
+| `CREDIBILITY_LEARNING_LOOKBACK_DAYS` | `30` | How far back to look — in `cleansing.events` for the CAUSES path, and in `prediction.predictions.decision_at` for the CORRELATES_WITH path |
 | `CREDIBILITY_LEARNING_VOLATILITY_LOOKBACK_DAYS` | `30` | Days of closes used to compute per-asset historical volatility |
 | `CREDIBILITY_LEARNING_ABNORMAL_THRESHOLD` | `2.0` | Multiplier: `|return| >= threshold × volatility` = abnormal |
 | `CREDIBILITY_LEARNING_DB_POOL_MIN_SIZE` | `1` | asyncpg minimum pool connections |
 | `CREDIBILITY_LEARNING_DB_POOL_MAX_SIZE` | `5` | asyncpg maximum pool connections |
+| `CREDIBILITY_LEARNING_CORRELATION_LEARNING_ENABLED` | `true` | Whether the `CORRELATES_WITH` path runs after the CAUSES path in the same pass; set `false` to run only the CAUSES path |
+
+`deadband`, `min_samples`, `lookback_days`, `volatility_lookback_days` and `abnormal_threshold` are
+shared by both learning paths; there is no separate correlation-only tuning knob.
 
 ---
 
@@ -542,6 +706,14 @@ Neo4j connection variables: `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`, `NEO4J_
 | CRD-25 – CRD-30 (sample builder) | `tests/learning/test_dataset.py` | Events loaded; conditions expanded; missing price skipped; abnormal flagging |
 | CRD-31 – CRD-38 (estimator) | `tests/learning/test_estimator.py` | min_samples threshold; abnormal bypass; RESOLUTION inversion; weight scaling; NEUTRAL dropped |
 | CRD-37 (seed writer) | `tests/learning/test_seed_writer.py` | upsert_conditioned_edge called for each estimate |
+| CRD-48, CRD-50 – CRD-51, CRD-53 (online correlation credit) | `tests/test_pipeline.py` | `test_correct_propagated_prediction_increments_alpha`; `test_wrong_propagated_prediction_increments_beta`; `test_propagated_prediction_missing_corr_edge_returns_no_update` — missing edge is skipped, `process` still returns True |
+| CRD-49 (proportional split across converging edges) | `tests/test_pipeline.py` | `test_converging_edges_receive_proportional_credit` — both edges credited, heavier `influence_weight` gets more, credits sum to 1.0; `test_converging_edges_share_the_blame_when_wrong` — same split lands on `beta`; `test_single_edge_propagation_still_gets_full_credit` — the one-edge case is unchanged at a full 1.0 |
+| CRD-52 (path exclusivity) | `tests/test_pipeline.py` | `test_direct_prediction_does_not_call_update_correlation_weight` — an empty `propagation_chain` leaves the CORRELATES_WITH graph untouched |
+| CRD-64 (correlation edge_id parser) | `tests/test_pipeline.py` | `test_parse_correlation_edge_id_recognises_correlation_form` — `UPSTREAM_*` form returns `(source, condition, target)`; `test_parse_correlation_edge_id_returns_none_for_causes_edges` — unconditional and conditioned CAUSES ids return `None` so they fall through to `parse_edge_id` |
+| CRD-54 (dual-path pass + flag) | `tests/test_learning_run.py` | `test_learning_settings_correlation_learning_enabled_default_true`; `test_learning_settings_correlation_learning_can_be_disabled`; `test_run_with_empty_data_returns_zero`; `test_run_with_skips_corr_path_when_disabled` |
+| CRD-55 – CRD-58 (correlation sample builder) | `tests/test_learning_dataset.py` | `test_build_correlation_samples_empty_when_no_prediction_rows`; `..._skips_when_no_corr_edges`; `..._produces_sample`; `..._skips_target_with_missing_price` |
+| CRD-59 – CRD-61, CRD-63 (correlation estimator, incl. determinism) | `tests/test_learning_estimator.py` | `test_corr_positive_returns_yield_up_edge`; `..._negative_returns_yield_down_edge`; `..._neutral_group_is_not_dropped_but_returns_neutral_direction`; `..._below_min_samples_is_dropped`; `..._single_abnormal_sample_bypasses_min_samples`; `..._groups_split_by_source_condition_target`; `..._output_sorted_deterministically` |
+| CRD-62 (correlation seed writer) | `tests/test_learning_seed_writer.py` | `test_write_correlation_estimates_skips_neutral`; `..._calls_upsert_for_directional`; `..._empty_input_returns_zero` |
 | End-to-end | `tests/test_integration.py` | Full PredictionScored → Neo4j edge update → Postgres commit |
 
 ---
@@ -557,9 +729,14 @@ Neo4j connection variables: `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`, `NEO4J_
 | Concurrent delivery race (lost insert race) | `commit_updates` returns False; log `scored_duplicate_skipped`; no double-counting |
 | `source_ids` is empty | Log WARNING; source updates skipped; edge updates continue |
 | Neo4j unreachable during edge update | GraphTransportError raised; transaction not attempted; message re-queued |
+| Contributing correlation edge not found in Neo4j | Log WARNING `correlation_edge_missing_in_graph`; no edge update recorded for that edge; the other contributing correlation edges, the sources, and the Postgres commit still proceed (`process` returns True) |
+| Propagated prediction whose `contributing_edges` holds no correlation-form edge_id | Log WARNING `propagated_prediction_without_correlation_edges` with the `prediction_id` and `edge_ids`; no edge updates; sources and the Postgres commit still proceed. Not expected in practice (`CRD-65`) |
+| Correlation-form edge_id naming an asset unknown to the registry | `InvalidScoredMessageError`; message dead-lettered (`CRD-64`) |
 | Offline learner: event has missing price | Sample skipped; counter logged at end |
 | Offline learner: insufficient samples in group | Group skipped; no edge written |
 | Offline learner: estimated direction is NEUTRAL | Edge not written; dropped silently |
+| Offline learner: source asset has no CORRELATES_WITH edges | Prediction contributes no correlation samples; skipped silently |
+| Offline learner: correlation target missing a close on either session | That target's sample skipped; `skipped_missing_price` counter logged at end |
 
 ---
 
@@ -574,7 +751,12 @@ Neo4j connection variables: `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`, `NEO4J_
 | Proportional credit for edges | Larger expert-weight edges have more influence on the prediction; they should receive more of the feedback signal |
 | Equal credit for sources | There is no weighting signal for news sources in the current pipeline; equal credit is the least-biased assignment |
 | Binary score only affects credibility | The score is 1.0/0.0; magnitude accuracy is not rewarded. This keeps the Beta-Bernoulli model simple |
-| Offline learner reads cross-schema | The learner is a read-only analytics batch; it reads `cleansing` and `market_data` directly to avoid building a separate pipeline for historical events. It never writes to those schemas |
+| Offline learner reads cross-schema | The learner is a read-only analytics batch; it reads `cleansing`, `market_data`, `prediction` and `verification` directly to avoid building a separate pipeline for historical events and outcomes. It never writes to those schemas |
+| Proportional credit across contributing correlation edges, reusing `compute_proportional_credits` | A propagated prediction is not always produced by a single edge: Prediction sums the inbound forces at a converged target and decides once, so several `CORRELATES_WITH` edges can be jointly responsible for one outcome. Splitting by `influence_weight` keeps one scored prediction worth exactly one observation and applies the same rule already used for CAUSES edges, rather than a second credit scheme. The credit for the CAUSES edges further up the chain was already applied when the direct prediction that started the chain was scored |
+| `contributing_edges`, not `propagation_chain`, decides which edge is credited | `contributing_edges` is what `decide()` actually reported, so it is the authoritative record of which edges fired. `propagation_chain` is provenance: it marks the message as propagated and carries depth, and for a converged target it holds one hop per inbound edge — so no single hop ("the last one") identifies the edge that produced the prediction |
+| Correlation learning uses only direct predictions (`propagation_depth = 0`) | Learning from propagated predictions would feed the learner its own prior output, reinforcing whatever the seeded correlation weights already claimed. A direct prediction plus the target's realised return is an independent observation |
+| Correlation learning does not sign-flip for polarity | The condition (`UPSTREAM_UP` / `UPSTREAM_DOWN`) already encodes the upstream direction, so the target's raw return is already in the correct orientation — unlike `CRD-36`, where RESOLUTION events must be inverted |
+| Correlation learning behind its own flag | `CREDIBILITY_LEARNING_CORRELATION_LEARNING_ENABLED=false` restores the previous single-path behaviour without a code change, so the new path can be disabled during rollout or debugging |
 | Offline learner uses Beta(1,1) prior for new edges | Consistent with the expert-seeded prior; a data-derived edge starts with the same uninformed prior as a hand-seeded one |
 | WEIGHT_RETURN_SCALE = 0.05 | A rough calibration: a 5% mean daily move maps to expert weight 1.0. Weights above 1.0 are capped, preventing extreme outliers from dominating |
 
@@ -585,6 +767,9 @@ Neo4j connection variables: `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`, `NEO4J_
 - **Industry fan-out credit dilution:** if an event is assigned to 10 assets via industry fan-out, each asset's prediction gets a credit update. Because 10 independent predictions are scored, the same causal edge may receive 10 credit updates from one real-world event — one for each asset. This inflates both alpha and beta proportionally, so the effect on reliability is small for well-seeded edges but may cause drift for sparse ones.
 - **The offline learner uses a fixed timezone (America/New_York)** for resolving sessions from `cleansing.events`; per-asset timezone resolution is used only when the asset is known to the registry. Unknown assets default to New York time, which is slightly wrong for European listings.
 - **No confidence interval feedback to prediction policy:** the `ci_lower` and `ci_upper` stored in `credibility_history` are computed for observability but are not currently read by any other service. The Prediction Service uses only the edge reliability (`alpha / (alpha + beta)`).
+- **Only the edges that fired at the scored prediction's own depth are credited:** upstream hops of a chain longer than one are not credited by the scored prediction at the far end. This is correct rather than lossy in the current pipeline, because every depth level's prediction is emitted and scored as its own `PredictionMade`, so each edge is credited when *its own* prediction is scored — and a converged target credits all of its inbound edges. If propagation ever emitted a single terminal prediction for a multi-hop chain, the upstream edges would silently stop learning.
+- **Correlation and causal edges share one `entity_id` namespace:** a correlation edge is recorded as `"SOURCE_ASSET|CONDITION->TARGET_ASSET"` and a conditioned causal edge as `"FACTOR|CONDITION->ASSET"`, both with `entity_type = "edge"`. The two cannot collide today because an `EventType` value is never an `AssetId` value, but nothing in the schema enforces that separation.
+- **Correlation learning is data-starved until predictions accumulate:** the CORRELATES_WITH path needs `min_samples` (default 5) scored direct predictions for the *same* (source asset, condition, target asset) triple within `lookback_days`. Early in a deployment it typically writes nothing, and expert-seeded correlation weights remain in force.
 
 ---
 
@@ -597,8 +782,9 @@ Update this document whenever any of the following changes:
 - The Beta-Bernoulli credit formula changes (proportional vs. equal, or a new scheme is added)
 - The `prior_floor` semantics change
 - The Wilson CI formula changes or a different interval is chosen
-- The offline learner's estimation algorithm changes (deadband, weight scaling, abnormal detection)
-- The `edge_id` business key format changes (adding a new form beyond unconditional/conditioned)
+- The offline learner's estimation algorithm changes (deadband, weight scaling, abnormal detection), on either the CAUSES or the CORRELATES_WITH path
+- The `edge_id` business key format changes (adding a new form beyond unconditional/conditioned/correlation)
+- The rule for selecting which correlation edges are credited changes, or propagation stops emitting one scored prediction per depth level
 - Source credibility is wired up (when `source_ids` starts being populated)
 - A new table column is added or modified in `db.py`
 - An environment variable is added, removed, or has its default changed in `config.py` or `learning/config.py`
@@ -622,3 +808,5 @@ Update this document whenever any of the following changes:
 |---|---|
 | 2026-08-05 | Initial as-built specification for E07 (Credibility Service); CRD-1 through CRD-44 |
 | 2026-08-07 | **Defect fix.** `parse_edge_id` coerced the `edge_id` target to `AssetId`, so every scored prediction that fired an *inherited group* edge was dead-lettered and its learning silently lost (8 such messages found in `credibility.scored.dlq`). ADR-007 and SyRS §9.2 always required both forms to parse; the code implemented only the asset form. CRD-11 reworded; CRD-45…CRD-47 added; §7.4 rewritten; §7.8 worked example added |
+| 2026-08-12 | **E10 (Cross-Asset Propagation), version 1.1.0.** `CORRELATES_WITH` edges now learn on two paths. Online: a scored prediction with a non-empty `propagation_chain` credits the last hop's correlation edge with full 1.0 credit instead of the CAUSES edges (CRD-48…CRD-53, §7.9). Offline: the existing structure learner gained a second data path that estimates correlation edges from scored *direct* predictions and their targets' realised returns, gated by `CREDIBILITY_LEARNING_CORRELATION_LEARNING_ENABLED` (CRD-54…CRD-63, §5.7, §7.10). §2.1, §3, §4, §8.1, §8.4, §8.5, §10.2, §11, §12, §13 updated; former §5.7 (health and readiness) renumbered to §5.8. No existing requirement changed or withdrawn |
+| 2026-08-12 | **Defect fix, version 1.2.0.** E10's design promised force summation for conflicting propagated forces, but the pipeline decided each target from a single edge, so the online consumer credited only the chain's last hop with a full 1.0. Prediction was fixed to collect all inbound correlation edges per depth level and decide once, so a converged target can legitimately have several contributing correlation edges — and it now emits one `PropagationHop` per contributing edge, making "the last hop" meaningless as a selector. `_update_edges` still branches on a non-empty `propagation_chain` but now calls `_update_correlation_edges`, which filters `contributing_edges` through the new `parse_correlation_edge_id` and splits credit with the existing `compute_proportional_credits` — the same helper the CAUSES path uses. CRD-48, CRD-49, CRD-51 and CRD-52 reworded; CRD-64 (correlation edge_id parser) and CRD-65 (`propagated_prediction_without_correlation_edges` warning) added; §2.1, §3, §4, §7.1, §7.9, §8.1, §11, §12, §13, §14.1 updated. No requirement withdrawn |

@@ -45,3 +45,43 @@ class EdgeEstimate:
     alpha: float
     beta: float
     sample_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class CorrelationSample:
+    """One realised observation for a CORRELATES_WITH edge.
+
+    ``source_asset``  — the asset that was predicted (propagation_depth=0).
+    ``condition``     — UPSTREAM_UP when the source was predicted UP, UPSTREAM_DOWN when DOWN.
+    ``target_asset``  — the asset whose actual return is being observed.
+    ``actual_return`` — (settlement_close - baseline_close) / baseline_close for target_asset
+                        in the same settlement session as the source prediction.
+    ``is_abnormal``   — True when |actual_return| >= abnormal_threshold * target volatility.
+    ``asset_volatility`` — std dev of target_asset daily returns over the volatility window;
+                           0.0 when fewer than two closes available.
+    """
+
+    source_asset: AssetId
+    condition: ConditionCode          # always UPSTREAM_UP or UPSTREAM_DOWN
+    target_asset: AssetId
+    actual_return: float
+    is_abnormal: bool = False
+    asset_volatility: float = 0.0
+
+
+@dataclass(frozen=True, slots=True)
+class CorrelationEdgeEstimate:
+    """A data-derived CORRELATES_WITH edge proposal.
+
+    One estimate per ``(source_asset, condition, target_asset)`` group.
+    """
+
+    source_asset: AssetId
+    condition: ConditionCode
+    target_asset: AssetId
+    direction: Direction
+    weight: float
+    confidence: float
+    alpha: float
+    beta: float
+    sample_count: int

@@ -14,11 +14,12 @@ from __future__ import annotations
 
 from shared.graph.client import CausalGraphClient
 from shared.graph.exceptions import GraphConfigurationError, GraphTransportError
-from shared.graph.models import FiringEdge
+from shared.graph.models import CorrelationEdge, FiringEdge
 from shared.graph.settings import Neo4jSettings
 
 __all__ = [
     "CausalGraphClient",
+    "CorrelationEdge",
     "FiringEdge",
     "GraphConfigurationError",
     "GraphTransportError",

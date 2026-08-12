@@ -8,8 +8,8 @@
 | Scope | Whole system — seven implemented components plus one approved (Notification) |
 | Requirement ID prefix | `SYS` |
 | Status | `Implemented` (components 1–7); `Approved` (Notification); Gateway and Dashboard not built |
-| Version | `1.2.0` |
-| Last verified against code | `2026-08-05` |
+| Version | `1.3.0` |
+| Last verified against code | `2026-08-12` |
 
 ## 2. Purpose and scope
 
@@ -61,6 +61,12 @@ The loop is: **news → event → prediction → price → score → learning.**
 | Causal factor | A node in the knowledge graph representing a kind of event, e.g. `MILITARY_CONFLICT` |
 | `CAUSES` edge | A directed, weighted link from a causal factor to an asset or asset group |
 | Firing edge | A `CAUSES` edge whose conditions are satisfied, so it contributes force to a decision |
+| `CORRELATES_WITH` edge | A directed, weighted link from one asset to another, always gated by a condition (`UPSTREAM_UP` or `UPSTREAM_DOWN`); fires when the source asset was predicted directional in the same pipeline run |
+| Propagation pass | A further `decide()` sweep in Prediction over assets reachable by `CORRELATES_WITH` edges from the assets decided in pass 0 |
+| Visited set | Per-pipeline-run set of asset IDs already decided; prevents cycle re-entry |
+| `propagation_depth` | Integer on `PredictionMade`: `0` = direct, from a fired `CAUSES` edge; `1+` = the number of `CORRELATES_WITH` hops that produced it |
+| `propagation_chain` | Ordered list of `PropagationHop` values on `PredictionMade` and `PredictionScored`; empty for a direct prediction |
+| `PropagationHop` | Frozen value model: `(source_asset_id, target_asset_id, condition, direction, edge_weight)` |
 | Context | A time window grouping the events that affect one asset, used for one prediction |
 | Baseline session | The trading session whose close is the "before" price |
 | Settlement session | The trading session whose close is the "after" price |
@@ -357,7 +363,19 @@ This walkthrough follows a single piece of news through all six services.
   weight gives magnitude.
 - Stance check: if the asset already has an unscored prediction with the same direction and
   magnitude, nothing is published. If different, a new independent prediction is created.
-- `PredictionMade` is published with `decision_method = GRAPH_ONLY` and zero LLM calls.
+- `PredictionMade` is published with `decision_method = GRAPH_ONLY` and zero LLM calls, at
+  `propagation_depth = 0` with an empty `propagation_chain`.
+- After pass 0, a propagation pass queries `CORRELATES_WITH` edges for each directionally predicted
+  asset — under condition `UPSTREAM_UP` or `UPSTREAM_DOWN`, matching that asset's own predicted
+  direction — and runs `decide()` for the downstream targets, up to
+  `PREDICTION_MAX_PROPAGATION_DEPTH` hops (default 3). A visited set per pipeline run prevents
+  cycles. `decide()` itself is unchanged, and a net ratio inside the deadband produces no
+  prediction at all. Each depth level collects all correlation edges reaching a target before
+  deciding it, so two upstream assets converging on one downstream asset have their forces summed
+  (and may cancel to no prediction). Summation is per level: a target decided at one depth is not
+  revised by an edge arriving at the next.
+- Each propagated prediction is published as its own `PredictionMade`, carrying
+  `propagation_depth` = its hop count and the `propagation_chain` of fired edges that reached it.
 
 **Step 4 — Verification (first half)**
 
@@ -383,13 +401,17 @@ This walkthrough follows a single piece of news through all six services.
 - Consumes from `verification.prices`.
 - Computes `actual_return = (settlement - baseline) / baseline`.
 - Applies the deadband and magnitude thresholds from section 5.6.
-- Publishes one immutable `PredictionScored` carrying the contributing edges and source IDs.
+- Publishes one immutable `PredictionScored` carrying the contributing edges, source IDs, and the
+  `propagation_chain` forwarded from the prediction, so Credibility knows which edge to credit.
 
 **Step 7 — Credibility**
 
 - Consumes from `credibility.scored`.
 - Inserts `prediction_id` into `credibility.processed_predictions` first. If the row already exists,
   the message is acknowledged and nothing is learned — this is what makes redelivery safe.
+- When `propagation_chain` is non-empty the outcome came from a propagated prediction, so credit goes
+  to the `CORRELATES_WITH` edge of the **last** hop in the chain, not to the originating `CAUSES`
+  edges. Direct predictions use the `CAUSES` path below, unchanged.
 - For each contributing edge: credit proportional to its `influence_weight`. If that edge's own
   direction matched the actual direction, credit is added to `alpha`; otherwise to `beta`. An edge
   that dissented and was right is rewarded even though the overall prediction was wrong.
@@ -458,10 +480,10 @@ values are canonical asset IDs.
 |---|---|---|---|
 | `ArticleIngested` | Ingestion | One normalised article, no raw HTML | [SRS-02 §8](SRS-02-ingestion.md#8-interfaces) |
 | `EventDetected` | Cleansing | One event with provenance, polarity, condition tags, affected assets | [SRS-03 §8](SRS-03-cleansing.md#8-interfaces) |
-| `PredictionMade` | Prediction | One prediction with contributing edges and decision method | [SRS-04 §8](SRS-04-prediction.md#8-interfaces) |
+| `PredictionMade` | Prediction | One prediction with contributing edges, decision method, `propagation_depth` (`0` = direct), and `propagation_chain` (empty for direct) | [SRS-04 §8](SRS-04-prediction.md#8-interfaces) |
 | `PriceRequested` | Verification | One dual-session price request | [SRS-06 §8](SRS-06-verification.md#8-interfaces) |
 | `PriceObserved` | Market Data | Two immutable closes with full provenance | [SRS-05 §8](SRS-05-market-data.md#8-interfaces) |
-| `PredictionScored` | Verification | One immutable outcome with both closes | [SRS-06 §8](SRS-06-verification.md#8-interfaces) |
+| `PredictionScored` | Verification | One immutable outcome with both closes, plus the `propagation_chain` forwarded from the prediction | [SRS-06 §8](SRS-06-verification.md#8-interfaces) |
 
 Full field definitions live in each component's specification and in
 [src/shared/shared/schemas/messages.py](../src/shared/shared/schemas/messages.py), which is the
@@ -515,11 +537,18 @@ its own tables.
 (:CausalFactor {id})-[:CAUSES {...}]->(:AssetGroup {id})    -- industry-level, inherited
 
 (:Asset {id})-[:MEMBER_OF]->(:AssetGroup {id})
+
+(:Asset {id})-[:CORRELATES_WITH {condition, direction, weight, confidence,
+                                 alpha, beta, last_updated}]->(:Asset {id})
+              -- condition is always set (UPSTREAM_UP or UPSTREAM_DOWN); no unconditional form
+              -- fires during Prediction's propagation pass when the source asset was
+              --   predicted directional in the same pipeline run
+              -- alpha/beta learned by Credibility (online) and by the offline structure learner
 ```
 
 Rules:
 
-- An edge without a `condition` property is unconditional and always fires.
+- A `CAUSES` edge without a `condition` property is unconditional and always fires.
 - Each `(factor, target, condition)` triple is a distinct edge with its own weight and its own
   `alpha`/`beta`.
 - An edge may target a single asset or a whole industry group.
@@ -527,6 +556,12 @@ Rules:
 - An asset's own edge always **overrides** its group's edge; it does not add to it.
 - When an asset has no edge of its own for a `(factor, condition)` pair, it inherits the group's, so
   a newly listed company can predict before it has any company-specific evidence.
+- A `CORRELATES_WITH` edge always carries a `condition`, so each `(source, target, condition)` triple
+  is a distinct edge with its own weight and its own `alpha`/`beta`. The invariant is enforced by the
+  `MERGE` pattern in the seed and by application code, **not** by the database: a relationship
+  property existence constraint is Neo4j Enterprise only and this stack runs `neo4j:5.20-community`.
+  A lookup index on the relationship property `condition` is created, for the propagation query.
+- `CORRELATES_WITH` edges link assets only; they are never inherited from a group.
 
 Edge business key, used in `ContributingEdge.edge_id`:
 
@@ -552,6 +587,7 @@ Applied from [infra/neo4j/init/](../infra/neo4j/init/) in filename order:
 | `05-seed-conditioned-edges.cypher` | Condition-qualified edges |
 | `06-seed-group-edges.cypher` | Industry-level priors, inherited by members |
 | `07-seed-new-event-type-edges.cypher` | Edges for later taxonomy additions |
+| `08-seed-correlation-edges.cypher` | `CORRELATES_WITH` asset-to-asset edges and the `condition` lookup index |
 
 All seeded edges start at `alpha = 1.0`, `beta = 1.0`. Regenerate the asset seed after any registry
 edit with `python scripts/generate-asset-seed.py`.
@@ -694,3 +730,4 @@ first things a new reader uses to orient.
 | `2026-08-05` | `1.0.0` | Initial system specification, written from the implemented E01–E07 code | E01–E07 complete; replaces the epic/task backlog structure |
 | `2026-08-05` | `1.1.0` | Added Notification Service (Approved): section 4.2 component row, section 7.1 routing topology binding, section 8.3 endpoint count, scope updated | SRS-10 added |
 | `2026-08-06` | `1.2.0` | Added section 6.5 governance (`SYS-73`…`SYS-76`, mostly `Approved`) and its verification rows | Merged from `docs/requirements/agreed-system-requirements.md` "Governance for the POC"; the disclaimer and source-terms obligations had no requirement ID anywhere |
+| `2026-08-12` | `1.3.0` | E10 cross-asset propagation: section 3 definitions for `CORRELATES_WITH`, propagation pass, visited set, `propagation_depth`, `propagation_chain`, `PropagationHop`; section 7.2 steps 3, 6 and 7 narrative; section 8.2 `PredictionMade` and `PredictionScored` rows; section 9.2 edge type and rules; section 9.3 seed file | ADR-008; E10 implemented and verified live |

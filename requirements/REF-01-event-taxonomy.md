@@ -6,12 +6,12 @@
 |---|---|
 | Document ID | `REF-01` |
 | Type | Reference data |
-| Taxonomy version | `1.1` |
+| Taxonomy version | `1.2` |
 | Status | `Implemented` |
 | Version | `1.0.0` |
 | Executable source | [`EventType` in src/shared/shared/schemas/messages.py](../src/shared/shared/schemas/messages.py) |
 | Consumed by | [SRS-01 §8.2](SRS-01-shared-foundation.md#82-shared-enums), [SRS-03](SRS-03-cleansing.md), [SRS-04](SRS-04-prediction.md) |
-| Last verified against code | `2026-08-06` |
+| Last verified against code | `2026-08-12` |
 
 This document is **reference data, not a requirement specification.** It contains no `shall`
 statements. The requirement that constrains it is
@@ -85,10 +85,17 @@ carried on `EventDetected` and both optional with backward-compatible defaults:
 | `TRANSPORT_AFFECTED` | The event disrupts physical movement of goods | Cleansing, from article text |
 | `SAFE_HAVEN_ONLY` | The event drives safe-haven demand without disrupting supply | Cleansing, from article text |
 | `RISK_PREMIUM_ELEVATED` | The asset already carries an elevated risk premium | **Prediction**, at decision time from recent price history via Market Data `GET /prices/recent` |
+| `UPSTREAM_UP` | The source asset was predicted `UP` in the current pipeline run — gates a `CORRELATES_WITH` edge on the downstream asset | **Prediction**, set programmatically during the propagation pass; never set by Cleansing |
+| `UPSTREAM_DOWN` | The source asset was predicted `DOWN` in the current pipeline run — gates a `CORRELATES_WITH` edge on the downstream asset | **Prediction**, set programmatically during the propagation pass; never set by Cleansing |
 
 `RISK_PREMIUM_ELEVATED` is the exception: it is not a property of the news, so Cleansing never sets
 it. Prediction derives it so a de-escalation only predicts a drop when there is a premium to unwind.
 See [SRS-04 §7](SRS-04-prediction.md#7-how-it-works).
+
+`UPSTREAM_UP` and `UPSTREAM_DOWN` are the only condition codes that apply to
+`CORRELATES_WITH` edges (Asset→Asset). They are never present on `EventDetected.context_tags`
+because they are not a property of the news article — they are derived from a prediction
+already made in the same pipeline run. Cleansing must not produce these values.
 
 Full edge-firing semantics are in
 [SyRS §9.2](SyRS-system.md#92-neo4j-graph-model) and [SRS-04 §7](SRS-04-prediction.md#7-how-it-works).

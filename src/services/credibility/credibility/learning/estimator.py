@@ -16,7 +16,12 @@ from shared.schemas.messages import (
     EventType,
 )
 
-from credibility.learning.models import EdgeEstimate, Sample
+from credibility.learning.models import (
+    CorrelationEdgeEstimate,
+    CorrelationSample,
+    EdgeEstimate,
+    Sample,
+)
 
 # A 5% mean signed daily move maps to full edge weight 1.0; smaller moves scale linearly. Chosen as
 # a simple, transparent POC scaling — daily gold/oil moves rarely exceed a few percent.
@@ -26,6 +31,10 @@ _WEIGHT_RETURN_SCALE = 0.05
 _PRIOR = 1.0
 
 _GroupKey = tuple[EventType, ConditionCode | None, AssetId]
+
+# CORRELATES_WITH grouping: (source asset, upstream condition, target asset). The condition is
+# never None here — an Asset->Asset edge is always gated on the upstream direction.
+_CorrGroupKey = tuple[AssetId, ConditionCode, AssetId]
 
 
 def _signed_return(sample: Sample) -> float:
@@ -96,5 +105,66 @@ def estimate_edges(
 
     estimates.sort(
         key=lambda e: (e.factor.value, e.condition.value if e.condition else "", e.asset.value)
+    )
+    return estimates
+
+
+def estimate_correlation_edges(
+    samples: list[CorrelationSample],
+    *,
+    deadband: float,
+    min_samples: int,
+) -> list[CorrelationEdgeEstimate]:
+    """Aggregate correlation samples into CORRELATES_WITH edge estimates.
+
+    Groups by (source_asset, condition, target_asset). Direction is determined by the mean
+    actual_return of the target asset. NEUTRAL groups are dropped (no directional signal).
+
+    Unlike CAUSES edges, actual_return is NOT sign-flipped for polarity: the condition
+    (UPSTREAM_UP/UPSTREAM_DOWN) already encodes the upstream direction.
+    """
+    grouped: dict[_CorrGroupKey, list[CorrelationSample]] = defaultdict(list)
+    for sample in samples:
+        grouped[(sample.source_asset, sample.condition, sample.target_asset)].append(sample)
+
+    estimates: list[CorrelationEdgeEstimate] = []
+    for (source, condition, target), group_samples in grouped.items():
+        total = len(group_samples)
+        effective_min = 1 if any(s.is_abnormal for s in group_samples) else min_samples
+        if total < effective_min:
+            continue
+
+        returns = [s.actual_return for s in group_samples]
+        mean = sum(returns) / total
+        positives = sum(1 for r in returns if r > 0.0)
+        negatives = sum(1 for r in returns if r < 0.0)
+
+        if mean > deadband:
+            direction = Direction.UP
+            agreeing = positives
+        elif mean < -deadband:
+            direction = Direction.DOWN
+            agreeing = negatives
+        else:
+            direction = Direction.NEUTRAL
+            agreeing = 0
+
+        disagreeing = total - agreeing
+        estimates.append(
+            CorrelationEdgeEstimate(
+                source_asset=source,
+                condition=condition,
+                target_asset=target,
+                direction=direction,
+                weight=min(1.0, abs(mean) / _WEIGHT_RETURN_SCALE),
+                confidence=agreeing / total,
+                alpha=agreeing + _PRIOR,
+                beta=disagreeing + _PRIOR,
+                sample_count=total,
+            )
+        )
+
+    estimates.sort(
+        key=lambda e: (e.source_asset.value, e.condition.value, e.target_asset.value)
     )
     return estimates

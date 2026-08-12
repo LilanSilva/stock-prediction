@@ -25,10 +25,15 @@ CREATE TABLE IF NOT EXISTS verification.evaluations (
     correlation_id       UUID NOT NULL,
     contributing_edges   JSONB NOT NULL DEFAULT '[]',
     source_ids           JSONB NOT NULL DEFAULT '[]',
+    propagation_chain    JSONB NOT NULL DEFAULT '[]',
     status               TEXT NOT NULL DEFAULT 'PENDING',
     created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Idempotent: adds propagation_chain to existing tables created before E10.
+ALTER TABLE verification.evaluations
+    ADD COLUMN IF NOT EXISTS propagation_chain JSONB NOT NULL DEFAULT '[]';
 
 CREATE INDEX IF NOT EXISTS evaluations_status_idx ON verification.evaluations (status);
 

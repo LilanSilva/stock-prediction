@@ -27,7 +27,7 @@ class FiringEdge(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    factor_id: EventType
+    factor_id: EventType | None = None  # None for propagated (CORRELATES_WITH) edges
     asset_id: AssetId
     direction: Direction
     weight: Annotated[float, Field(ge=0.0, le=1.0)]
@@ -36,17 +36,57 @@ class FiringEdge(BaseModel):
     beta: Annotated[float, Field(gt=0.0)]
     condition: ConditionCode | None = None
     inherited_from: str | None = None
+    # Set only on a propagated (CORRELATES_WITH) edge: the upstream asset the force came from.
+    # It makes ``edge_id`` identify the specific correlation edge, so two upstream assets
+    # converging on one target stay distinguishable when Credibility assigns credit.
+    correlation_source_id: AssetId | None = None
 
     @property
     def edge_id(self) -> str:
         # An inherited edge identifies the GROUP edge it came from, not a per-asset edge that does
         # not exist: learning must flow back to the industry prior that actually fired.
         target = self.inherited_from or self.asset_id.value
+        # A propagated edge is keyed by its source asset so it matches CorrelationEdge.edge_id
+        # (``SOURCE|CONDITION->TARGET``) and Credibility can route credit to the right edge.
+        if self.factor_id is None and self.correlation_source_id is not None:
+            prefix = self.correlation_source_id.value
+        elif self.factor_id is not None:
+            prefix = self.factor_id.value
+        else:
+            prefix = "CORRELATION"
         if self.condition is None:
-            return f"{self.factor_id.value}->{target}"
-        return f"{self.factor_id.value}|{self.condition.value}->{target}"
+            return f"{prefix}->{target}"
+        return f"{prefix}|{self.condition.value}->{target}"
 
     @property
     def reliability(self) -> float:
         """Beta-Bernoulli mean directional reliability, ``alpha / (alpha + beta)``."""
         return self.alpha / (self.alpha + self.beta)
+
+
+class CorrelationEdge(BaseModel):
+    """A single (:Asset)-[:CORRELATES_WITH {condition}]->(:Asset) edge that is active.
+
+    ``weight`` is the expert-assigned magnitude in [0,1]; sign is carried by ``direction``.
+    ``alpha``/``beta`` are the Beta-Bernoulli reliability counts (seeded 1.0/1.0).
+    ``condition`` is always set (unlike CAUSES, CORRELATES_WITH has no unconditional form).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    source_asset_id: AssetId
+    target_asset_id: AssetId
+    condition: ConditionCode
+    direction: Direction
+    weight: Annotated[float, Field(ge=0.0, le=1.0)]
+    confidence: Annotated[float, Field(ge=0.0, le=1.0)]
+    alpha: Annotated[float, Field(gt=0.0)]
+    beta: Annotated[float, Field(gt=0.0)]
+
+    @property
+    def reliability(self) -> float:
+        return self.alpha / (self.alpha + self.beta)
+
+    @property
+    def edge_id(self) -> str:
+        return f"{self.source_asset_id.value}|{self.condition.value}->{self.target_asset_id.value}"
