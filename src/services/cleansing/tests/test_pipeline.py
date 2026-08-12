@@ -244,8 +244,8 @@ async def test_cross_language_same_event_merges() -> None:
 async def test_article_count_does_not_close_cluster() -> None:
     repo = FakeRepository()
     pipeline = _pipeline(repo)
-    await pipeline.process_article(_message("S1", "US imposes sanctions on the exporter"))
-    await pipeline.process_article(_message("S2", "US imposes sanctions on the exporter again"))
+    await pipeline.process_article(_message("US imposes sanctions on the exporter", "S1"))
+    await pipeline.process_article(_message("US imposes sanctions on the exporter again", "S2"))
     produced = await pipeline.close_ready_clusters()
     # Two articles, but the quiet period has not elapsed -> nothing closes yet.
     assert produced == 0
@@ -255,7 +255,7 @@ async def test_article_count_does_not_close_cluster() -> None:
 async def test_replayed_article_is_idempotent() -> None:
     repo = FakeRepository()
     pipeline = _pipeline(repo)
-    message = _message("S1", "US imposes sanctions on the exporter")
+    message = _message("US imposes sanctions on the exporter", "S1")
     await pipeline.process_article(message)
     await pipeline.process_article(message)
     assert len(repo.fingerprints) == 1
@@ -265,7 +265,7 @@ async def test_replayed_article_is_idempotent() -> None:
 async def test_ready_cluster_produces_local_event() -> None:
     repo = FakeRepository()
     pipeline = _pipeline(repo)
-    await pipeline.process_article(_message("S1", "US imposes sanctions on the exporter"))
+    await pipeline.process_article(_message("US imposes sanctions on the exporter", "S1"))
     # Force the quiet deadline into the past so the cluster is due.
     cluster = next(iter(repo.clusters.values()))
     cluster.quiet_deadline = datetime.now(UTC) - timedelta(minutes=1)

@@ -87,7 +87,8 @@ ACTION_TAXONOMY: dict[str, EventType] = {
     "guidance": EventType.CORPORATE_EARNINGS,
     "profit": EventType.CORPORATE_EARNINGS,
     "revenue": EventType.CORPORATE_EARNINGS,
-    "resultat": EventType.CORPORATE_EARNINGS,  # sv
+    "kvartalsresultat": EventType.CORPORATE_EARNINGS,  # sv: quarterly result (not generic "resultat")
+    "rörelseresultat": EventType.CORPORATE_EARNINGS,   # sv: operating result
     # POLITICAL_TRANSITION
     "election": EventType.POLITICAL_TRANSITION,
     "resign": EventType.POLITICAL_TRANSITION,

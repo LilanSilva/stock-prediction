@@ -138,7 +138,10 @@ class CleansingPipeline:
             return
 
         vector = await self._embedder.embed(text)
-        action = await self._extractor.extract(text, facts.language)
+        # Classify on title only: the body frequently mentions other events as context
+        # (e.g. "a country at war", "solar eclipses have ended wars") which fires the wrong
+        # taxonomy keyword. The title states what the article is actually about.
+        action = await self._extractor.extract(facts.title, facts.language)
 
         await self._repo.store_fingerprint(
             facts.article_id, fingerprint, facts.source_id, facts.published_at
