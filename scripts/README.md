@@ -47,10 +47,13 @@ Postgres and Neo4j via `docker exec`. Each writes a timestamped HTML file next t
 |---|---|
 | [query-daily-activity.ps1](query-daily-activity.ps1) | `daily-activity-<date>.html` — news retrieved and predictions with their verified results |
 | [debug-pipeline.ps1](debug-pipeline.ps1) | `debug-pipeline-<date>.html` — diagnostic report: ingestion/cleansing gaps, articles classified `OTHER`, predictions and verification state |
+| [export-cleansing-audit.ps1](export-cleansing-audit.ps1) | `cleansing-audit-<date>.json` — each cleansing cluster with its raw articles (title, body excerpt, NLP extraction) for manual LLM verification of event-group classification |
 
 ```powershell
 powershell -File scripts\query-daily-activity.ps1 -Date 2026-08-06
 powershell -File scripts\debug-pipeline.ps1 -Date 2026-08-06
+powershell -File scripts\export-cleansing-audit.ps1 -Date 2026-08-06
+powershell -File scripts\export-cleansing-audit.ps1 -Date 2026-08-06 -OutputPath C:\tmp\audit.json
 ```
 
 All date filtering is UTC, matching the containers' server time.

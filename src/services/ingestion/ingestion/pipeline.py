@@ -19,6 +19,7 @@ from shared.schemas.messages import ArticleIngested
 from ingestion.exceptions import AdapterError
 from ingestion.fetcher import BodyFetcher
 from ingestion.models import RawArticle
+from ingestion.normalize import strip_html_page
 
 logger = structlog.get_logger(__name__)
 
@@ -148,7 +149,12 @@ class IngestionPipeline:
         if self._body_fetcher is None or not self._body_fetch_enabled:
             return raw.summary
         try:
-            return await self._body_fetcher.fetch(str(raw.url))
+            fetched = await self._body_fetcher.fetch(str(raw.url))
+            clean = strip_html_page(fetched)
+            if not clean:
+                logger.info("body_is_html_page_fallback", url=str(raw.url))
+                return raw.summary
+            return clean
         except Exception as exc:  # noqa: BLE001 - degrade one article, never break the batch
             logger.info("body_fetch_fallback", url=str(raw.url), error=str(exc))
             return raw.summary

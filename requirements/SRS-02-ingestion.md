@@ -236,6 +236,10 @@ they are bounded by a semaphore rather than serialised.
 1. If body fetching is disabled or no fetcher is configured, return the feed summary.
 2. Otherwise attempt the SSRF-safe fetch.
 3. On **any** exception, log at info level and return the feed summary.
+4. If the fetched content is a full HTML page (starts with `<!DOCTYPE html>` or `<html`), discard
+   it and return the feed summary. Such responses contain only `<head>`, `<script>`, and `<meta>`
+   markup with no readable news text; storing them contaminates SimHash fingerprints and embeddings
+   in Cleansing. The check is a single regex on the first 200 characters — O(1) cost.
 
 This function is documented as never raising. It is the fault-isolation boundary for concurrent body
 fetching: if it could raise, one bad article would fail the whole gathered batch.
@@ -612,7 +616,7 @@ accepted content types `text/html`, `application/xhtml+xml`, `text/plain`.
 | `ING-18`, `ING-20` | Test | [test_pipeline.py](../src/services/ingestion/tests/test_pipeline.py) — summary fallback on fetch failure and when disabled |
 | `ING-19` | Test | [test_pipeline_concurrency.py](../src/services/ingestion/tests/test_pipeline_concurrency.py) — concurrency bounded by the semaphore |
 | `ING-21` | Test | [test_urls.py](../src/services/ingestion/tests/test_urls.py) — every canonicalisation rule |
-| `ING-22`…`ING-24` | Test | [test_normalize.py](../src/services/ingestion/tests/test_normalize.py) — NFC, whitespace, truncation, stable hash |
+| `ING-22`…`ING-24` | Test | [test_normalize.py](../src/services/ingestion/tests/test_normalize.py) — NFC, whitespace, truncation, stable hash, HTML page detection |
 | `ING-25`…`ING-27` | Test | [test_integration.py](../src/services/ingestion/tests/test_integration.py) — UTC timestamps, code formats, fresh correlation ID |
 | `ING-28`, `ING-29` | Test | [test_integration.py](../src/services/ingestion/tests/test_integration.py) — re-poll creates no duplicate row or message |
 | `ING-30`, `ING-31` | Test | [test_integration.py](../src/services/ingestion/tests/test_integration.py) — routing key correct, no raw HTML present |
@@ -670,7 +674,7 @@ accepted content types `text/html`, `application/xhtml+xml`, `text/plain`.
 |---|---|
 | The retention window must be maintained by hand against source lookbacks | Setting it too low would let a still-listed article be re-ingested as new |
 | Only the canonical URL is enforced unique; the content hash is indexed but not constrained | The same story republished at a different URL creates two articles. Cleansing catches this later with SimHash |
-| Body extraction takes the whole page text | No boilerplate stripping, so navigation and footer text can enter the body |
+| Sources that return a full HTML page instead of article text | The fetched content is discarded and the RSS summary is used instead (see §7.2 step 4). Navigation, footer, and script text no longer enter the body. |
 | Circuit breaker state is in-memory | A restart resets every circuit to closed, so a dead source is retried immediately after restart |
 | All four RSS sources are Swedish | English coverage depends entirely on FreeNewsApi, so an unset key leaves the corpus Swedish-only |
 | A source's failure is silent beyond the logs | There is no alerting; a permanently dead source shows up only as zero articles |
