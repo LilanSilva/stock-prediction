@@ -4,6 +4,7 @@ from shared.reference import members_of
 from shared.schemas.messages import AssetId, ConditionCode, EventPolarity, EventType
 
 from cleansing.taxonomy import (
+    NewsScope,
     assets_for_event_type,
     classify_polarity,
     classify_text,
@@ -11,6 +12,7 @@ from cleansing.taxonomy import (
     infer_assets,
     infer_conditions,
     map_action,
+    resolve_scope,
 )
 
 
@@ -293,3 +295,114 @@ def test_new_types_gate2_compatible_with_themselves() -> None:
         EventType.ENERGY_POLICY,
     ]:
         assert gate2_compatible(event_type, event_type), f"{event_type} should be gate2 compatible with itself"
+
+
+# --- Non-financial reject bucket -------------------------------------------------------------
+#
+# These are real headlines from a day of production output that the classifier previously typed as
+# market events, because generic keywords ("close", "gold", "penalty", "contract") matched. An
+# asset-bearing type here becomes a prediction and a notification, so each must stay non-financial.
+
+
+def test_sport_headlines_are_not_market_events() -> None:
+    for title in [
+        "Which Florida Panthers Are Close to Going to the Hockey Hall of Fame",
+        "Josh Berry Is Racing for His NASCAR Career",
+        "Elena Rybakina beats Coco Gauff to reach Canadian Open tennis final",
+        "UAA men's basketball schedule loaded with minefields on the road",
+    ]:
+        assert classify_text(title)[0] == EventType.SPORT, title
+
+
+def test_entertainment_and_lifestyle_headlines() -> None:
+    assert classify_text("Malmö named Eurovision host city")[0] == EventType.ENTERTAINMENT
+    assert classify_text("Your Daily Horoscope For Every Star Sign")[0] == EventType.LIFESTYLE
+
+
+def test_non_financial_types_never_cluster() -> None:
+    # Same reasoning as OTHER: no causal event, so a cluster of them could never be predicted on.
+    for event_type in [EventType.SPORT, EventType.ENTERTAINMENT, EventType.LIFESTYLE]:
+        assert not gate2_compatible(event_type, event_type)
+
+
+def test_non_financial_types_resolve_no_assets() -> None:
+    # Even when the text names a listed company, a non-financial event moves nothing. Without this
+    # the event-type fallback would hand a football result the gold and oil proxies.
+    scope = resolve_scope("Exxon employees win the company golf tournament", EventType.SPORT)
+    assert scope.scope is NewsScope.NONE
+    assert scope.assets == ()
+    assert assets_for_event_type(EventType.SPORT) == ()
+
+
+def test_company_headline_is_never_rejected_as_non_financial() -> None:
+    # A registered company in the headline means financial news, even with sport/entertainment words
+    # nearby. Suppressing these would be a far more expensive error than mistyping a match report.
+    assert classify_text("Exxon signs supply contract with the NFL")[0] != EventType.SPORT
+    assert classify_text("Newmont lifts guidance after golf-course land sale")[0] == (
+        EventType.CORPORATE_EARNINGS
+    )
+
+
+def test_generic_word_does_not_reject_market_news() -> None:
+    # "game" is deliberately absent from NON_FINANCIAL_KEYWORDS: it occurs in market copy too.
+    event_type, _ = classify_text(
+        "Goldman Sachs is paying $2.25 billion to get into Bitcoin income game"
+    )
+    assert event_type not in {EventType.SPORT, EventType.ENTERTAINMENT, EventType.LIFESTYLE}
+
+
+# --- Evidence tiering ------------------------------------------------------------------------
+
+
+def test_specific_keyword_in_title_beats_generic_one() -> None:
+    # "close" appears before "hike" but is generic, so the rate decision must win regardless of
+    # position. Position within the text is not a measure of relevance.
+    event_type, keyword = classify_text(
+        "US Open: S&P 500 close to highs as September Fed hike chances fall"
+    )
+    assert event_type == EventType.RATE_DECISION
+    assert keyword == "hike"
+
+
+def test_specific_keyword_in_body_recovers_vague_headline() -> None:
+    event_type, _ = classify_text(
+        "Bolaget kommenterar kvartalet",
+        "Rörelseresultatet föll till 120 miljoner kronor jämfört med föregående år.",
+    )
+    assert event_type == EventType.CORPORATE_EARNINGS
+
+
+def test_generic_keyword_in_body_is_ignored() -> None:
+    # The regression that shipped: a sports report whose body says "close" was typed STRAIT_CLOSURE.
+    event_type, _ = classify_text(
+        "Mets fall to Atlanta in extra innings",
+        "The game was close throughout, with gold-glove defence and a penalty-free ninth.",
+    )
+    assert event_type not in {EventType.STRAIT_CLOSURE, EventType.COMMODITY_PRICE_SHOCK}
+
+
+# --- Swedish recall --------------------------------------------------------------------------
+
+
+def test_swedish_earnings_compounds() -> None:
+    for title in [
+        "Vinstkross från Embracer",
+        "Raysearchs siffror i linje med vinstvarningen",
+        "Vinstkollaps för gruvjätten",
+        "Thyssenkrupp skruvar upp golvet för vinstutsikterna",
+    ]:
+        assert classify_text(title)[0] == EventType.CORPORATE_EARNINGS, title
+
+
+def test_swedish_rate_and_acquisition_compounds() -> None:
+    assert classify_text("Räntebeskedet från Norges Bank")[0] == EventType.RATE_DECISION
+    assert classify_text("Kenneth Dart lägger budpliktsbud på Evolution")[0] == (
+        EventType.CORPORATE_ACQUISITION
+    )
+
+
+def test_bare_swedish_vinst_is_not_earnings() -> None:
+    # "vinst" alone means "a win" in Swedish sports reporting, so it is deliberately not a keyword.
+    # Guarding this stops the fix from recreating the bug class it was written to remove.
+    event_type, _ = classify_text("Djurgårdens vinst mot AIK i matchen igår")
+    assert event_type != EventType.CORPORATE_EARNINGS

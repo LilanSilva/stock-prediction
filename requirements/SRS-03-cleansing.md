@@ -75,7 +75,7 @@ Specific responsibilities:
 | Hamming distance | Count of bit positions that differ between two SimHash values; ≤ 3 = near-duplicate |
 | Embedding | 1024-dim float vector encoding semantic meaning; used for Gate 1 cosine similarity |
 | Gate 1 | Cosine similarity threshold check: article embedding vs cluster centroid ≥ 0.80 |
-| Gate 2 | Event-type compatibility check: both sides must share the same known type (not OTHER) |
+| Gate 2 | Event-type compatibility check: both sides must share the same clusterable type (not `OTHER`, not a non-financial type) |
 | Cluster | A running group of articles that appear to cover the same real-world event |
 | Centroid | Running-mean average of all member embedding vectors; updated incrementally on each addition |
 | Quiet period | 30-minute window of silence after the last article joined; expiry signals the event story has settled |
@@ -155,6 +155,8 @@ Specific responsibilities:
 | CLN-13 | The service shall support two extraction backends: `keyword` (deterministic taxonomy scan) and `spacy` (per-language spaCy pipelines for English and Swedish) | Implemented |
 | CLN-14 | The active NLP backend shall be controlled by `CLEANSING_NLP_BACKEND` (default `keyword`) | Implemented |
 | CLN-15 | When an action lemma cannot be mapped to any canonical event type, the type shall be `OTHER` | Implemented |
+| CLN-15a | When an article matches a non-financial keyword and names no registered company, the type shall be the corresponding non-financial type (`SPORT`, `ENTERTAINMENT`, `LIFESTYLE`) rather than `OTHER` | Implemented |
+| CLN-15b | A non-financial event type shall resolve to zero affected assets, regardless of any company or industry keyword in the text | Implemented |
 | CLN-61 | The keyword scan shall select the earliest positional match, and on a positional tie the longest keyword, so a specific phrase wins over a generic token that starts at the same word (e.g. `"appoints new cfo"` → `EXECUTIVE_CHANGE`, not `"appoint"` → `POLITICAL_TRANSITION`) | Implemented |
 | CLN-62 | Taxonomy keywords shall be declared in the punctuation-normalised form the scanner sees, since normalisation replaces punctuation with spaces (`"spin off"`, never `"spin-off"`) | Implemented |
 | CLN-16 | The service shall resolve the news scope and affected asset IDs using the precedence: COMPANY → INDUSTRY → EVENT_TYPE → NONE (see 7.5 for the full algorithm) | Implemented |
@@ -168,11 +170,11 @@ Specific responsibilities:
 |---|---|---|
 | CLN-20 | The service shall query OPEN and QUIET clusters of the same event type for candidates when assigning an article | Implemented |
 | CLN-21 | Gate 1 shall pass only if cosine similarity of the article's embedding to a candidate's centroid is ≥ the configured threshold (default 0.80) | Implemented |
-| CLN-22 | Gate 2 shall pass only if both the article and the candidate share the same event type AND that type is not `OTHER` | Implemented |
+| CLN-22 | Gate 2 shall pass only if both the article and the candidate share the same event type AND that type is neither `OTHER` nor a non-financial type | Implemented |
 | CLN-23 | Both gates must pass; an article failing either gate does not join that candidate | Implemented |
 | CLN-24 | When multiple candidates pass both gates, the one with the highest similarity shall win | Implemented |
 | CLN-25 | When no candidate passes, a new OPEN cluster shall be created with the article's embedding as its initial centroid | Implemented |
-| CLN-26 | `OTHER`-typed articles shall never be clustered with any candidate; they always open a new cluster | Implemented |
+| CLN-26 | `OTHER`-typed and non-financially-typed articles shall never be clustered with any candidate; they always open a new cluster | Implemented |
 | CLN-27 | When an article joins an existing cluster, the cluster's centroid shall be updated by an incremental running-mean: `(old_centroid × old_count + new_vector) / (old_count + 1)` | Implemented |
 | CLN-28 | The cluster's `last_seen_at` shall be updated and the quiet deadline recalculated on every article addition | Implemented |
 | CLN-29 | Only OPEN or QUIET clusters shall accept new articles; READY clusters are immutable | Implemented |
@@ -262,7 +264,13 @@ This runs once per incoming `ArticleIngested` message from the `cleansing.articl
 
 **Step 4 — Action extraction**
 - Call the configured NLP backend with `(text, language)`:
-  - `keyword` backend: punctuation-normalise and lowercase the text; scan for taxonomy keywords using suffix-tolerant word-boundary matching; take the earliest positional match, and on a positional tie the **longest** keyword; unmapped → `OTHER`
+  - `keyword` backend: punctuation-normalise and lowercase the text; scan for taxonomy keywords using suffix-tolerant word-boundary matching. Evidence is tiered, first hit wins, because position within body prose is not a measure of relevance:
+    1. a **specific** keyword in the title;
+    2. a **non-financial** keyword in the title, skipped when the title names a registered company;
+    3. a **generic** keyword in the title — words such as `close`, `gold`, `contract` or `penalty`, trustworthy only in a headline;
+    4. a **specific** keyword in the body. Generic keywords are never honoured here: matching them against body prose is what previously typed sports reports as `STRAIT_CLOSURE`.
+
+    Within a tier, the earliest positional match wins, and on a positional tie the **longest** keyword. Nothing matched → `OTHER`
   - `spacy` backend: load `en_core_web_sm` or `sv_core_news_sm`; extract subject/verb/object via dependency tags; map verb lemma to event type; fall back to keyword scan if unmapped
 - After extraction, call `resolve_scope`, `classify_polarity`, and `infer_conditions` to complete the `ExtractedAction`
 

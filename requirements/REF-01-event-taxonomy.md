@@ -6,7 +6,7 @@
 |---|---|
 | Document ID | `REF-01` |
 | Type | Reference data |
-| Taxonomy version | `1.2` |
+| Taxonomy version | `1.3` |
 | Status | `Implemented` |
 | Version | `1.0.0` |
 | Executable source | [`EventType` in src/shared/shared/schemas/messages.py](../src/shared/shared/schemas/messages.py) |
@@ -26,7 +26,11 @@ source of truth. This table must match it value for value.
 The Cleansing Service maps local NLP output to exactly one of these types before publishing an
 `EventDetected`. Neo4j causal-factor seed nodes
 ([03-seed-causal-factors.cypher](../infra/neo4j/init/03-seed-causal-factors.cypher)) and Prediction's
-graph matching use the same 32 values.
+graph matching use the same 35 values.
+
+Types 1-31 are causal: each has a seeded causal edge and can move an asset. Type 32 (`OTHER`) is a
+causal event that is not yet modelled. Types 33-35 are **non-financial** and deliberately have no
+causal edge and no asset mapping — see section 2.1.
 
 | # | Event type | Example actions |
 |---|---|---|
@@ -62,11 +66,39 @@ graph matching use the same 32 values.
 | 30 | `PANDEMIC_OUTBREAK` | pandemic, epidemic, outbreak, lockdown |
 | 31 | `ENERGY_POLICY` | carbon tax, nuclear power decision, renewable energy mandate |
 | 32 | `OTHER` | Valid event not yet represented |
+| 33 | `SPORT` | Match result, transfer, fixture, league or tournament news |
+| 34 | `ENTERTAINMENT` | Film, television, music, awards, celebrity news |
+| 35 | `LIFESTYLE` | Horoscopes, recipes, travel, consumer-interest features |
 
 `OTHER` is the escape hatch, not a failure. An unmapped action becomes `OTHER` with the original
 lemma retained so the taxonomy can be reviewed later — see
 [SRS-03 §7.4](SRS-03-cleansing.md#7-how-it-works). Prediction handles `OTHER` as a distinct case
 ([SRS-04 §5.5](SRS-04-prediction.md#5-functional-requirements)) because it has no seeded causal edge.
+
+### 2.1 Non-financial types (33-35)
+
+Ingestion applies no keyword pre-filter — it fetches all recent news and relies on Cleansing to
+decide relevance ([SRS-02](SRS-02-ingestion.md)), and three of the four RSS sources are general or
+tabloid rather than financial. The majority of ingested articles are therefore not market events at
+all.
+
+Types 33-35 make that rejection **explicit**. Before they existed, an irrelevant article either fell
+to `OTHER` — overloading a value that means "valid event not yet represented" — or, worse, matched a
+generic keyword and was typed as a market event. A measured day of output typed 27 sports articles as
+asset-bearing events; each resolved to the gold and oil proxies and could produce a prediction and a
+notification from a match report.
+
+These types therefore:
+
+- have **no** entry in the causal-factor seed or in Cleansing's event-type asset mapping, so they
+  resolve to zero assets and Prediction drops them (`event_no_assets`);
+- are **excluded from Gate 2** like `OTHER`, so they never form clusters — a cluster of them could
+  never produce a prediction;
+- are matched **before** generic taxonomy keywords but **after** a company-keyword match, so a
+  headline naming a listed company is never rejected as sport.
+
+Keep the keywords that select these types specific. Broad words such as "game", "season", "transfer"
+or "cup" also occur in market copy and would suppress real news.
 
 ## 3. Event polarity and conditions
 
@@ -128,7 +160,8 @@ Adding an event type is a **contract change**: the value crosses service boundar
 3. Add the lemma mapping in Cleansing so the type can actually be produced.
 4. Seed a `CausalFactor` node and at least one `CAUSES` edge
    ([07-seed-new-event-type-edges.cypher](../infra/neo4j/init/07-seed-new-event-type-edges.cypher)) —
-   **a type with no edge produces no prediction.**
+   **a type with no edge produces no prediction.** Skip this step only for a non-financial type
+   (section 2.1), where producing no prediction is the point.
 5. Update [SRS-01 §8.2](SRS-01-shared-foundation.md#82-shared-enums) if the value count changed.
 6. Add a row to section 6.
 
@@ -140,3 +173,4 @@ Never renumber or reuse a retired value. A removed event type is a major contrac
 | Date | Version | Change | Driver |
 |---|---|---|---|
 | `2026-08-06` | `1.0.0` | Moved into `requirements/` from `docs/reference/event-taxonomy.md`; added document control, `OTHER`/`RISK_PREMIUM_ELEVATED` cross-references, and update rules | Requirements consolidation |
+| `2026-08-13` | `1.3` | Added non-financial types `SPORT`, `ENTERTAINMENT`, `LIFESTYLE` (33-35) and section 2.1. No causal edge or asset mapping by design; excluded from Gate 2 | Audit of one day of Cleansing output found 27 sports articles typed as asset-bearing events, and `OTHER` overloaded as both "unmapped event" and "irrelevant" |

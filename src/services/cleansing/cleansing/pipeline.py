@@ -138,10 +138,12 @@ class CleansingPipeline:
             return
 
         vector = await self._embedder.embed(text)
-        # Classify on title only: the body frequently mentions other events as context
-        # (e.g. "a country at war", "solar eclipses have ended wars") which fires the wrong
-        # taxonomy keyword. The title states what the article is actually about.
-        action = await self._extractor.extract(facts.title, facts.language)
+        # The title is the primary evidence: the body frequently mentions other events as context
+        # (e.g. "a country at war", "solar eclipses have ended wars") which fires the wrong taxonomy
+        # keyword. The body is passed as weaker, second-choice evidence — only keywords specific
+        # enough to be unambiguous are honoured there, which recovers articles with a vague headline
+        # without reintroducing those false positives. See taxonomy.classify_text for the tiers.
+        action = await self._extractor.extract(facts.title, facts.language, facts.body)
 
         await self._repo.store_fingerprint(
             facts.article_id, fingerprint, facts.source_id, facts.published_at

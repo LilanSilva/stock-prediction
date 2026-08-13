@@ -56,7 +56,7 @@ class RoutingKey(StrEnum):
 
 
 class EventType(StrEnum):
-    """requirements/REF-01-event-taxonomy.md (taxonomy version 1.1)."""
+    """requirements/REF-01-event-taxonomy.md (taxonomy version 1.3)."""
 
     MILITARY_CONFLICT = "MILITARY_CONFLICT"
     STRAIT_CLOSURE = "STRAIT_CLOSURE"
@@ -93,6 +93,13 @@ class EventType(StrEnum):
     PANDEMIC_OUTBREAK = "PANDEMIC_OUTBREAK"
     ENERGY_POLICY = "ENERGY_POLICY"
     OTHER = "OTHER"
+    # Non-financial events. These carry no causal edge and no asset mapping, so they are the
+    # explicit reject bucket: an article typed here is recognised as irrelevant rather than merely
+    # unmapped. Keeping them distinct from OTHER restores OTHER to its documented meaning ("valid
+    # event not yet represented") and stops generic keywords from typing sport as a market event.
+    SPORT = "SPORT"
+    ENTERTAINMENT = "ENTERTAINMENT"
+    LIFESTYLE = "LIFESTYLE"
 
 
 class Direction(StrEnum):

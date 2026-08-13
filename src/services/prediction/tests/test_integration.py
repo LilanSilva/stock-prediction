@@ -313,8 +313,13 @@ async def test_propagation_produces_downstream_prediction_for_nem() -> None:
             PredictionRepository(pool), graph, _StubPriceReader(), settings
         )
 
+        # Every asset this test asserts a prediction for must be isolated, not just the direct and
+        # depth-1 ones: LUG_STO and SWED_A_STO are the depth-2 convergence pair below, and a real
+        # PENDING stance on either suppresses the write that the assertions look for.
         parked_xom = await _isolate_stance(pool, AssetId.XOM_NYSE)
         parked_nem = await _isolate_stance(pool, AssetId.NEM_NYSE)
+        parked_lug = await _isolate_stance(pool, AssetId.LUG_STO)
+        parked_swed = await _isolate_stance(pool, AssetId.SWED_A_STO)
 
         # TRANSPORT_AFFECTED is the condition on the seeded XOM_NYSE CAUSES edge (oil proxy).
         # When XOM_NYSE is predicted UP the seeded CORRELATES_WITH edge fires for NEM_NYSE DOWN.
@@ -379,7 +384,24 @@ async def test_propagation_produces_downstream_prediction_for_nem() -> None:
             None,
         )
         assert prop_row is not None, "No propagated NEM_NYSE prediction found in outbox"
-        assert prop_row["direction"] == "DOWN"
+
+        # The expected direction is read from the graph rather than hardcoded. Credibility's
+        # structure learner rewrites `direction` and `weight` on CORRELATES_WITH edges as it learns
+        # (see credibility/learning/seed_writer.py), so asserting the seeded value makes this test
+        # fail on correct behaviour once the graph has evolved. What matters here is that
+        # propagation applies whatever the edge currently says.
+        nem_edge = next(
+            edge
+            for edge in await graph.get_correlation_edges(
+                AssetId.XOM_NYSE, ConditionCode.UPSTREAM_UP
+            )
+            if edge.target_asset_id == AssetId.NEM_NYSE
+        )
+        assert prop_row["direction"] == nem_edge.direction.value, (
+            f"propagated direction must follow the XOM_NYSE->NEM_NYSE edge "
+            f"({nem_edge.direction.value})"
+        )
+
         payload = _json.loads(prop_row["payload"])
         assert payload["propagation_depth"] == 1
         assert len(payload["propagation_chain"]) == 1
@@ -388,28 +410,14 @@ async def test_propagation_produces_downstream_prediction_for_nem() -> None:
         assert hop["target_asset_id"] == "NEM_NYSE"
         assert hop["condition"] == "UPSTREAM_UP"
 
-        # Depth 2 convergence: NEM_NYSE DOWN and LUG_STO DOWN both reach SWED_A_STO in the same
-        # level, so their forces sum. The seeded NEM edge (UP, 0.40) outweighs the LUG edge
-        # (DOWN, 0.15), so the net must be UP -- and BOTH edges must appear as contributors.
-        swed_rows = await pool.fetch(
-            "SELECT p.direction, o.payload FROM prediction.outbox_events o "
-            "JOIN prediction.predictions p ON p.prediction_id = o.aggregate_id "
-            "WHERE p.asset_id = $1 AND p.context_id = $2",
-            AssetId.SWED_A_STO.value,
-            context_id,
-        )
-        assert len(swed_rows) == 1, (
-            "expected exactly one converged SWED_A_STO prediction; "
-            "has 08-seed-correlation-edges.cypher been re-applied?"
-        )
-        swed_payload = _json.loads(swed_rows[0]["payload"])
-        assert swed_rows[0]["direction"] == "UP", "net of +0.40 and -0.15 must be UP"
-        assert swed_payload["propagation_depth"] == 2
-        contributors = {e["edge_id"] for e in swed_payload["contributing_edges"]}
-        assert contributors == {
-            "NEM_NYSE|UPSTREAM_DOWN->SWED_A_STO",
-            "LUG_STO|UPSTREAM_DOWN->SWED_A_STO",
-        }, f"both converging edges must be reported, got {contributors}"
+        # Depth-2 convergence (two edges reaching SWED_A_STO at the same level, forces summing) is
+        # deliberately NOT asserted here. It requires the exact seeded graph shape: it only occurs
+        # while NEM_NYSE is predicted DOWN, which stops being true as soon as the learner flips the
+        # XOM->NEM edge. Force summation is covered against stubs instead, where the graph shape is
+        # fixed by the test rather than by whatever the learner has derived:
+        #   test_pipeline.test_converging_edges_at_same_depth_sum_forces
+        #   test_pipeline.test_converging_edges_cancelling_below_deadband_produce_no_prediction
+        #   test_decision.test_dominant_force_wins_conflict
 
         # Capture the ids BEFORE deleting the predictions: Verification may already have created
         # evaluations from the published messages, and those are keyed by prediction_id.
@@ -427,6 +435,8 @@ async def test_propagation_produces_downstream_prediction_for_nem() -> None:
         await _cleanup_downstream_evaluations(pool, touched_ids)
         await _restore_stance(pool, parked_xom)
         await _restore_stance(pool, parked_nem)
+        await _restore_stance(pool, parked_lug)
+        await _restore_stance(pool, parked_swed)
     finally:
         await graph.close()
         await pool.close()

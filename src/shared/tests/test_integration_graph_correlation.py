@@ -32,7 +32,11 @@ async def test_get_correlation_edges_returns_seeded_edges() -> None:
             "Has 08-seed-correlation-edges.cypher been applied to the Neo4j container?"
         )
         nem_edge = next(e for e in edges if e.target_asset_id is AssetId.NEM_NYSE)
-        assert nem_edge.direction is Direction.DOWN
+        # The specific direction is NOT asserted: Credibility's structure learner rewrites
+        # `direction` and `weight` on this edge as it learns from outcomes (see
+        # credibility/learning/seed_writer.py), so pinning the seeded value makes this fail once the
+        # graph has evolved. What this test covers is that the query returns a well-formed edge.
+        assert isinstance(nem_edge.direction, Direction)
         assert nem_edge.weight > 0.0
         assert nem_edge.alpha > 0.0
         assert nem_edge.beta > 0.0

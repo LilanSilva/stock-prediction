@@ -373,6 +373,8 @@ services:
       ASSET_REGISTRY_PATH: /config/assets.json
       # Confidence gate: predictions below this value are silently discarded.
       NOTIFICATION_MIN_CONFIDENCE: ${NOTIFICATION_MIN_CONFIDENCE:-0.6}
+      # Verification alerts (scored-prediction notifications). Disabled by default.
+      NOTIFICATION_VERIFICATION_ALERTS_ENABLED: ${NOTIFICATION_VERIFICATION_ALERTS_ENABLED:-false}
       # Brevo email channel — leave empty to disable.
       BREVO_API_KEY: ${BREVO_API_KEY:-}
       BREVO_SENDER_EMAIL: ${BREVO_SENDER_EMAIL:-}

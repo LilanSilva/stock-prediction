@@ -471,7 +471,7 @@ Defined on `FeedMessage`, inherited by all six messages.
 | `LlmStatus` | `SUCCESS`, `FAILED` |
 | `EventPolarity` | `OCCURRENCE`, `RESOLUTION` |
 | `ConditionCode` | `TRANSPORT_AFFECTED`, `SAFE_HAVEN_ONLY`, `RISK_PREMIUM_ELEVATED`, `UPSTREAM_UP`, `UPSTREAM_DOWN` |
-| `EventType` | 32 values — see [REF-01-event-taxonomy.md](REF-01-event-taxonomy.md) |
+| `EventType` | 35 values (32 causal incl. `OTHER`, 3 non-financial) — see [REF-01-event-taxonomy.md](REF-01-event-taxonomy.md) |
 | `RoutingKey` | `article.ingested`, `event.detected`, `prediction.made`, `price.requested`, `price.observed`, `prediction.scored` |
 
 ### 8.3 Shared nested types

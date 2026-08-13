@@ -312,7 +312,132 @@ ACTION_TAXONOMY: dict[str, EventType] = {
     "koldioxidskatt": EventType.ENERGY_POLICY,      # sv: carbon tax
     "kärnkraft": EventType.ENERGY_POLICY,           # sv: nuclear power
     "förnybar energi": EventType.ENERGY_POLICY,     # sv: renewable energy
+    # CORPORATE_EARNINGS (sv compounds). Bare "vinst" is deliberately absent: in Swedish sports
+    # reporting it means "a win" ("Djurgårdens vinst"), which is the exact false-positive class this
+    # module now guards against. Only unambiguous compounds are listed.
+    "vinstvarning": EventType.CORPORATE_EARNINGS,   # sv: profit warning
+    "vinstkross": EventType.CORPORATE_EARNINGS,     # sv: profit crash
+    "vinstkollaps": EventType.CORPORATE_EARNINGS,   # sv: profit collapse
+    "vinstutsikt": EventType.CORPORATE_EARNINGS,    # sv: profit outlook
+    # Swedish definite plural (-erna) is outside the generic suffix set in ``_keyword_present``, so
+    # the inflected form is listed explicitly — same approach as "hormuz"/"hormuzsundet" above.
+    "vinstutsikterna": EventType.CORPORATE_EARNINGS,  # sv: the profit outlook
+    "rörelsevinst": EventType.CORPORATE_EARNINGS,   # sv: operating profit
+    "kvartalsvinst": EventType.CORPORATE_EARNINGS,  # sv: quarterly profit
+    "delårsrapport": EventType.CORPORATE_EARNINGS,  # sv: interim report
+    "bokslut": EventType.CORPORATE_EARNINGS,        # sv: year-end report
+    # RATE_DECISION (sv compounds)
+    "räntebesked": EventType.RATE_DECISION,         # sv: rate announcement
+    "styrräntan": EventType.RATE_DECISION,          # sv: the policy rate (definite form)
+    # CORPORATE_ACQUISITION (sv compounds)
+    "budpliktsbud": EventType.CORPORATE_ACQUISITION,  # sv: mandatory takeover bid
+    "storägare": EventType.CORPORATE_ACQUISITION,     # sv: major shareholder (stake building)
 }
+
+# Keywords too generic to be trusted outside a headline. Each one measurably mistyped unrelated
+# articles when matched against body prose: "close" alone typed 14 sports/markets clusters as
+# STRAIT_CLOSURE, "gold" fired on Olympic gold medals, "penalty" on football penalties, "contract"
+# on player contracts. They stay in the taxonomy because they are correct in a title ("Iran closes
+# strait"), but `classify_text` only honours them there — see the tier order in that function.
+GENERIC_KEYWORDS: frozenset[str] = frozenset(
+    {
+        "close",
+        "closure",
+        "block",
+        "gold",
+        "contract",
+        "penalty",
+        "strike",
+        "rate",
+        "rates",
+        "val",
+        "hack",
+        "budget",
+        "partnership",
+        "investigation",
+        "attack",
+        "approved",
+        "cleared",
+        "fired",
+        "default",
+        "settlement",
+        "listing",
+        "outbreak",
+        "tensions",
+        "halt",
+        "brist",
+        "deal signed",
+        "profit",
+        "revenue",
+        "sund",
+    }
+)
+
+# Keyword -> non-financial type. These are the explicit reject buckets: an article matching here is
+# recognised as irrelevant instead of falling through to OTHER (which means "valid event not yet
+# represented" per REF-01 §2). Deliberately specific: broad words like "game", "season", "transfer",
+# "cup" and "club" are omitted because they also occur in market news — "Goldman Sachs is paying
+# $2.25 billion to get into Bitcoin income game" must not be suppressed.
+NON_FINANCIAL_KEYWORDS: dict[str, EventType] = {
+    # SPORT
+    "nfl": EventType.SPORT,
+    "nba": EventType.SPORT,
+    "mlb": EventType.SPORT,
+    "nhl": EventType.SPORT,
+    "ncaa": EventType.SPORT,
+    "nascar": EventType.SPORT,
+    "wwe": EventType.SPORT,
+    "ufc": EventType.SPORT,
+    "golf": EventType.SPORT,
+    "tennis": EventType.SPORT,
+    "quarterback": EventType.SPORT,
+    "touchdown": EventType.SPORT,
+    "goalie": EventType.SPORT,
+    # Sport names are unambiguous enough to reject on. A listed club or sportswear firm is still
+    # safe: a company keyword in the headline skips this tier entirely (see ``classify_text``).
+    "basketball": EventType.SPORT,
+    "baseball": EventType.SPORT,
+    "football": EventType.SPORT,
+    "soccer": EventType.SPORT,
+    "hockey": EventType.SPORT,
+    "cricket": EventType.SPORT,
+    "rugby": EventType.SPORT,
+    # "olympic"/"medal" also pre-empt the generic "gold" keyword, which otherwise reads a gold medal
+    # as a COMMODITY_PRICE_SHOCK. The non-financial tier runs before the generic tier by design.
+    "olympic": EventType.SPORT,
+    "medal": EventType.SPORT,
+    "playoff": EventType.SPORT,
+    "preseason": EventType.SPORT,
+    "midfielder": EventType.SPORT,
+    "home run": EventType.SPORT,
+    "hall of fame": EventType.SPORT,
+    "allsvenskan": EventType.SPORT,   # sv: Swedish top football league
+    "matchen": EventType.SPORT,       # sv: the match
+    "laget": EventType.SPORT,         # sv: the team
+    "tränare": EventType.SPORT,       # sv: coach
+    # ENTERTAINMENT
+    "eurovision": EventType.ENTERTAINMENT,
+    "bafta": EventType.ENTERTAINMENT,
+    "box office": EventType.ENTERTAINMENT,
+    "casting": EventType.ENTERTAINMENT,
+    "skådespelare": EventType.ENTERTAINMENT,  # sv: actor
+    "premiär": EventType.ENTERTAINMENT,       # sv: premiere
+    # LIFESTYLE
+    "horoscope": EventType.LIFESTYLE,
+    "recipe": EventType.LIFESTYLE,
+    "star sign": EventType.LIFESTYLE,
+}
+
+# Types that carry no causal edge and no asset mapping. Used to short-circuit asset resolution and
+# to keep these articles out of clustering (see ``gate2_compatible``). Mirrors the
+# ``GEOPOLITICAL_EVENT_TYPES`` pattern further down this module.
+NON_FINANCIAL_EVENT_TYPES: frozenset[EventType] = frozenset(
+    {EventType.SPORT, EventType.ENTERTAINMENT, EventType.LIFESTYLE}
+)
+
+# Neither a non-financial article nor an unmapped one may join a cluster: distinct causal events
+# must not be silently merged, and irrelevant articles have no causal event at all.
+NON_CLUSTERING_EVENT_TYPES: frozenset[EventType] = NON_FINANCIAL_EVENT_TYPES | {EventType.OTHER}
 
 def _asset_keywords() -> dict[AssetId, tuple[str, ...]]:
     """Per-asset inference keywords, read from the JSON registry rather than hardcoded here.
@@ -349,14 +474,19 @@ def map_action(lemma: str | None) -> EventType:
     return ACTION_TAXONOMY.get(lemma.strip().lower(), EventType.OTHER)
 
 
-def classify_text(text: str) -> tuple[EventType, str | None]:
-    """Deterministically classify free text by scanning for the earliest taxonomy keyword.
+def _scan(
+    text: str,
+    table: dict[str, EventType],
+    *,
+    include: frozenset[str] | None = None,
+    exclude: frozenset[str] | None = None,
+) -> tuple[EventType, str | None]:
+    """Scan ``text`` for the earliest keyword in ``table``, restricted by include/exclude.
 
-    Returns the mapped event type and the matched keyword (the "action" evidence). Multi-word keys
-    are checked so phrases like "interest rate" win over the bare token. Single-token keys use
-    ``_keyword_present`` so Swedish definite/inflected forms (e.g. "kriget", "oljepriset") and
-    English plurals are matched without enumerating every form. Returns (OTHER, None) when nothing
-    matches.
+    Returns the mapped event type and the matched keyword, or (OTHER, None) when nothing matches.
+    Multi-word keys are checked as substrings so phrases like "interest rate" win over the bare
+    token. Single-token keys use ``_keyword_present`` so Swedish definite/inflected forms
+    (e.g. "kriget", "oljepriset") and English plurals match without enumerating every form.
 
     The haystack is punctuation-normalised before matching so symbols attached to words
     (e.g. "opec+" or "anfall:") do not defeat word-boundary detection.
@@ -366,7 +496,11 @@ def classify_text(text: str) -> tuple[EventType, str | None]:
     best_keyword: str | None = None
     best_pos = len(haystack) + 1
     best_len = 0
-    for keyword, event_type in ACTION_TAXONOMY.items():
+    for keyword, event_type in table.items():
+        if include is not None and keyword not in include:
+            continue
+        if exclude is not None and keyword in exclude:
+            continue
         if " " in keyword:
             # Multi-word phrase: find position for earliest-match tie-breaking.
             pos = haystack.find(keyword)
@@ -391,6 +525,49 @@ def classify_text(text: str) -> tuple[EventType, str | None]:
                     best_type = event_type
                     best_keyword = keyword
     return best_type, best_keyword
+
+
+def classify_text(title: str, body: str = "") -> tuple[EventType, str | None]:
+    """Deterministically classify an article, most trustworthy evidence first.
+
+    Returns the mapped event type and the matched keyword (the "action" evidence), or (OTHER, None)
+    when nothing matches.
+
+    Evidence is tiered rather than taken purely by position, because position within a long body is
+    not a measure of relevance. Tiers, first hit wins:
+
+      1. **Specific keyword in the title.** The title states what the article is about, and a
+         specific keyword there is the strongest signal available.
+      2. **Non-financial keyword in the title** — sport/entertainment/lifestyle, which makes the
+         reject explicit instead of letting a generic keyword mistype it. Skipped when the title
+         names a registered company, so "Nike lifts full-year guidance" is never suppressed by a
+         sports word.
+      3. **Generic keyword in the title.** Words like "close" or "gold" are only trustworthy in a
+         headline (see ``GENERIC_KEYWORDS``).
+      4. **Specific keyword in the body.** Recovers articles whose headline is vague but whose body
+         names the event outright. Generic keywords are deliberately never honoured here — matching
+         them against body prose is what typed sports reports as STRAIT_CLOSURE.
+
+    ``body`` is optional so a caller with only a headline (and the existing lemma-fallback path in
+    ``extraction``) can pass one argument.
+    """
+    specific_in_title, keyword = _scan(title, ACTION_TAXONOMY, exclude=GENERIC_KEYWORDS)
+    if specific_in_title != EventType.OTHER:
+        return specific_in_title, keyword
+
+    # A company-specific headline is financial news by definition; never reject it as sport.
+    if not _company_matches(f" {_normalise(title.lower())} ")[0]:
+        non_financial, keyword = _scan(title, NON_FINANCIAL_KEYWORDS)
+        if non_financial != EventType.OTHER:
+            return non_financial, keyword
+
+    generic_in_title, keyword = _scan(title, ACTION_TAXONOMY, include=GENERIC_KEYWORDS)
+    if generic_in_title != EventType.OTHER:
+        return generic_in_title, keyword
+
+    if body:
+        return _scan(body, ACTION_TAXONOMY, exclude=GENERIC_KEYWORDS)
+    return EventType.OTHER, None
 
 
 class NewsScope(StrEnum):
@@ -496,7 +673,15 @@ def resolve_scope(text: str, event_type: EventType) -> AssetScope:
 
     Returns an empty ``NONE`` scope when nothing resolves; the caller decides whether that is worth
     recording. Never raises.
+
+    A non-financial event type resolves to nothing at all, including when the text happens to
+    mention a company or industry: a football result naming a listed club is not a market event, and
+    Prediction drops asset-less events. This is what keeps the reject bucket from reaching
+    Prediction via the event-type fallback below.
     """
+    if event_type in NON_FINANCIAL_EVENT_TYPES:
+        return AssetScope(NewsScope.NONE, ())
+
     haystack = f" {text.lower()} "
 
     assets, matched = _company_matches(haystack)
@@ -516,9 +701,11 @@ def resolve_scope(text: str, event_type: EventType) -> AssetScope:
 
 def gate2_compatible(left: EventType, right: EventType) -> bool:
     """Gate 2: two articles may share a cluster only if their canonical types are the same and
-    known. OTHER is never compatible with anything (including another OTHER), because unknown
-    events must not be silently merged."""
-    return left == right and left != EventType.OTHER
+    clusterable. ``OTHER`` is never compatible with anything (including another OTHER), because
+    unknown events must not be silently merged. The non-financial types are excluded for the
+    opposite reason: they carry no causal event, so grouping them would build clusters that can
+    never produce a prediction."""
+    return left == right and left not in NON_CLUSTERING_EVENT_TYPES
 
 
 # Downstream assets implied by each canonical event type, mirroring the seeded Neo4j CAUSES edges

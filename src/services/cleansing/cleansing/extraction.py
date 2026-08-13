@@ -28,11 +28,18 @@ from cleansing.taxonomy import (
 
 @runtime_checkable
 class ActionExtractor(Protocol):
-    """Stable extraction interface (text + language -> canonical ExtractedAction)."""
+    """Stable extraction interface (title + language [+ body] -> canonical ExtractedAction).
+
+    ``body`` is optional and used only as weaker, second-choice evidence for the event type (see
+    ``taxonomy.classify_text``). Polarity, context tags and asset scope are always derived from the
+    title alone, because body prose routinely mentions unrelated events as background.
+    """
 
     def is_ready(self) -> bool: ...
 
-    async def extract(self, text: str, language: str) -> ExtractedAction: ...
+    async def extract(
+        self, title: str, language: str, body: str = ""
+    ) -> ExtractedAction: ...
 
 
 def _build_action(
@@ -69,10 +76,10 @@ class KeywordExtractor:
     def is_ready(self) -> bool:
         return True
 
-    async def extract(self, text: str, language: str) -> ExtractedAction:
-        event_type, keyword = classify_text(text)
+    async def extract(self, title: str, language: str, body: str = "") -> ExtractedAction:
+        event_type, keyword = classify_text(title, body)
         return _build_action(
-            text,
+            title,
             event_type,
             actor=None,
             action_lemma=keyword,
@@ -107,15 +114,15 @@ class SpacyExtractor:
             self._pipelines[language] = spacy.load(model_name)
         self._loaded = True
 
-    async def extract(self, text: str, language: str) -> ExtractedAction:
+    async def extract(self, title: str, language: str, body: str = "") -> ExtractedAction:
         import asyncio
 
         nlp = self._pipelines.get(language) or self._pipelines.get("en")
         if nlp is None:
             # Fall back to the deterministic classifier if no pipeline is loaded.
-            event_type, keyword = classify_text(text)
+            event_type, keyword = classify_text(title, body)
             return _build_action(
-                text,
+                title,
                 event_type,
                 actor=None,
                 action_lemma=keyword,
@@ -124,7 +131,7 @@ class SpacyExtractor:
             )
 
         def _parse() -> ExtractedAction:
-            doc = nlp(text)  # type: ignore[operator]
+            doc = nlp(title)  # type: ignore[operator]
             actor: str | None = None
             action_lemma: str | None = None
             obj: str | None = None
@@ -137,11 +144,13 @@ class SpacyExtractor:
                     obj = token.text
             mapped = map_action(action_lemma)
             if mapped == EventType.OTHER:
-                # Back off to a full-text keyword scan before giving up on the type.
-                mapped, keyword = classify_text(text)
+                # The headline verb was not in the taxonomy. Back off to the tiered keyword scan,
+                # which may still recognise the event from the title or (specific keywords only)
+                # from the body.
+                mapped, keyword = classify_text(title, body)
                 action_lemma = action_lemma or keyword
             return _build_action(
-                text,
+                title,
                 mapped,
                 actor=actor,
                 action_lemma=action_lemma,
