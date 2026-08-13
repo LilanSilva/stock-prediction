@@ -49,7 +49,7 @@ class AppContext:
     http_client: AsyncClient
     engine: NotificationEngine
     consumer_task: asyncio.Task[None]
-    scored_consumer_task: asyncio.Task[None]
+    scored_consumer_task: asyncio.Task[None] | None
     state: ServiceState
     db_pool: asyncpg.Pool | None = None
 
@@ -165,9 +165,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     consumer_task = asyncio.create_task(
         rabbit.consume(settings.predictions_queue, _make_consumer(app))
     )
-    scored_consumer_task = asyncio.create_task(
-        rabbit.consume(settings.scores_queue, _make_scored_consumer(app))
-    )
+    scored_consumer_task: asyncio.Task[None] | None = None
+    if settings.verification_alerts_enabled:
+        scored_consumer_task = asyncio.create_task(
+            rabbit.consume(settings.scores_queue, _make_scored_consumer(app))
+        )
+    else:
+        logger.info("verification_alerts_disabled")
 
     app.state.ctx = AppContext(
         settings=settings,
@@ -185,20 +189,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         scores_queue=settings.scores_queue,
         channels=state.active_channels,
         min_confidence=settings.min_confidence,
+        verification_alerts_enabled=settings.verification_alerts_enabled,
     )
     try:
         yield
     finally:
         consumer_task.cancel()
-        scored_consumer_task.cancel()
+        if scored_consumer_task is not None:
+            scored_consumer_task.cancel()
         try:
             await consumer_task
         except asyncio.CancelledError:
             pass
-        try:
-            await scored_consumer_task
-        except asyncio.CancelledError:
-            pass
+        if scored_consumer_task is not None:
+            try:
+                await scored_consumer_task
+            except asyncio.CancelledError:
+                pass
         await http_client.aclose()
         await rabbit.close()
         if db_pool is not None:

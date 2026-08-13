@@ -31,3 +31,6 @@ class NotificationSettings(BaseSettings):
     meta_access_token: str = Field(default="", validation_alias="META_ACCESS_TOKEN")
     meta_phone_number_id: str = Field(default="", validation_alias="META_PHONE_NUMBER_ID")
     meta_api_version: str = Field(default="v18.0", validation_alias="META_API_VERSION")
+
+    # Set to false to suppress verification (scored-prediction) alerts entirely.
+    verification_alerts_enabled: bool = Field(default=False)
