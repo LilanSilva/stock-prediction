@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Protocol
 
 import structlog
@@ -79,6 +79,10 @@ class PipelineRepository(Protocol):
     async def latest_active_prediction(
         self, asset_id: AssetId
     ) -> ActivePrediction | None: ...
+
+    async def count_predictions_on(
+        self, asset_id: AssetId, local_date: date, timezone_name: str
+    ) -> int: ...
 
     async def set_context_state(self, context_id: uuid.UUID, state: ContextState) -> None: ...
 
@@ -215,6 +219,21 @@ class PredictionPipeline:
             return False
         return await self._price_reader.is_price_available(asset_id)
 
+    async def _within_daily_limit(self, asset_id: AssetId, now: datetime) -> bool:
+        """True when the asset may still take another stance today (its local trading day).
+
+        Counted per asset in its own timezone, so a Stockholm and a New York listing each roll over
+        at their own midnight. An unregistered asset has no calendar, so it is not limited here — it
+        already takes the market-closed collapse path, which allows only one active stance anyway.
+        """
+        try:
+            timezone_name = resolve(asset_id).timezone
+        except UnknownAssetError:
+            return True
+        today = local_date_in(now, timezone_name)
+        count = int(await self._repo.count_predictions_on(asset_id, today, timezone_name))
+        return count < self._settings.max_daily_predictions_per_asset
+
     async def _store_prediction(
         self,
         record: ContextRecord,
@@ -230,10 +249,12 @@ class PredictionPipeline:
         market_open = await self._is_market_open(record.asset_id, now)
 
         if market_open:
-            if active is not None and (
-                active.direction == decision.direction
-                and active.magnitude == decision.magnitude
-            ):
+            # A trading day allows at most `max_daily_predictions_per_asset` stances per asset,
+            # and a further one only when the DIRECTION changes. Without this an asset accumulated
+            # a new prediction on every arriving event — 52 in one day for one asset —
+            # flip-flopping UP/DOWN and drowning the signal. A magnitude-only change no longer
+            # emits: it is not a change of stance, only of degree.
+            if active is not None and active.direction == decision.direction:
                 logger.info(
                     "prediction_unchanged",
                     context_id=str(record.context_id),
@@ -241,9 +262,20 @@ class PredictionPipeline:
                     direction=decision.direction.value,
                 )
                 return False
+            if not await self._within_daily_limit(record.asset_id, now):
+                logger.info(
+                    "prediction_daily_limit_reached",
+                    context_id=str(record.context_id),
+                    asset_id=record.asset_id.value,
+                    direction=decision.direction.value,
+                    limit=self._settings.max_daily_predictions_per_asset,
+                )
+                return False
             supersedes = None
             withdraw = False
         else:
+            # Market closed: collapse to exactly one stance for the upcoming session by superseding
+            # and withdrawing any prior one, so a weekend or holiday can never leave two open.
             supersedes = active.prediction_id if active is not None else None
             withdraw = supersedes is not None
 
@@ -333,6 +365,7 @@ class PredictionPipeline:
                     deadband=self._settings.decision_deadband,
                     small_max=self._settings.magnitude_small_max,
                     medium_max=self._settings.magnitude_medium_max,
+                    evidence_halfpoint=self._settings.confidence_evidence_halfpoint,
                 )
                 if decision is None or decision.direction is Direction.NEUTRAL:
                     logger.info(
@@ -454,6 +487,7 @@ class PredictionPipeline:
                 medium_max=self._settings.magnitude_medium_max,
                 polarity_by_type=polarity_by_type,
                 elevated=elevated,
+                evidence_halfpoint=self._settings.confidence_evidence_halfpoint,
             )
             if decision is None:
                 await self._repo.set_context_state(record.context_id, ContextState.PREDICTED)

@@ -61,6 +61,30 @@ All date filtering is UTC, matching the containers' server time.
 The generated `*.html` reports are point-in-time output, not documentation — they accumulate in this
 folder and are safe to delete.
 
+## Prediction accuracy
+
+| Script | Produces |
+|---|---|
+| [measure-prediction-accuracy.py](measure-prediction-accuracy.py) | Console report: directional accuracy, per-event-type breakdown, confidence distribution, NEUTRAL rate, and per-asset-per-day volume |
+
+```bash
+python scripts/measure-prediction-accuracy.py
+python scripts/measure-prediction-accuracy.py --since 2026-08-14
+python scripts/measure-prediction-accuracy.py --split 2026-08-13T20:11:56Z
+```
+
+Reads `DATABASE_URL` from the environment, so load `infra/.env` first (unlike the PowerShell reports
+above, which shell into the containers).
+
+Two things this exists to prevent, both of which hid real defects:
+
+- **Reading the raw correct/total ratio as accuracy.** About a quarter of outcomes are NEUTRAL — the
+  price moved less than Verification's 0.3% deadband — so that ratio understates the system. The
+  *directional* figure is the headline; the report shows both and how many outcomes were NEUTRAL.
+- **Judging a change from a window that spans its deploy.** Use `--split <deploy timestamp>` to
+  compare the windows either side; a single window covering both mixes old and new behaviour and
+  cannot be attributed to either.
+
 ## Demo
 
 | Script | Purpose |

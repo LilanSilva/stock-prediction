@@ -78,8 +78,10 @@ Specific responsibilities:
 | Context version | An integer that increments when a late event extends an already-closed context (see 7.3) |
 | FiringEdge | A CAUSES relationship in Neo4j that is active given the query's event type and conditions |
 | Force | Signed strength of one firing edge: `weight × reliability`, where reliability = `alpha / (alpha + beta)` |
-| Net ratio | `sum(signed forces) / sum(absolute forces)` for all directional edges; drives direction and confidence |
-| Deadband | If `abs(net ratio) < deadband (0.15)` the direction is NEUTRAL and no prediction is emitted |
+| Consensus | `abs(sum(signed forces)) / sum(absolute forces)` for all directional edges; how much the firing edges agree. 1.0 when nothing opposes |
+| Evidence mass | `total / (total + confidence_evidence_halfpoint)` where `total = sum(absolute forces)`; how much evidence there is at all |
+| Confidence | `consensus × evidence mass`. Consensus alone is self-normalising, so with a single firing edge the strength cancels and every such prediction scored 1.00 regardless of how weak the edge was |
+| Deadband | If `confidence < deadband (0.15)` the direction is NEUTRAL. Applied to the evidence-weighted confidence, not to consensus: the old ratio form was unreachable for a single firing edge, so NEUTRAL was never emitted |
 | Magnitude | SMALL / MEDIUM / LARGE based on average expert weight of the agreeing-direction edges |
 | M1 / GRAPH_ONLY | The decision method used exclusively in this POC: graph traversal + force summation, zero LLM calls |
 | POC-6 STOP | Experiment result confirming LLM arbitration does not improve accuracy; M1 is the sole policy |
@@ -182,8 +184,8 @@ Specific responsibilities:
 | PRD-21 | The Scope-B price gate: a RESOLUTION-driven DOWN force is counted only when the asset's latest close is elevated; if the price is not elevated, that edge's contribution is dropped | Implemented |
 | PRD-22 | If dropping Scope-B edges leaves no directional edge, the decision function shall return `None` and no prediction is emitted | Implemented |
 | PRD-23 | `net_ratio = sum(signed forces) / sum(absolute forces)` over all directional edges | Implemented |
-| PRD-24 | If `abs(net_ratio) < decision_deadband` (default 0.15), direction is NEUTRAL and the decision returns `None` (no prediction) | Implemented |
-| PRD-25 | `confidence = min(1.0, abs(net_ratio))` rounded to 4 decimal places | Implemented |
+| PRD-24 | If `confidence < decision_deadband` (default 0.15), direction is NEUTRAL. A NEUTRAL prediction **is** emitted: roughly a quarter of real outcomes are flat, and Verification scores a correct NEUTRAL call (SRS-06 §7) | Implemented |
+| PRD-25 | `confidence = min(1.0, consensus × evidence_mass)` rounded to 4 decimal places, where `consensus = abs(net)/total` and `evidence_mass = total/(total + confidence_evidence_halfpoint)` (default half-point 0.5) | Implemented |
 | PRD-26 | Magnitude is derived from the average expert `weight` of the agreeing-direction edges: `< 0.40` → SMALL; `< 0.70` → MEDIUM; else LARGE | Implemented |
 | PRD-27 | The decision method shall always be `GRAPH_ONLY` | Implemented |
 | PRD-28 | All firing edges (including opposing and neutral ones) shall be recorded in `contributing_edges` for explainability, using their polarity-adjusted direction | Implemented |
@@ -194,8 +196,11 @@ Specific responsibilities:
 | ID | Requirement | Status |
 |---|---|---|
 | PRD-30 | The service shall check whether the market is open before emitting a prediction: `is_trading_day(local_date_in(now, timezone)) AND is_price_available(asset_id)` | Implemented |
-| PRD-31 | On a trading day (market open): if the latest active prediction has the same direction AND magnitude, the context shall be marked PREDICTED and no new prediction emitted | Implemented |
-| PRD-32 | On a trading day: if the new decision differs in direction OR magnitude from the active prediction, a new independent prediction shall be emitted with `supersedes_prediction_id = None` | Implemented |
+| PRD-31 | On a trading day (market open): if the latest active prediction has the same **direction**, the context shall be marked PREDICTED and no new prediction emitted. Magnitude is deliberately not part of this test — a change of degree is not a change of stance | Implemented |
+| PRD-32 | On a trading day: if the new decision differs in **direction** from the active prediction, a new independent prediction shall be emitted with `supersedes_prediction_id = None`, subject to the daily limit in PRD-32a | Implemented |
+| PRD-32a | On a trading day an asset shall hold at most `max_daily_predictions_per_asset` (default 2) non-withdrawn predictions. Once reached, further decisions are skipped with `prediction_daily_limit_reached` and the context marked PREDICTED. Combined with PRD-31/PRD-32 this allows one initial stance plus one reversal per day | Implemented |
+| PRD-32b | The daily count shall be taken per asset in the **asset's own timezone**, so a Stockholm and a New York listing each roll over at their own market's midnight (`decision_at` is stored in UTC) | Implemented |
+| PRD-32c | Withdrawn predictions shall not count toward the daily limit: they were superseded and never stood as the asset's stance | Implemented |
 | PRD-33 | On a non-trading day (market closed): if an active prediction exists, it shall be superseded and withdrawn; the new prediction shall carry `supersedes_prediction_id` | Implemented |
 | PRD-34 | On a non-trading day with no prior active prediction, the new prediction is emitted with `supersedes_prediction_id = None` | Implemented |
 | PRD-35 | A withdrawn prediction shall have `status = 'WITHDRAWN'` in the `predictions` table; this happens atomically with the insertion of the new prediction in the same transaction | Implemented |
@@ -431,14 +436,15 @@ Step 4 — Force summation
     net  += (+strength if UP else -strength)
     total += strength
 
-  ratio = net / total   (total > 0 guaranteed by non-empty directional set)
+  consensus = abs(net) / total   (total > 0 guaranteed by non-empty directional set)
+  mass      = total / (total + evidence_halfpoint)
 
-Step 5 — Direction bucket
-  if abs(ratio) < deadband:  direction = NEUTRAL
-  elif ratio > 0:            direction = UP
+Step 5 — Confidence, then direction bucket
+  confidence = min(1.0, consensus × mass)   rounded to 4 d.p.
+
+  if confidence < deadband:  direction = NEUTRAL
+  elif net > 0:              direction = UP
   else:                      direction = DOWN
-
-  confidence = min(1.0, abs(ratio))   rounded to 4 d.p.
 
 Step 6 — Magnitude
   if direction == NEUTRAL:
@@ -504,8 +510,10 @@ If the endpoint is unreachable or returns no data: `elevated = False` (conservat
 | Prior stance | New decision | Action |
 |---|---|---|
 | None | Any non-None | Emit new prediction (no supersede) |
-| Same direction + magnitude | — | Skip; log `prediction_unchanged` |
-| Different direction or magnitude | — | Emit independent new prediction (both scored) |
+| Same direction | — | Skip; log `prediction_unchanged` |
+| Different direction, under daily limit | — | Emit independent new prediction (both scored) |
+| Different direction, daily limit reached | — | Skip; log `prediction_daily_limit_reached` |
+| Same direction, different magnitude | — | Skip; log `prediction_unchanged` |
 
 **Market closed scenario:**
 

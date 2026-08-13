@@ -1,4 +1,4 @@
-"""Pure Beta-Bernoulli credit math (no I/O), unit-tested in isolation.
+"""Pure credit math (no I/O), unit-tested in isolation.
 
 Two credit-assignment rules, matching the frozen ``PredictionScored`` contract:
 
@@ -7,8 +7,14 @@ Two credit-assignment rules, matching the frozen ``PredictionScored`` contract:
   - Sources are a plain list of domain strings; credit is split equally across them
     (``compute_source_credits``).
 
-On a hit the credit is added to ``alpha`` (successes); on a miss it is added to ``beta`` (failures).
-``alpha``/``beta`` are floored at the uninformed prior so a seeded edge can only ever grow.
+Two different quantities move, because the two entity types are consumed differently:
+
+  - **Sources** keep Beta-Bernoulli (``apply_bernoulli``): a hit adds credit to ``alpha``, a miss to
+    ``beta``, both floored at the uninformed prior.
+  - **KG edges** move their ``weight`` instead (``apply_weight_delta``). Reliability
+    (``alpha``/``beta``) cancels out of the decision's net/total ratio whenever a single edge
+    fires — 92% of predictions — so counting outcomes there had no observable effect. ``weight``
+    is what feeds magnitude, so it is the quantity worth learning.
 """
 
 from __future__ import annotations
@@ -20,7 +26,11 @@ from shared.schemas.messages import ContributingEdge
 
 @dataclass(frozen=True)
 class WeightUpdate:
-    """A single entity's Beta-Bernoulli transition, captured for persistence and history."""
+    """A single entity's transition, captured for persistence and history.
+
+    Sources move ``alpha``/``beta``; KG edges move ``weight`` and leave the counts unchanged, so
+    ``weight_before``/``weight_after`` are set only for ``entity_type == 'edge'``.
+    """
 
     entity_id: str
     entity_type: str  # 'edge' | 'source'
@@ -28,6 +38,8 @@ class WeightUpdate:
     beta_before: float
     alpha_after: float
     beta_after: float
+    weight_before: float | None = None
+    weight_after: float | None = None
 
     @property
     def credibility_before(self) -> float:
@@ -80,3 +92,27 @@ def apply_bernoulli(
     else:
         beta += credit
     return max(alpha, floor), max(beta, floor)
+
+
+def apply_weight_delta(
+    weight: float,
+    credit: float,
+    *,
+    is_correct: bool,
+    step: float,
+    floor: float,
+    ceiling: float = 1.0,
+) -> float:
+    """Apply one outcome observation to a KG edge's ``weight`` and return the clamped result.
+
+    A hit raises the weight, a miss lowers it, by ``step`` scaled by the edge's ``credit`` share of
+    the prediction (so an edge that contributed a tenth of the decision earns a tenth of the move).
+
+    Clamped to ``[floor, ceiling]``. The floor is deliberately above zero: an edge encodes an
+    expert-asserted causal relationship, so sustained bad outcomes should make it negligible rather
+    than delete it or let it change sign. ``weight`` carries magnitude only — direction is a
+    separate edge property and is never touched here.
+    """
+    delta = step * credit
+    weight = weight + delta if is_correct else weight - delta
+    return min(max(weight, floor), ceiling)

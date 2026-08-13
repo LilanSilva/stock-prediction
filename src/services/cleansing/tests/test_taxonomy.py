@@ -401,6 +401,26 @@ def test_swedish_rate_and_acquisition_compounds() -> None:
     )
 
 
+def test_gold_medal_does_not_resolve_to_gold_miners() -> None:
+    # `gold` was an industry keyword on PRECIOUS_METALS, so any "gold medal" story fanned out to
+    # every gold miner in the group — 18 identical wrong LUG_STO predictions in one audited day.
+    scope = resolve_scope(
+        "Indian fencing team secures five more gold medals at the Commonwealth Games",
+        EventType.OTHER,
+    )
+    assert scope.assets == ()
+
+
+def test_gold_price_still_resolves_to_gold_miners() -> None:
+    # Narrowing the keyword must not cost real commodity coverage.
+    scope = resolve_scope(
+        "Gold price expected to trade around $4,500/oz by end of 2026",
+        EventType.COMMODITY_PRICE_SHOCK,
+    )
+    assert scope.scope is NewsScope.INDUSTRY
+    assert AssetId.LUG_STO in scope.assets
+
+
 def test_bare_swedish_vinst_is_not_earnings() -> None:
     # "vinst" alone means "a win" in Swedish sports reporting, so it is deliberately not a keyword.
     # Guarding this stops the fix from recreating the bug class it was written to remove.

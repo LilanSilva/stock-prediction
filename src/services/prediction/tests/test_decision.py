@@ -51,9 +51,55 @@ def test_unanimous_up_is_confident_and_large() -> None:
     decision = decide(AssetId.NEM_NYSE, edges, **_KW)
     assert decision is not None
     assert decision.direction == Direction.UP
-    assert decision.confidence == 1.0
+    # Nothing opposes, so consensus is 1.0, but confidence is scaled by how much evidence there is:
+    # these edges carry the untested 1.0/1.0 prior, so reliability is only 0.5.
+    assert 0.5 < decision.confidence < 1.0
     assert decision.magnitude == Magnitude.LARGE  # avg agreeing weight 0.775 >= 0.70
     assert len(decision.contributing_edges) == 2
+
+
+def test_single_weak_edge_is_not_fully_confident() -> None:
+    # The defect this replaced: with one firing edge the strength cancelled out of the ratio, so
+    # every single-edge prediction reported 1.00 no matter how weak or unreliable the edge was.
+    weak = decide(
+        AssetId.NEM_NYSE,
+        [_edge(EventType.MILITARY_CONFLICT, Direction.UP, 0.10)],
+        **_KW,
+    )
+    strong = decide(
+        AssetId.NEM_NYSE,
+        [_edge(EventType.MILITARY_CONFLICT, Direction.UP, 0.90, alpha=9.0, beta=1.0)],
+        **_KW,
+    )
+    assert weak is not None and strong is not None
+    assert weak.confidence < 1.0
+    assert strong.confidence > weak.confidence, "stronger, more reliable evidence must score higher"
+
+
+def test_more_agreeing_edges_raise_confidence() -> None:
+    one = decide(AssetId.NEM_NYSE, [_edge(EventType.SANCTIONS, Direction.UP, 0.50)], **_KW)
+    two = decide(
+        AssetId.NEM_NYSE,
+        [
+            _edge(EventType.SANCTIONS, Direction.UP, 0.50),
+            _edge(EventType.MILITARY_CONFLICT, Direction.UP, 0.50),
+        ],
+        **_KW,
+    )
+    assert one is not None and two is not None
+    assert two.confidence > one.confidence
+
+
+def test_negligible_evidence_yields_neutral() -> None:
+    # A barely-there edge no longer forces a directional call: the deadband is reachable now, so the
+    # system can say "no move expected" -- which is the correct answer ~24% of the time.
+    decision = decide(
+        AssetId.NEM_NYSE,
+        [_edge(EventType.MILITARY_CONFLICT, Direction.UP, 0.05)],
+        **_KW,
+    )
+    assert decision is not None
+    assert decision.direction == Direction.NEUTRAL
 
 
 def test_balanced_conflict_falls_in_deadband_and_is_neutral() -> None:

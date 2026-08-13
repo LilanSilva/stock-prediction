@@ -4,9 +4,11 @@ Ordering (the dual-store update is not a distributed transaction; full 2PC is ou
 POC per T01's notes):
 
   1. Early-out if the ``prediction_id`` was already processed (common at-least-once redelivery).
-  2. Read each contributing edge's current ``alpha``/``beta`` from Neo4j, apply proportional
-     Beta-Bernoulli credit, and write the new counts back via the shared graph client. A missing
-     edge is logged and skipped (the remaining edges still process).
+  1b. Early-out if the prediction was superseded (``status = 'WITHDRAWN'``): it never stood as the
+     asset's stance, so its outcome says nothing about the edges that produced it.
+  2. Read each contributing edge's current ``weight`` from Neo4j, move it by the edge's proportional
+     share of one outcome observation, and write it back via the shared graph client. A missing edge
+     is logged and skipped (the remaining edges still process). Edge ``alpha``/``beta`` are frozen.
   3. Read each source's current state from Postgres, apply equal credit.
   4. Commit the Postgres side atomically: the idempotency guard row, the source-state upserts, and
      one history row per entity (edges included). If this commit fails after the Neo4j writes
@@ -32,6 +34,7 @@ from credibility.exceptions import InvalidScoredMessageError
 from credibility.updater import (
     WeightUpdate,
     apply_bernoulli,
+    apply_weight_delta,
     compute_proportional_credits,
     compute_source_credits,
 )
@@ -55,15 +58,14 @@ class GraphClient(Protocol):
         factor_id: EventType,
         group_id: str,
         condition: ConditionCode | None = None,
-    ) -> tuple[float, float] | None: ...
+    ) -> tuple[float, float, float] | None: ...
 
     async def update_edge_weight(
         self,
         factor_id: EventType,
         asset_id: AssetId | str,
         *,
-        alpha: float,
-        beta: float,
+        weight: float,
         condition: ConditionCode | None = None,
         target_is_group: bool = False,
     ) -> None: ...
@@ -73,7 +75,7 @@ class GraphClient(Protocol):
         source_asset_id: AssetId,
         target_asset_id: AssetId,
         condition: ConditionCode,
-    ) -> tuple[float, float] | None: ...
+    ) -> tuple[float, float, float] | None: ...
 
     async def update_correlation_weight(
         self,
@@ -81,8 +83,7 @@ class GraphClient(Protocol):
         target_asset_id: AssetId,
         condition: ConditionCode,
         *,
-        alpha: float,
-        beta: float,
+        weight: float,
     ) -> None: ...
 
 
@@ -90,6 +91,8 @@ class Repository(Protocol):
     """Structural type for the credibility repository."""
 
     async def already_processed(self, prediction_id: uuid.UUID) -> bool: ...
+
+    async def prediction_status(self, prediction_id: uuid.UUID) -> str | None: ...
 
     async def get_source_state(self, source_id: str) -> tuple[float, float] | None: ...
 
@@ -171,10 +174,22 @@ def parse_edge_id(edge_id: str) -> tuple[EventType, ConditionCode | None, AssetI
 class CredibilityPipeline:
     """Applies Beta-Bernoulli credit from scored predictions to edges (Neo4j) and sources (PG)."""
 
-    def __init__(self, repository: Repository, graph: GraphClient, *, prior_floor: float) -> None:
+    def __init__(
+        self,
+        repository: Repository,
+        graph: GraphClient,
+        *,
+        prior_floor: float,
+        # Defaults mirror CredibilitySettings; app.py passes the configured values. Defaulted
+        # here so a test covering unrelated behaviour need not restate the weight policy.
+        weight_step: float = 0.02,
+        weight_floor: float = 0.05,
+    ) -> None:
         self._repo = repository
         self._graph = graph
         self._floor = prior_floor
+        self._weight_step = weight_step
+        self._weight_floor = weight_floor
 
     async def _update_correlation_edge(
         self,
@@ -185,7 +200,7 @@ class CredibilityPipeline:
         *,
         is_correct: bool,
     ) -> WeightUpdate | None:
-        """Apply ``credit`` of Beta-Bernoulli evidence to one CORRELATES_WITH edge."""
+        """Apply ``credit`` of outcome evidence to one CORRELATES_WITH edge's weight."""
         counts = await self._graph.get_correlation_edge_counts(source, target, condition)
         if counts is None:
             logger.warning(
@@ -195,20 +210,27 @@ class CredibilityPipeline:
                 condition=condition.value,
             )
             return None
-        alpha_before, beta_before = counts
-        alpha_after, beta_after = apply_bernoulli(
-            alpha_before, beta_before, credit, is_correct=is_correct, floor=self._floor
+        alpha_before, beta_before, weight_before = counts
+        weight_after = apply_weight_delta(
+            weight_before,
+            credit,
+            is_correct=is_correct,
+            step=self._weight_step,
+            floor=self._weight_floor,
         )
         await self._graph.update_correlation_weight(
-            source, target, condition, alpha=alpha_after, beta=beta_after
+            source, target, condition, weight=weight_after
         )
+        # alpha/beta are reported unchanged: reliability is frozen, weight is the learned quantity.
         return WeightUpdate(
             entity_id=f"{source.value}|{condition.value}->{target.value}",
             entity_type="edge",
             alpha_before=alpha_before,
             beta_before=beta_before,
-            alpha_after=alpha_after,
-            beta_after=beta_after,
+            alpha_after=alpha_before,
+            beta_after=beta_before,
+            weight_before=weight_before,
+            weight_after=weight_after,
         )
 
     async def _update_correlation_edges(
@@ -269,50 +291,56 @@ class CredibilityPipeline:
         updates: list[WeightUpdate] = []
         for edge in message.contributing_edges:
             factor_id, condition, target = parse_edge_id(edge.edge_id)
-            counts: tuple[float, float] | None
+            state: tuple[float, float, float] | None
             if isinstance(target, AssetId):
                 firing = await self._graph.get_firing_edges(factor_id, [target])
                 # Match on the full business key so the right conditioned edge is picked
                 # when several conditions share one (factor, asset) pair.
                 current = next((e for e in firing if e.edge_id == edge.edge_id), None)
-                counts = (current.alpha, current.beta) if current is not None else None
+                state = (
+                    (current.alpha, current.beta, current.weight)
+                    if current is not None
+                    else None
+                )
             else:
                 # A group target means the prediction fired an inherited industry edge. Read it
                 # directly: get_firing_edges hides a group edge from members that own an edge
                 # for the same pair, so a member-based lookup can miss the edge that fired.
-                counts = await self._graph.get_group_edge_counts(factor_id, target, condition)
+                state = await self._graph.get_group_edge_counts(factor_id, target, condition)
             target_is_group = not isinstance(target, AssetId)
-            if counts is None:
+            if state is None:
                 logger.warning(
                     "edge_missing_in_graph",
                     edge_id=edge.edge_id,
                     prediction_id=str(message.prediction_id),
                 )
                 continue
-            alpha_before, beta_before = counts
-            alpha_after, beta_after = apply_bernoulli(
-                alpha_before,
-                beta_before,
+            alpha_before, beta_before, weight_before = state
+            weight_after = apply_weight_delta(
+                weight_before,
                 credits[edge.edge_id],
                 is_correct=message.is_correct,
-                floor=self._floor,
+                step=self._weight_step,
+                floor=self._weight_floor,
             )
             await self._graph.update_edge_weight(
                 factor_id,
                 target,
-                alpha=alpha_after,
-                beta=beta_after,
+                weight=weight_after,
                 condition=condition,
                 target_is_group=target_is_group,
             )
+            # alpha/beta reported unchanged: reliability is frozen, weight is the learned quantity.
             updates.append(
                 WeightUpdate(
                     entity_id=edge.edge_id,
                     entity_type="edge",
                     alpha_before=alpha_before,
                     beta_before=beta_before,
-                    alpha_after=alpha_after,
-                    beta_after=beta_after,
+                    alpha_after=alpha_before,
+                    beta_after=beta_before,
+                    weight_before=weight_before,
+                    weight_after=weight_after,
                 )
             )
         return updates
@@ -353,6 +381,20 @@ class CredibilityPipeline:
         """Apply the scored prediction. Returns False when it was already processed (no-op)."""
         if await self._repo.already_processed(message.prediction_id):
             logger.info("scored_duplicate_skipped", prediction_id=str(message.prediction_id))
+            return False
+
+        # A withdrawn prediction was superseded before it could stand, so its outcome says nothing
+        # about the edges that produced it. Verification still scores it (scoring is pure
+        # measurement); deciding what is worth learning from belongs here. Claim the guard row so a
+        # redelivery does not re-check, but apply no weight change.
+        status = await self._repo.prediction_status(message.prediction_id)
+        if status == "WITHDRAWN":
+            logger.info(
+                "scored_prediction_ignored_invalid",
+                prediction_id=str(message.prediction_id),
+                status=status,
+            )
+            await self._repo.commit_updates(message.prediction_id, [])
             return False
 
         edge_updates = await self._update_edges(message)

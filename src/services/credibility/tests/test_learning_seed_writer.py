@@ -24,8 +24,15 @@ class _Upsert:
 
 
 class _FakeGraph:
-    def __init__(self) -> None:
+    """Records upsert calls. ``creates`` mimics the add-only return: True when the edge was new.
+
+    The real client reports this from Neo4j's `relationships_created` counter, so an estimate for an
+    edge that already exists comes back False and must not be counted as written.
+    """
+
+    def __init__(self, *, creates: bool = True) -> None:
         self.calls: list[_Upsert] = []
+        self._creates = creates
 
     async def upsert_conditioned_edge(
         self,
@@ -38,12 +45,13 @@ class _FakeGraph:
         confidence: float,
         alpha: float,
         beta: float,
-    ) -> None:
+    ) -> bool:
         self.calls.append(
             _Upsert(
                 factor_id, condition, asset_id, direction, weight, confidence, alpha, beta
             )
         )
+        return self._creates
 
 
 def _estimate(
@@ -118,8 +126,9 @@ class _CorrUpsert:
 
 
 class _FakeCorrGraph:
-    def __init__(self) -> None:
+    def __init__(self, *, creates: bool = True) -> None:
         self.calls: list[_CorrUpsert] = []
+        self._creates = creates
 
     async def upsert_correlation_edge(
         self,
@@ -132,7 +141,7 @@ class _FakeCorrGraph:
         confidence: float,
         alpha: float,
         beta: float,
-    ) -> None:
+    ) -> bool:
         self.calls.append(
             _CorrUpsert(
                 source_asset_id,
@@ -145,6 +154,7 @@ class _FakeCorrGraph:
                 beta,
             )
         )
+        return self._creates
 
 
 def _corr_estimate(*, direction: Direction) -> CorrelationEdgeEstimate:
@@ -190,3 +200,30 @@ async def test_write_correlation_estimates_empty_input_returns_zero() -> None:
     graph = _FakeCorrGraph()
     written = await write_correlation_estimates(graph, [])
     assert written == 0
+
+
+# --- add-only reporting: an estimate for an existing edge is a no-op, not a write ---
+
+
+@_pytest.mark.asyncio
+async def test_existing_edges_are_attempted_but_not_counted_as_written() -> None:
+    # The learner is add-only, so an estimate for an edge that already exists changes nothing. The
+    # count must reflect edges CREATED, otherwise the log claims graph changes that never happened.
+    graph = _FakeGraph(creates=False)
+    estimates = [
+        _estimate(condition=ConditionCode.TRANSPORT_AFFECTED, direction=Direction.UP),
+        _estimate(condition=ConditionCode.SAFE_HAVEN_ONLY, direction=Direction.DOWN),
+    ]
+    written = await write_estimates(graph, estimates)
+    assert written == 0, "existing edges must not be reported as written"
+    assert len(graph.calls) == 2, "both were still attempted"
+
+
+@_pytest.mark.asyncio
+async def test_existing_correlation_edges_are_not_counted_as_written() -> None:
+    graph = _FakeCorrGraph(creates=False)
+    written = await write_correlation_estimates(
+        graph, [_corr_estimate(direction=Direction.DOWN)]
+    )
+    assert written == 0
+    assert len(graph.calls) == 1

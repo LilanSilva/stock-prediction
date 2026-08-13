@@ -102,12 +102,19 @@ def test_group_below_min_samples_is_dropped() -> None:
     assert estimate_edges(samples, deadband=0.002, min_samples=3) == []
 
 
-def test_single_abnormal_sample_bypasses_min_samples() -> None:
-    # One sample normally requires min_samples=5, but is_abnormal=True reduces effective min to 1.
-    samples = [_sample(0.12, is_abnormal=True, asset_volatility=0.01)]
-    (estimate,) = estimate_edges(samples, deadband=0.002, min_samples=5)
+def test_abnormal_samples_lower_min_samples_but_not_to_one() -> None:
+    # is_abnormal lowers the bar from min_samples to abnormal_min_samples, not to a single
+    # observation: the learner only creates edges now, but one observation is still too thin.
+    one = [_sample(0.12, is_abnormal=True, asset_volatility=0.01)]
+    assert estimate_edges(one, deadband=0.002, min_samples=5, abnormal_min_samples=2) == []
+
+    two = [
+        _sample(0.12, is_abnormal=True, asset_volatility=0.01),
+        _sample(0.10, is_abnormal=True, asset_volatility=0.01),
+    ]
+    (estimate,) = estimate_edges(two, deadband=0.002, min_samples=5, abnormal_min_samples=2)
     assert estimate.direction is Direction.UP
-    assert estimate.sample_count == 1
+    assert estimate.sample_count == 2
 
 
 def test_normal_single_sample_still_dropped_by_min_samples() -> None:
@@ -115,8 +122,8 @@ def test_normal_single_sample_still_dropped_by_min_samples() -> None:
     assert estimate_edges(samples, deadband=0.002, min_samples=5) == []
 
 
-def test_mixed_group_with_one_abnormal_sample_uses_effective_min_one() -> None:
-    # Two samples: one normal, one abnormal. Group total=2, effective_min=1 -> passes.
+def test_mixed_group_with_one_abnormal_sample_uses_the_lowered_min() -> None:
+    # Two samples, one of them abnormal. Group total=2, effective_min=abnormal_min_samples=2.
     samples = [
         _sample(0.03, is_abnormal=False),
         _sample(0.10, is_abnormal=True, asset_volatility=0.01),
@@ -221,11 +228,24 @@ def test_corr_below_min_samples_is_dropped() -> None:
     assert estimate_correlation_edges(samples, deadband=0.002, min_samples=3) == []
 
 
-def test_corr_single_abnormal_sample_bypasses_min_samples() -> None:
-    samples = [_corr_sample(0.15, is_abnormal=True, asset_volatility=0.01)]
-    (estimate,) = estimate_correlation_edges(samples, deadband=0.002, min_samples=5)
+def test_corr_abnormal_samples_lower_min_samples_but_not_to_one() -> None:
+    one = [_corr_sample(0.15, is_abnormal=True, asset_volatility=0.01)]
+    assert (
+        estimate_correlation_edges(
+            one, deadband=0.002, min_samples=5, abnormal_min_samples=2
+        )
+        == []
+    )
+
+    two = [
+        _corr_sample(0.15, is_abnormal=True, asset_volatility=0.01),
+        _corr_sample(0.12, is_abnormal=True, asset_volatility=0.01),
+    ]
+    (estimate,) = estimate_correlation_edges(
+        two, deadband=0.002, min_samples=5, abnormal_min_samples=2
+    )
     assert estimate.direction is Direction.UP
-    assert estimate.sample_count == 1
+    assert estimate.sample_count == 2
 
 
 def test_corr_groups_split_by_source_condition_target() -> None:

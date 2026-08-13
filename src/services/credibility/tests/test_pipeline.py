@@ -34,44 +34,52 @@ class FakeGraph:
     share a ``(factor, target)`` pair stay distinct (``condition=None`` is the unconditional edge).
     ``target`` is an ``AssetId`` for a per-asset edge, or a plain ``str`` group id for an
     industry-level (inherited) edge.
+
+    Edge state is stored as ``(alpha, beta, weight)``. A test may supply a 2-tuple ``(alpha, beta)``
+    when it does not care about the weight, and ``_DEFAULT_WEIGHT`` is filled in — most tests
+    predate weight becoming the learned quantity and only assert on which edge was written.
     """
+
+    _DEFAULT_WEIGHT = 0.5
 
     def __init__(
         self,
-        edges: dict[tuple[EventType, AssetId, ConditionCode | None], tuple[float, float]],
-        group_edges: dict[tuple[EventType, str, ConditionCode | None], tuple[float, float]]
+        edges: dict[tuple[EventType, AssetId, ConditionCode | None], tuple[float, ...]],
+        group_edges: dict[tuple[EventType, str, ConditionCode | None], tuple[float, ...]]
         | None = None,
-        corr_edges: dict[tuple[AssetId, AssetId, ConditionCode], tuple[float, float]]
+        corr_edges: dict[tuple[AssetId, AssetId, ConditionCode], tuple[float, ...]]
         | None = None,
     ) -> None:
-        self._edges = edges
-        self._group_edges = group_edges or {}
-        self._corr_edges: dict[tuple[AssetId, AssetId, ConditionCode], tuple[float, float]] = (
-            corr_edges or {}
-        )
-        self.writes: list[
-            tuple[EventType, AssetId | str, ConditionCode | None, float, float]
-        ] = []
-        self.group_writes: list[
-            tuple[EventType, str, ConditionCode | None, float, float]
-        ] = []
-        self.corr_writes: list[
-            tuple[AssetId, AssetId, ConditionCode, float, float]
-        ] = []
+        self._edges = {key: self._state(value) for key, value in edges.items()}
+        self._group_edges = {
+            key: self._state(value) for key, value in (group_edges or {}).items()
+        }
+        self._corr_edges = {
+            key: self._state(value) for key, value in (corr_edges or {}).items()
+        }
+        self.writes: list[tuple[EventType, AssetId | str, ConditionCode | None, float]] = []
+        self.group_writes: list[tuple[EventType, str, ConditionCode | None, float]] = []
+        self.corr_writes: list[tuple[AssetId, AssetId, ConditionCode, float]] = []
+
+    @classmethod
+    def _state(cls, value: tuple[float, ...]) -> tuple[float, float, float]:
+        alpha, beta = value[0], value[1]
+        weight = value[2] if len(value) > 2 else cls._DEFAULT_WEIGHT
+        return alpha, beta, weight
 
     async def get_group_edge_counts(
         self,
         factor_id: EventType,
         group_id: str,
         condition: ConditionCode | None = None,
-    ) -> tuple[float, float] | None:
+    ) -> tuple[float, float, float] | None:
         return self._group_edges.get((factor_id, group_id, condition))
 
     async def get_firing_edges(
         self, event_type: EventType, asset_ids: list[AssetId] | None = None
     ) -> list[FiringEdge]:
         out: list[FiringEdge] = []
-        for (factor, asset, condition), (alpha, beta) in self._edges.items():
+        for (factor, asset, condition), (alpha, beta, weight) in self._edges.items():
             if factor != event_type:
                 continue
             if asset_ids is not None and asset not in asset_ids:
@@ -81,7 +89,7 @@ class FakeGraph:
                     factor_id=factor,
                     asset_id=asset,
                     direction=Direction.UP,
-                    weight=0.5,
+                    weight=weight,
                     confidence=0.5,
                     alpha=alpha,
                     beta=beta,
@@ -95,25 +103,28 @@ class FakeGraph:
         factor_id: EventType,
         asset_id: AssetId | str,
         *,
-        alpha: float,
-        beta: float,
+        weight: float,
         condition: ConditionCode | None = None,
         target_is_group: bool = False,
     ) -> None:
-        self.writes.append((factor_id, asset_id, condition, alpha, beta))
+        self.writes.append((factor_id, asset_id, condition, weight))
         if target_is_group:
-            self.group_writes.append((factor_id, str(asset_id), condition, alpha, beta))
-            self._group_edges[(factor_id, str(asset_id), condition)] = (alpha, beta)
+            key = (factor_id, str(asset_id), condition)
+            self.group_writes.append((factor_id, str(asset_id), condition, weight))
+            alpha, beta, _ = self._group_edges.get(key, (1.0, 1.0, weight))
+            self._group_edges[key] = (alpha, beta, weight)
         else:
             assert isinstance(asset_id, AssetId)
-            self._edges[(factor_id, asset_id, condition)] = (alpha, beta)
+            asset_key = (factor_id, asset_id, condition)
+            alpha, beta, _ = self._edges.get(asset_key, (1.0, 1.0, weight))
+            self._edges[asset_key] = (alpha, beta, weight)
 
     async def get_correlation_edge_counts(
         self,
         source_asset_id: AssetId,
         target_asset_id: AssetId,
         condition: ConditionCode,
-    ) -> tuple[float, float] | None:
+    ) -> tuple[float, float, float] | None:
         return self._corr_edges.get((source_asset_id, target_asset_id, condition))
 
     async def update_correlation_weight(
@@ -122,11 +133,12 @@ class FakeGraph:
         target_asset_id: AssetId,
         condition: ConditionCode,
         *,
-        alpha: float,
-        beta: float,
+        weight: float,
     ) -> None:
-        self.corr_writes.append((source_asset_id, target_asset_id, condition, alpha, beta))
-        self._corr_edges[(source_asset_id, target_asset_id, condition)] = (alpha, beta)
+        key = (source_asset_id, target_asset_id, condition)
+        self.corr_writes.append((source_asset_id, target_asset_id, condition, weight))
+        alpha, beta, _ = self._corr_edges.get(key, (1.0, 1.0, weight))
+        self._corr_edges[key] = (alpha, beta, weight)
 
 
 class FakeRepo:
@@ -137,13 +149,18 @@ class FakeRepo:
         *,
         processed: set[uuid.UUID] | None = None,
         sources: dict[str, tuple[float, float]] | None = None,
+        status: str = "PENDING",
     ) -> None:
         self._processed = processed or set()
         self._sources = sources or {}
+        self._status = status
         self.committed: list[tuple[uuid.UUID, list[WeightUpdate]]] = []
 
     async def already_processed(self, prediction_id: uuid.UUID) -> bool:
         return prediction_id in self._processed
+
+    async def prediction_status(self, prediction_id: uuid.UUID) -> str | None:
+        return self._status
 
     async def get_source_state(self, source_id: str) -> tuple[float, float] | None:
         return self._sources.get(source_id)
@@ -284,16 +301,21 @@ async def test_inherited_group_edge_credit_lands_on_the_group_prior() -> None:
     assert await pipeline.process(message) is True
 
     assert len(graph.group_writes) == 1
-    factor, group_id, condition, alpha, beta = graph.group_writes[0]
+    factor, group_id, condition, weight = graph.group_writes[0]
     assert (factor, group_id, condition) == (
         EventType.MILITARY_CONFLICT,
         "WEAPON_INDUSTRY",
         None,
     )
-    assert alpha > 1.0, "a correct prediction must add credit to the group edge's alpha"
-    assert beta == 1.0
+    assert weight > FakeGraph._DEFAULT_WEIGHT, (
+        "a correct prediction must raise the group edge's weight"
+    )
     # The asset's own edge is untouched: credit follows the edge that fired.
-    assert graph._edges[(EventType.MILITARY_CONFLICT, AssetId("LMT_NYSE"), None)] == (9.0, 9.0)
+    assert graph._edges[(EventType.MILITARY_CONFLICT, AssetId("LMT_NYSE"), None)] == (
+        9.0,
+        9.0,
+        FakeGraph._DEFAULT_WEIGHT,
+    )
 
 
 async def test_missing_group_edge_is_skipped_not_dead_lettered() -> None:
@@ -310,15 +332,15 @@ async def test_missing_group_edge_is_skipped_not_dead_lettered() -> None:
     assert graph.group_writes == []
 
 
-async def test_hit_adds_proportional_credit_to_edge_alpha() -> None:
+async def test_hit_raises_edge_weight_proportionally() -> None:
     graph = FakeGraph(
         {
-            (EventType.MILITARY_CONFLICT, AssetId.NEM_NYSE, None): (1.0, 1.0),
-            (EventType.INFLATION_CHANGE, AssetId.NEM_NYSE, None): (1.0, 1.0),
+            (EventType.MILITARY_CONFLICT, AssetId.NEM_NYSE, None): (1.0, 1.0, 0.50),
+            (EventType.INFLATION_CHANGE, AssetId.NEM_NYSE, None): (1.0, 1.0, 0.50),
         }
     )
     repo = FakeRepo()
-    pipeline = CredibilityPipeline(repo, graph, prior_floor=1.0)
+    pipeline = CredibilityPipeline(repo, graph, prior_floor=1.0, weight_step=0.10)
     message = _scored(
         is_correct=True,
         edges=[("MILITARY_CONFLICT->NEM_NYSE", 0.7), ("INFLATION_CHANGE->NEM_NYSE", 0.3)],
@@ -327,20 +349,57 @@ async def test_hit_adds_proportional_credit_to_edge_alpha() -> None:
     applied = await pipeline.process(message)
     assert applied is True
 
-    written = {(f, a): (alpha, beta) for f, a, _c, alpha, beta in graph.writes}
-    assert written[(EventType.MILITARY_CONFLICT, AssetId.NEM_NYSE)] == pytest.approx((1.7, 1.0))
-    assert written[(EventType.INFLATION_CHANGE, AssetId.NEM_NYSE)] == pytest.approx((1.3, 1.0))
+    written = {(f, a): weight for f, a, _c, weight in graph.writes}
+    # step 0.10 scaled by each edge's credit share of the decision.
+    assert written[(EventType.MILITARY_CONFLICT, AssetId.NEM_NYSE)] == pytest.approx(0.57)
+    assert written[(EventType.INFLATION_CHANGE, AssetId.NEM_NYSE)] == pytest.approx(0.53)
 
 
-async def test_miss_adds_proportional_credit_to_edge_beta() -> None:
-    graph = FakeGraph({(EventType.SANCTIONS, AssetId.XOM_NYSE, None): (2.0, 2.0)})
+async def test_miss_lowers_edge_weight() -> None:
+    graph = FakeGraph({(EventType.SANCTIONS, AssetId.XOM_NYSE, None): (2.0, 2.0, 0.40)})
     repo = FakeRepo()
-    pipeline = CredibilityPipeline(repo, graph, prior_floor=1.0)
+    pipeline = CredibilityPipeline(repo, graph, prior_floor=1.0, weight_step=0.10)
     message = _scored(is_correct=False, edges=[("SANCTIONS->XOM_NYSE", 0.5)], sources=[])
     await pipeline.process(message)
 
-    _factor, _asset, _condition, alpha, beta = graph.writes[0]
-    assert (alpha, beta) == pytest.approx((2.0, 3.0))  # sole edge -> full credit 1.0 to beta
+    _factor, _asset, _condition, weight = graph.writes[0]
+    assert weight == pytest.approx(0.30)  # sole edge -> full credit 1.0, so the whole step
+
+
+async def test_outcome_leaves_edge_reliability_frozen() -> None:
+    # alpha/beta are no longer the learned quantity: reliability cancels out of the decision's
+    # net/total ratio for a single firing edge, so only weight is moved.
+    graph = FakeGraph({(EventType.SANCTIONS, AssetId.XOM_NYSE, None): (2.0, 2.0, 0.40)})
+    repo = FakeRepo()
+    pipeline = CredibilityPipeline(repo, graph, prior_floor=1.0)
+    await pipeline.process(
+        _scored(is_correct=False, edges=[("SANCTIONS->XOM_NYSE", 0.5)], sources=[])
+    )
+
+    _prediction_id, updates = repo.committed[0]
+    edge_update = next(u for u in updates if u.entity_type == "edge")
+    assert (edge_update.alpha_before, edge_update.alpha_after) == (2.0, 2.0)
+    assert (edge_update.beta_before, edge_update.beta_after) == (2.0, 2.0)
+    assert edge_update.weight_before is not None
+    assert edge_update.weight_after is not None
+    assert edge_update.weight_before == pytest.approx(0.40)
+    assert edge_update.weight_after < edge_update.weight_before
+
+
+async def test_withdrawn_prediction_is_ignored_but_recorded() -> None:
+    # A superseded prediction never stood, so its outcome says nothing about the edges that made it.
+    # Verification still scores it; deciding what to learn from belongs to Credibility.
+    graph = FakeGraph({(EventType.SANCTIONS, AssetId.XOM_NYSE, None): (2.0, 2.0, 0.40)})
+    repo = FakeRepo(status="WITHDRAWN")
+    pipeline = CredibilityPipeline(repo, graph, prior_floor=1.0)
+
+    applied = await pipeline.process(
+        _scored(is_correct=True, edges=[("SANCTIONS->XOM_NYSE", 1.0)], sources=[])
+    )
+
+    assert applied is False
+    assert graph.writes == []          # no weight moved
+    assert repo.committed == [(repo.committed[0][0], [])]  # guard claimed, nothing applied
 
 
 async def test_missing_edge_is_skipped_not_fatal() -> None:
@@ -421,13 +480,13 @@ async def test_conditioned_edge_passes_condition_to_graph_and_keys_history_by_fu
     assert applied is True
 
     assert len(graph.writes) == 1
-    factor, asset, condition, alpha, beta = graph.writes[0]
+    factor, asset, condition, weight = graph.writes[0]
     assert (factor, asset, condition) == (
         EventType.MILITARY_CONFLICT,
         AssetId.XOM_NYSE,
         ConditionCode.TRANSPORT_AFFECTED,
     )
-    assert (alpha, beta) == pytest.approx((2.0, 1.0))  # sole edge -> full hit credit to alpha
+    assert weight > FakeGraph._DEFAULT_WEIGHT  # sole edge -> full hit credit raises the weight
 
     _, updates = repo.committed[0]
     edge_ids = {u.entity_id for u in updates if u.entity_type == "edge"}
@@ -496,10 +555,9 @@ async def test_correct_propagated_prediction_increments_alpha() -> None:
 
     assert await pipeline.process(msg) is True
     assert len(graph.corr_writes) == 1
-    src, tgt, cond, alpha, beta = graph.corr_writes[0]
+    src, tgt, cond, weight = graph.corr_writes[0]
     assert (src, tgt, cond) == (AssetId.XOM_NYSE, AssetId.NEM_NYSE, ConditionCode.UPSTREAM_UP)
-    assert alpha > 2.0, "correct prediction must increment alpha"
-    assert beta == pytest.approx(1.0)
+    assert weight > FakeGraph._DEFAULT_WEIGHT, "correct prediction must raise the weight"
 
 
 async def test_wrong_propagated_prediction_increments_beta() -> None:
@@ -513,9 +571,8 @@ async def test_wrong_propagated_prediction_increments_beta() -> None:
 
     assert await pipeline.process(msg) is True
     assert len(graph.corr_writes) == 1
-    _, _, _, alpha, beta = graph.corr_writes[0]
-    assert alpha == pytest.approx(2.0)
-    assert beta > 1.0, "wrong prediction must increment beta"
+    _, _, _, weight = graph.corr_writes[0]
+    assert weight < FakeGraph._DEFAULT_WEIGHT, "wrong prediction must lower the weight"
 
 
 async def test_direct_prediction_does_not_call_update_correlation_weight() -> None:
@@ -619,21 +676,21 @@ async def test_converging_edges_receive_proportional_credit() -> None:
         },
     )
     repo = FakeRepo()
-    pipeline = CredibilityPipeline(repo, graph, prior_floor=1.0)
+    base = FakeGraph._DEFAULT_WEIGHT
+    pipeline = CredibilityPipeline(repo, graph, prior_floor=1.0, weight_step=0.10)
 
     assert await pipeline.process(_scored_converged(is_correct=True)) is True
 
     assert len(graph.corr_writes) == 2, "both converging edges must be credited"
-    by_source = {src: (alpha, beta) for src, _tgt, _c, alpha, beta in graph.corr_writes}
-    nem_alpha, nem_beta = by_source[AssetId.NEM_NYSE]
-    lug_alpha, lug_beta = by_source[AssetId.LUG_STO]
-    # Correct prediction -> alpha grows on both, beta untouched.
-    assert nem_alpha > 1.0 and nem_beta == pytest.approx(1.0)
-    assert lug_alpha > 1.0 and lug_beta == pytest.approx(1.0)
+    by_source = {src: weight for src, _tgt, _c, weight in graph.corr_writes}
+    nem_weight = by_source[AssetId.NEM_NYSE]
+    lug_weight = by_source[AssetId.LUG_STO]
+    # Correct prediction -> weight rises on both.
+    assert nem_weight > base and lug_weight > base
     # Credit is proportional: 0.90 vs 0.20 influence.
-    assert nem_alpha > lug_alpha
-    # The two credits sum to the single full observation (1.0).
-    assert (nem_alpha - 1.0) + (lug_alpha - 1.0) == pytest.approx(1.0)
+    assert nem_weight > lug_weight
+    # The two moves sum to one full step, i.e. a single observation shared between them.
+    assert (nem_weight - base) + (lug_weight - base) == pytest.approx(0.10)
 
 
 async def test_converging_edges_share_the_blame_when_wrong() -> None:
@@ -650,12 +707,13 @@ async def test_converging_edges_share_the_blame_when_wrong() -> None:
     assert await pipeline.process(_scored_converged(is_correct=False)) is True
 
     assert len(graph.corr_writes) == 2
-    by_source = {src: (alpha, beta) for src, _tgt, _c, alpha, beta in graph.corr_writes}
+    by_source = {src: weight for src, _tgt, _c, weight in graph.corr_writes}
     for source in (AssetId.NEM_NYSE, AssetId.LUG_STO):
-        alpha, beta = by_source[source]
-        assert alpha == pytest.approx(1.0), f"{source} alpha must not grow on a miss"
-        assert beta > 1.0, f"{source} beta must grow on a miss"
-    assert by_source[AssetId.NEM_NYSE][1] > by_source[AssetId.LUG_STO][1]
+        assert by_source[source] < FakeGraph._DEFAULT_WEIGHT, (
+            f"{source} weight must fall on a miss"
+        )
+    # The heavier edge carries more of the blame, so it falls further.
+    assert by_source[AssetId.NEM_NYSE] < by_source[AssetId.LUG_STO]
 
 
 async def test_single_edge_propagation_still_gets_full_credit() -> None:
@@ -665,11 +723,11 @@ async def test_single_edge_propagation_still_gets_full_credit() -> None:
         corr_edges={(AssetId.XOM_NYSE, AssetId.NEM_NYSE, ConditionCode.UPSTREAM_UP): (1.0, 1.0)},
     )
     repo = FakeRepo()
-    pipeline = CredibilityPipeline(repo, graph, prior_floor=1.0)
+    pipeline = CredibilityPipeline(repo, graph, prior_floor=1.0, weight_step=0.10)
     assert await pipeline.process(_scored_propagated(is_correct=True)) is True
-    _s, _t, _c, alpha, beta = graph.corr_writes[0]
-    assert alpha == pytest.approx(2.0)  # 1.0 prior + full 1.0 credit
-    assert beta == pytest.approx(1.0)
+    _s, _t, _c, weight = graph.corr_writes[0]
+    # Sole edge -> full credit, so the whole step is applied.
+    assert weight == pytest.approx(FakeGraph._DEFAULT_WEIGHT + 0.10)
 
 
 def test_parse_correlation_edge_id_recognises_correlation_form() -> None:

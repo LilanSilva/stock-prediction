@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 import asyncpg
 from shared.schemas.messages import (
@@ -237,6 +237,29 @@ class PredictionRepository:
             direction=Direction(row["direction"]),
             magnitude=Magnitude(row["magnitude"]),
         )
+
+    async def count_predictions_on(
+        self, asset_id: AssetId, local_date: date, timezone_name: str
+    ) -> int:
+        """How many non-withdrawn predictions the asset already has on ``local_date``.
+
+        Counted in the asset's own timezone, not UTC: a per-day cap on a Stockholm listing and a New
+        York one must each roll over at that market's midnight; ``decision_at`` is stored in UTC.
+        Withdrawn rows do not count — they were superseded and never stood as the asset's stance.
+        """
+        count = await self._pool.fetchval(
+            """
+            SELECT count(*)
+            FROM prediction.predictions
+            WHERE asset_id = $1
+              AND status <> 'WITHDRAWN'
+              AND (decision_at AT TIME ZONE $3)::date = $2
+            """,
+            asset_id.value,
+            local_date,
+            timezone_name,
+        )
+        return int(count or 0)
 
     async def set_context_state(self, context_id: uuid.UUID, state: ContextState) -> None:
         await self._pool.execute(

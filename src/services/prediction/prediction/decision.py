@@ -114,6 +114,8 @@ def decide(
     medium_max: float,
     polarity_by_type: Mapping[EventType, EventPolarity] | None = None,
     elevated: bool = False,
+    # Default mirrors PredictionSettings; the pipeline passes the configured value.
+    evidence_halfpoint: float = 0.5,
 ) -> Decision | None:
     """Aggregate firing edges into one decision, or ``None`` when no material edge fires.
 
@@ -122,6 +124,20 @@ def decide(
     a factor's edges when its contributing event(s) resolved rather than occurred. ``elevated`` (the
     Scope-B price gate) suppresses a RESOLUTION-driven DOWN when the asset's price is flat: such an
     edge is dropped, and if that leaves no material edge the result is ``None``.
+
+    Confidence combines two independent things — how much the firing edges *agree*, and how much
+    evidence there is at all::
+
+        consensus  = |net| / total          # agreement, 1.0 when nothing opposes
+        mass       = total / (total + evidence_halfpoint)
+        confidence = consensus * mass
+
+    The mass term matters because ``consensus`` alone is self-normalising: with a single firing edge
+    the strength cancels between numerator and denominator, so every single-edge prediction scored a
+    confident 1.00 regardless of how weak or unreliable the edge was — and 92% of predictions have
+    exactly one edge. That also made ``deadband`` unreachable, so NEUTRAL was never emitted even
+    though a quarter of real outcomes are flat. ``deadband`` now applies to the evidence-weighted
+    confidence, which makes both meaningful.
     """
     polarities = polarity_by_type or {}
     effective = [
@@ -141,15 +157,16 @@ def decide(
         net += sign * strength
         total += strength
 
-    ratio = net / total if total > 0 else 0.0
-    if abs(ratio) < deadband:
+    consensus = abs(net) / total if total > 0 else 0.0
+    mass = total / (total + evidence_halfpoint) if total > 0 else 0.0
+    confidence = round(min(1.0, consensus * mass), 4)
+
+    if confidence < deadband:
         direction = Direction.NEUTRAL
-    elif ratio > 0:
+    elif net > 0:
         direction = Direction.UP
     else:
         direction = Direction.DOWN
-
-    confidence = round(min(1.0, abs(ratio)), 4)
 
     if direction is Direction.NEUTRAL:
         agreeing = [e for e, _ in directional]

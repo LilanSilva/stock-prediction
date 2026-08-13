@@ -38,7 +38,10 @@ async def run_with(
         abnormal_threshold=settings.abnormal_threshold,
     )
     estimates = estimate_edges(
-        samples, deadband=settings.deadband, min_samples=settings.min_samples
+        samples,
+        deadband=settings.deadband,
+        min_samples=settings.min_samples,
+        abnormal_min_samples=settings.abnormal_min_samples,
     )
     written_causes = await write_estimates(graph, estimates)
 
@@ -53,7 +56,10 @@ async def run_with(
             abnormal_threshold=settings.abnormal_threshold,
         )
         corr_estimates = estimate_correlation_edges(
-            corr_samples, deadband=settings.deadband, min_samples=settings.min_samples
+            corr_samples,
+            deadband=settings.deadband,
+            min_samples=settings.min_samples,
+            abnormal_min_samples=settings.abnormal_min_samples,
         )
         written_corr = await write_correlation_estimates(graph, corr_estimates)
 
@@ -62,9 +68,12 @@ async def run_with(
         "learning_run_complete",
         samples=len(samples),
         estimates=len(estimates),
-        written_causes=written_causes,
-        written_corr=written_corr,
-        edges_written=total,
+        # Counts are edges CREATED, not upserts attempted: the learner is add-only, so an estimate
+        # for an existing edge is a deliberate no-op. A run that creates nothing is normal once the
+        # graph covers the observed structure.
+        created_causes=written_causes,
+        created_corr=written_corr,
+        edges_created=total,
         lookback_days=settings.lookback_days,
         deadband=settings.deadband,
         min_samples=settings.min_samples,

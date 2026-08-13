@@ -510,8 +510,8 @@ All variables use the `VERIFICATION_` prefix unless noted.
 | Decision | Rationale |
 |---|---|
 | Deterministic request_id (UUID5) | If the Verification Service crashes after creating the evaluation but before the Market Data service registers the request, the message replay produces the same request_id, so Market Data's idempotency guard handles the duplicate correctly |
-| Binary score (1.0 / 0.0) | Keeps the Credibility Service's Beta-Bernoulli update simple; a partial credit scheme is a future enhancement |
-| NEUTRAL prediction can be correct | If the Prediction Service emits NEUTRAL (rare, see PRD-24), it is correct when the market barely moved; the Credibility Service handles this appropriately |
+| Binary score (1.0 / 0.0) | Keeps the Credibility Service's edge-weight update simple; a partial credit scheme is a future enhancement |
+| NEUTRAL prediction can be correct | The Prediction Service emits NEUTRAL when evidence is weak (PRD-24); it is correct when the market barely moved, which is roughly a quarter of outcomes. The Credibility Service handles this appropriately |
 | close-to-close return | Uses two settled official closes; does not use intraday or mid-session prices; avoids noise from bid/ask spread |
 | No magnitude in correctness check | A LARGE UP prediction is correct if the actual direction is UP, regardless of whether the magnitude was SMALL or LARGE; magnitude is recorded but not part of the binary score |
 | Superseded evaluation WITHDRAWN immediately | The prior prediction never had its own settlement session (it was replaced before the market opened); scoring it with the new settlement close would be meaningless |

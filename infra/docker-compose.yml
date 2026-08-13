@@ -232,6 +232,12 @@ services:
       # Editable asset registry (mounted read-only below): add companies/markets without
       # a rebuild. Falls back to the wheel-packaged assets.json when unset.
       ASSET_REGISTRY_PATH: /config/assets.json
+      # Decision policy. Below the deadband the decision is NEUTRAL; the half-point controls how
+      # much total edge strength is needed before confidence approaches its consensus ceiling.
+      PREDICTION_DECISION_DEADBAND: ${PREDICTION_DECISION_DEADBAND:-0.15}
+      PREDICTION_CONFIDENCE_EVIDENCE_HALFPOINT: ${PREDICTION_CONFIDENCE_EVIDENCE_HALFPOINT:-0.5}
+      # Stances per asset per local trading day (a second only on a direction flip).
+      PREDICTION_MAX_DAILY_PREDICTIONS_PER_ASSET: ${PREDICTION_MAX_DAILY_PREDICTIONS_PER_ASSET:-2}
     ports:
       - "8003:8000"
     healthcheck:
@@ -340,6 +346,18 @@ services:
       # Editable asset registry (mounted read-only below): add companies/markets without
       # a rebuild. Falls back to the wheel-packaged assets.json when unset.
       ASSET_REGISTRY_PATH: /config/assets.json
+      # KG edge weight learning: one scored prediction moves the fired edge's weight by
+      # WEIGHT_STEP x its credit share, up on a correct prediction and down on a wrong one, clamped
+      # to [WEIGHT_FLOOR, 1.0]. Edge alpha/beta are frozen; weight is the learned quantity.
+      CREDIBILITY_WEIGHT_STEP: ${CREDIBILITY_WEIGHT_STEP:-0.02}
+      CREDIBILITY_WEIGHT_FLOOR: ${CREDIBILITY_WEIGHT_FLOOR:-0.05}
+      # Offline structure learner. It only CREATES edges (never revises an existing one), so these
+      # bound how readily new causal structure is added.
+      CREDIBILITY_LEARNING_ENABLED: ${CREDIBILITY_LEARNING_ENABLED:-true}
+      CREDIBILITY_LEARNING_INTERVAL_HOURS: ${CREDIBILITY_LEARNING_INTERVAL_HOURS:-24}
+      CREDIBILITY_LEARNING_VOLATILITY_LOOKBACK_DAYS: ${CREDIBILITY_LEARNING_VOLATILITY_LOOKBACK_DAYS:-30}
+      CREDIBILITY_LEARNING_ABNORMAL_THRESHOLD: ${CREDIBILITY_LEARNING_ABNORMAL_THRESHOLD:-2.0}
+      CREDIBILITY_LEARNING_ABNORMAL_MIN_SAMPLES: ${CREDIBILITY_LEARNING_ABNORMAL_MIN_SAMPLES:-2}
     ports:
       - "8007:8000"
     healthcheck:

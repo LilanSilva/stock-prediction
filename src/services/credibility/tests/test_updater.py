@@ -7,6 +7,7 @@ from shared.schemas.messages import ContributingEdge, Direction
 
 from credibility.updater import (
     apply_bernoulli,
+    apply_weight_delta,
     compute_proportional_credits,
     compute_source_credits,
 )
@@ -81,3 +82,47 @@ def test_apply_bernoulli_enforces_floor() -> None:
     alpha, beta = apply_bernoulli(0.0, 0.5, 0.2, is_correct=True, floor=1.0)
     assert alpha == pytest.approx(1.0)  # 0.0 + 0.2 = 0.2, floored to 1.0
     assert beta == pytest.approx(1.0)  # 0.5 floored to 1.0
+
+
+# --- KG edge weight (outcome-driven) ---
+
+
+def test_apply_weight_delta_hit_raises_weight() -> None:
+    assert apply_weight_delta(
+        0.40, 1.0, is_correct=True, step=0.02, floor=0.05
+    ) == pytest.approx(0.42)
+
+
+def test_apply_weight_delta_miss_lowers_weight() -> None:
+    assert apply_weight_delta(
+        0.40, 1.0, is_correct=False, step=0.02, floor=0.05
+    ) == pytest.approx(0.38)
+
+
+def test_apply_weight_delta_scales_by_credit_share() -> None:
+    # An edge that contributed a quarter of the decision earns a quarter of the move.
+    assert apply_weight_delta(
+        0.40, 0.25, is_correct=True, step=0.02, floor=0.05
+    ) == pytest.approx(0.405)
+
+
+def test_apply_weight_delta_clamps_at_floor() -> None:
+    assert apply_weight_delta(
+        0.06, 1.0, is_correct=False, step=0.02, floor=0.05
+    ) == pytest.approx(0.05)
+
+
+def test_apply_weight_delta_clamps_at_ceiling() -> None:
+    assert apply_weight_delta(
+        0.99, 1.0, is_correct=True, step=0.02, floor=0.05
+    ) == pytest.approx(1.0)
+
+
+def test_apply_weight_delta_never_reaches_zero_or_flips() -> None:
+    # An edge asserts a causal relationship, so sustained bad outcomes must make it negligible
+    # rather than delete it or let it change sign.
+    weight = 0.45
+    for _ in range(200):
+        weight = apply_weight_delta(weight, 1.0, is_correct=False, step=0.02, floor=0.05)
+    assert weight == pytest.approx(0.05)
+    assert weight > 0.0

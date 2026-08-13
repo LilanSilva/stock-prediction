@@ -50,16 +50,21 @@ def _signed_return(sample: Sample) -> float:
 
 
 def estimate_edges(
-    samples: list[Sample], *, deadband: float, min_samples: int
+    samples: list[Sample],
+    *,
+    deadband: float,
+    min_samples: int,
+    abnormal_min_samples: int = 2,
 ) -> list[EdgeEstimate]:
     """Aggregate ``samples`` into conditioned-edge estimates.
 
     Groups by ``(factor, condition, asset)``; groups with fewer than ``min_samples`` observations
     are dropped as insufficient evidence — unless any sample in the group is flagged
-    ``is_abnormal=True``, in which case a single observation is sufficient. Direction is UP/DOWN
-    when the mean signed return clears ``±deadband``, else NEUTRAL. ``alpha``/``beta`` are the
-    agreeing/disagreeing counts plus the Beta(1, 1) prior, and ``confidence`` is the agreeing
-    fraction. Output is sorted for determinism.
+    ``is_abnormal=True``, which lowers the bar to ``abnormal_min_samples``. It does not lower it to
+    one: these estimates only ever *create* edges now, but an edge conjured from a single
+    observation is still too thin to act on. Direction is UP/DOWN when the mean signed return clears
+    ``±deadband``, else NEUTRAL. ``alpha``/``beta`` are the agreeing/disagreeing counts plus the
+    Beta(1, 1) prior, and ``confidence`` is the agreeing fraction. Output is sorted for determinism.
     """
     grouped: dict[_GroupKey, list[Sample]] = defaultdict(list)
     for sample in samples:
@@ -68,7 +73,11 @@ def estimate_edges(
     estimates: list[EdgeEstimate] = []
     for (factor, condition, asset), group_samples in grouped.items():
         total = len(group_samples)
-        effective_min = 1 if any(s.is_abnormal for s in group_samples) else min_samples
+        effective_min = (
+            min(abnormal_min_samples, min_samples)
+            if any(s.is_abnormal for s in group_samples)
+            else min_samples
+        )
         if total < effective_min:
             continue
 
@@ -114,6 +123,7 @@ def estimate_correlation_edges(
     *,
     deadband: float,
     min_samples: int,
+    abnormal_min_samples: int = 2,
 ) -> list[CorrelationEdgeEstimate]:
     """Aggregate correlation samples into CORRELATES_WITH edge estimates.
 
@@ -130,7 +140,11 @@ def estimate_correlation_edges(
     estimates: list[CorrelationEdgeEstimate] = []
     for (source, condition, target), group_samples in grouped.items():
         total = len(group_samples)
-        effective_min = 1 if any(s.is_abnormal for s in group_samples) else min_samples
+        effective_min = (
+            min(abnormal_min_samples, min_samples)
+            if any(s.is_abnormal for s in group_samples)
+            else min_samples
+        )
         if total < effective_min:
             continue
 

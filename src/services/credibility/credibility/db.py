@@ -49,6 +49,14 @@ CREATE TABLE IF NOT EXISTS credibility.credibility_history (
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Edge outcomes now move the edge's `weight` rather than its Beta-Bernoulli counts, so the history
+-- row records the weight transition. NULL for 'source' rows, which are still alpha/beta-driven.
+-- Nullable + IF NOT EXISTS so databases created before this change keep working.
+ALTER TABLE credibility.credibility_history
+    ADD COLUMN IF NOT EXISTS weight_before DOUBLE PRECISION;
+ALTER TABLE credibility.credibility_history
+    ADD COLUMN IF NOT EXISTS weight_after DOUBLE PRECISION;
+
 CREATE INDEX IF NOT EXISTS credibility_history_entity_idx
     ON credibility.credibility_history (entity_id, entity_type, updated_at DESC);
 

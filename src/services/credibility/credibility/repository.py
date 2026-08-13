@@ -29,6 +29,20 @@ class CredibilityRepository:
         )
         return row is not None
 
+    async def prediction_status(self, prediction_id: uuid.UUID) -> str | None:
+        """The prediction's lifecycle status, or ``None`` when the row is unknown.
+
+        Cross-schema read of ``prediction.predictions``, the same analytics exception the offline
+        learner relies on (see ``credibility.learning.dataset``). ``PredictionScored`` does not
+        carry the status, and a superseded (``WITHDRAWN``) prediction must not move any edge weight.
+        """
+        async with self._pool.acquire() as conn:
+            status = await conn.fetchval(
+                "SELECT status FROM prediction.predictions WHERE prediction_id = $1",
+                prediction_id,
+            )
+        return None if status is None else str(status)
+
     async def get_source_state(self, source_id: str) -> tuple[float, float] | None:
         """Return the stored ``(alpha, beta)`` for a source, or None if it has never been seen."""
         row = await self._pool.fetchrow(
@@ -90,8 +104,8 @@ class CredibilityRepository:
                         INSERT INTO credibility.credibility_history
                             (entity_id, entity_type, prediction_id, alpha_before, beta_before,
                              alpha_after, beta_after, credibility_before, credibility_after,
-                             ci_lower, ci_upper)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                             ci_lower, ci_upper, weight_before, weight_after)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
                         """,
                         update.entity_id,
                         update.entity_type,
@@ -104,5 +118,8 @@ class CredibilityRepository:
                         update.credibility_after,
                         ci_lower,
                         ci_upper,
+                        # NULL for sources, which are still alpha/beta-driven.
+                        update.weight_before,
+                        update.weight_after,
                     )
                 return True

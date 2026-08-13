@@ -32,16 +32,23 @@ class EdgeUpserter(Protocol):
         confidence: float,
         alpha: float,
         beta: float,
-    ) -> None: ...
+    ) -> bool: ...
 
 
 async def write_estimates(graph: EdgeUpserter, estimates: list[EdgeEstimate]) -> int:
-    """Upsert each conditioned, non-NEUTRAL estimate; return the number of edges written."""
-    written = 0
+    """Create each conditioned, non-NEUTRAL estimate; return the number of edges actually created.
+
+    ``created`` and ``attempted`` are logged separately because the learner is add-only: an estimate
+    for an edge that already exists is a deliberate no-op, and counting it as "written" would report
+    graph changes that never happened.
+    """
+    created = 0
+    attempted = 0
     for estimate in estimates:
         if estimate.direction is Direction.NEUTRAL or estimate.condition is None:
             continue
-        await graph.upsert_conditioned_edge(
+        attempted += 1
+        if await graph.upsert_conditioned_edge(
             estimate.factor,
             estimate.condition,
             estimate.asset,
@@ -50,10 +57,16 @@ async def write_estimates(graph: EdgeUpserter, estimates: list[EdgeEstimate]) ->
             confidence=estimate.confidence,
             alpha=estimate.alpha,
             beta=estimate.beta,
-        )
-        written += 1
-    logger.info("learning_edges_written", written=written, estimates=len(estimates))
-    return written
+        ):
+            created += 1
+    logger.info(
+        "learning_edges_written",
+        created=created,
+        attempted=attempted,
+        existing_left_untouched=attempted - created,
+        estimates=len(estimates),
+    )
+    return created
 
 
 class CorrelationEdgeUpserter(Protocol):
@@ -70,19 +83,24 @@ class CorrelationEdgeUpserter(Protocol):
         confidence: float,
         alpha: float,
         beta: float,
-    ) -> None: ...
+    ) -> bool: ...
 
 
 async def write_correlation_estimates(
     graph: CorrelationEdgeUpserter,
     estimates: list[CorrelationEdgeEstimate],
 ) -> int:
-    """Upsert each non-NEUTRAL correlation estimate; return the number of edges written."""
-    written = 0
+    """Create each non-NEUTRAL correlation estimate; return the number actually created.
+
+    Add-only, and reported the same way as ``write_estimates``.
+    """
+    created = 0
+    attempted = 0
     for estimate in estimates:
         if estimate.direction is Direction.NEUTRAL:
             continue
-        await graph.upsert_correlation_edge(
+        attempted += 1
+        if await graph.upsert_correlation_edge(
             estimate.source_asset,
             estimate.condition,
             estimate.target_asset,
@@ -91,7 +109,13 @@ async def write_correlation_estimates(
             confidence=estimate.confidence,
             alpha=estimate.alpha,
             beta=estimate.beta,
-        )
-        written += 1
-    logger.info("corr_learning_edges_written", written=written, estimates=len(estimates))
-    return written
+        ):
+            created += 1
+    logger.info(
+        "corr_learning_edges_written",
+        created=created,
+        attempted=attempted,
+        existing_left_untouched=attempted - created,
+        estimates=len(estimates),
+    )
+    return created

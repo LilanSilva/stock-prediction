@@ -77,11 +77,13 @@ class _FakeRepo:
         events: dict[uuid.UUID, list[ContextEvent]] | None = None,
         store_result: bool = True,
         active: ActivePrediction | None = None,
+        predictions_today: int = 0,
     ) -> None:
         self.assigned: list[dict[str, object]] = []
         self._claimed = claimed or []
         self._events = events or {}
         self._store_result = store_result
+        self._predictions_today = predictions_today
         self._active = active
         self.states: dict[uuid.UUID, ContextState] = {}
         self.stored: list[tuple[PredictionMade, str]] = []
@@ -100,6 +102,11 @@ class _FakeRepo:
 
     async def latest_active_prediction(self, asset_id: AssetId) -> ActivePrediction | None:
         return self._active
+
+    async def count_predictions_on(
+        self, asset_id: AssetId, local_date: object, timezone_name: str
+    ) -> int:
+        return self._predictions_today
 
     async def set_context_state(self, context_id: uuid.UUID, state: ContextState) -> None:
         self.states[context_id] = state
@@ -428,10 +435,76 @@ async def test_open_market_skips_duplicate_signal() -> None:
     repo = _FakeRepo(claimed=[ctx], events={ctx.context_id: events}, active=active)
     graph = _FakeGraph(edges=[_edge(EventType.MILITARY_CONFLICT, Direction.UP, 0.75)])
     produced = await _pipeline(repo, graph).close_ready_contexts(now=_WEEKDAY)
-    # Same (direction, magnitude) as the active stance on a trading day -> do nothing.
+    # Same direction as the active stance on a trading day -> do nothing.
     assert produced == 0
     assert repo.stored == []
     assert repo.states[ctx.context_id] == ContextState.PREDICTED
+
+
+async def test_open_market_skips_magnitude_only_change() -> None:
+    # A change of degree is not a change of stance: only a direction flip earns a second prediction.
+    ctx = _context()
+    events = [ContextEvent(uuid.uuid4(), EventType.MILITARY_CONFLICT, _NOW)]
+    active = ActivePrediction(uuid.uuid4(), Direction.UP, Magnitude.SMALL)
+    repo = _FakeRepo(claimed=[ctx], events={ctx.context_id: events}, active=active)
+    graph = _FakeGraph(edges=[_edge(EventType.MILITARY_CONFLICT, Direction.UP, 0.75)])
+    produced = await _pipeline(repo, graph).close_ready_contexts(now=_WEEKDAY)
+    assert produced == 0
+    assert repo.stored == []
+
+
+async def test_daily_limit_blocks_a_third_prediction() -> None:
+    # Two opposing stances is the day's allowance; anything beyond it is churn. One asset previously
+    # accumulated 52 predictions in a single day, flip-flopping UP/DOWN.
+    ctx = _context()
+    events = [ContextEvent(uuid.uuid4(), EventType.MILITARY_CONFLICT, _NOW)]
+    active = ActivePrediction(uuid.uuid4(), Direction.DOWN, Magnitude.LARGE)
+    repo = _FakeRepo(
+        claimed=[ctx],
+        events={ctx.context_id: events},
+        active=active,
+        predictions_today=2,
+    )
+    graph = _FakeGraph(edges=[_edge(EventType.MILITARY_CONFLICT, Direction.UP, 0.75)])
+    produced = await _pipeline(repo, graph).close_ready_contexts(now=_WEEKDAY)
+    assert produced == 0
+    assert repo.stored == []
+    assert repo.states[ctx.context_id] == ContextState.PREDICTED
+
+
+async def test_daily_limit_does_not_block_the_second_prediction() -> None:
+    ctx = _context()
+    events = [ContextEvent(uuid.uuid4(), EventType.MILITARY_CONFLICT, _NOW)]
+    active = ActivePrediction(uuid.uuid4(), Direction.DOWN, Magnitude.LARGE)
+    repo = _FakeRepo(
+        claimed=[ctx],
+        events={ctx.context_id: events},
+        active=active,
+        predictions_today=1,
+    )
+    graph = _FakeGraph(edges=[_edge(EventType.MILITARY_CONFLICT, Direction.UP, 0.75)])
+    produced = await _pipeline(repo, graph).close_ready_contexts(now=_WEEKDAY)
+    assert produced == 1
+    assert repo.stored[0][0].direction == Direction.UP
+
+
+async def test_daily_limit_does_not_apply_when_market_closed() -> None:
+    # A non-trading day collapses to one active stance by superseding, so the cap is irrelevant
+    # there — and must not block the collapse.
+    ctx = _context()
+    events = [ContextEvent(uuid.uuid4(), EventType.MILITARY_CONFLICT, _NOW)]
+    active = ActivePrediction(uuid.uuid4(), Direction.DOWN, Magnitude.LARGE)
+    repo = _FakeRepo(
+        claimed=[ctx],
+        events={ctx.context_id: events},
+        active=active,
+        predictions_today=9,
+    )
+    graph = _FakeGraph(edges=[_edge(EventType.MILITARY_CONFLICT, Direction.UP, 0.75)])
+    produced = await _pipeline(repo, graph).close_ready_contexts(now=_WEEKEND)
+    assert produced == 1
+    assert repo.stored[0][0].supersedes_prediction_id == active.prediction_id
+    assert repo.withdrawals == [True]
 
 
 async def test_open_market_adds_new_prediction_on_change() -> None:

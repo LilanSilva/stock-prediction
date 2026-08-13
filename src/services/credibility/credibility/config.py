@@ -24,7 +24,15 @@ class CredibilitySettings(BaseSettings):
 
     # Beta-Bernoulli floor: alpha/beta are never allowed below this uninformed-prior value, so a
     # seed edge that starts at 1.0/1.0 can only ever grow (T01/T02 acceptance criteria).
+    # Applies to source credibility only; KG edge outcomes move `weight` (see below).
     prior_floor: float = Field(default=1.0, gt=0.0)
+
+    # KG edge weight learning. One scored prediction moves the edge's weight by `weight_step` scaled
+    # by that edge's credit share, clamped to [weight_floor, 1.0]. The step is small and the floor
+    # is above zero on purpose: an expert-asserted edge should degrade only under sustained
+    # evidence, and become negligible rather than vanish.
+    weight_step: float = Field(default=0.02, gt=0.0, le=1.0)
+    weight_floor: float = Field(default=0.05, ge=0.0, lt=1.0)
 
     db_pool_min_size: int = Field(default=1, ge=1)
     db_pool_max_size: int = Field(default=5, ge=1)

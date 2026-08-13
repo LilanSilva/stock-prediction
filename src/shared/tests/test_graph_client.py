@@ -9,15 +9,32 @@ from shared.graph.exceptions import GraphConfigurationError, GraphTransportError
 from shared.schemas.messages import AssetId, ConditionCode, Direction, EventType
 
 
+class _FakeCounters:
+    def __init__(self, relationships_created: int) -> None:
+        self.relationships_created = relationships_created
+
+
+class _FakeSummary:
+    def __init__(self, relationships_created: int) -> None:
+        self.counters = _FakeCounters(relationships_created)
+
+
 class _FakeResult:
-    def __init__(self, rows: list[dict[str, Any]]) -> None:
+    def __init__(
+        self, rows: list[dict[str, Any]], *, relationships_created: int = 0
+    ) -> None:
         self._rows = rows
+        self._relationships_created = relationships_created
 
     async def data(self) -> list[dict[str, Any]]:
         return self._rows
 
     async def single(self) -> dict[str, Any] | None:
         return self._rows[0] if self._rows else None
+
+    async def consume(self) -> _FakeSummary:
+        """Mirrors the driver's write counters, which is how add-only upserts report creation."""
+        return _FakeSummary(self._relationships_created)
 
 
 class _FakeSession:
@@ -33,10 +50,12 @@ class _FakeSession:
         *,
         group_rows: list[dict[str, Any]] | None = None,
         raise_exc: Exception | None = None,
+        relationships_created: int = 0,
     ) -> None:
         self._rows = rows
         self._group_rows = group_rows or []
         self._raise = raise_exc
+        self._relationships_created = relationships_created
         self.run_calls: list[tuple[str, dict[str, Any] | None]] = []
 
     async def __aenter__(self) -> _FakeSession:
@@ -49,9 +68,8 @@ class _FakeSession:
         self.run_calls.append((cypher, params))
         if self._raise is not None:
             raise self._raise
-        if "AssetGroup" in cypher:
-            return _FakeResult(self._group_rows)
-        return _FakeResult(self._rows)
+        rows = self._group_rows if "AssetGroup" in cypher else self._rows
+        return _FakeResult(rows, relationships_created=self._relationships_created)
 
 
 class _FakeDriver:
@@ -61,15 +79,20 @@ class _FakeDriver:
         *,
         group_rows: list[dict[str, Any]] | None = None,
         raise_exc: Exception | None = None,
+        relationships_created: int = 0,
     ) -> None:
         self._rows = rows
         self._group_rows = group_rows
         self._raise = raise_exc
+        self._relationships_created = relationships_created
         self.last_session: _FakeSession | None = None
 
     def session(self) -> _FakeSession:
         self.last_session = _FakeSession(
-            self._rows, group_rows=self._group_rows, raise_exc=self._raise
+            self._rows,
+            group_rows=self._group_rows,
+            raise_exc=self._raise,
+            relationships_created=self._relationships_created,
         )
         return self.last_session
 
@@ -149,32 +172,33 @@ async def test_query_without_connect_raises_configuration_error() -> None:
 
 
 async def test_update_edge_weight_ok() -> None:
-    driver = _FakeDriver([{"alpha": 5.0, "beta": 2.0}])
+    driver = _FakeDriver([{"weight": 0.42}])
     client = _client_with(driver)
     await client.update_edge_weight(
-        EventType.MILITARY_CONFLICT, AssetId.NEM_NYSE, alpha=5.0, beta=2.0
+        EventType.MILITARY_CONFLICT, AssetId.NEM_NYSE, weight=0.42
     )
     assert driver.last_session is not None
     cypher, params = driver.last_session.run_calls[0]
     assert ":Asset {id: $target_id}" in cypher
+    # Only weight is written: alpha/beta are frozen for KG edges.
+    assert "r.weight = $weight" in cypher
+    assert "r.alpha" not in cypher
     assert params == {
         "factor_id": "MILITARY_CONFLICT",
         "target_id": "NEM_NYSE",
-        "alpha": 5.0,
-        "beta": 2.0,
+        "weight": 0.42,
     }
 
 
 async def test_update_edge_weight_targets_asset_group_when_flagged() -> None:
     # An inherited edge names the industry group, so learning must land on the group edge itself
     # rather than on a per-asset edge that was never seeded.
-    driver = _FakeDriver([], group_rows=[{"alpha": 2.0, "beta": 1.0}])
+    driver = _FakeDriver([], group_rows=[{"weight": 0.30}])
     client = _client_with(driver)
     await client.update_edge_weight(
         EventType.MILITARY_CONFLICT,
         "WEAPON_INDUSTRY",
-        alpha=2.0,
-        beta=1.0,
+        weight=0.30,
         target_is_group=True,
     )
     assert driver.last_session is not None
@@ -185,13 +209,12 @@ async def test_update_edge_weight_targets_asset_group_when_flagged() -> None:
 
 
 async def test_update_conditioned_group_edge_uses_condition_and_group_label() -> None:
-    driver = _FakeDriver([], group_rows=[{"alpha": 3.0, "beta": 2.0}])
+    driver = _FakeDriver([], group_rows=[{"weight": 0.55}])
     client = _client_with(driver)
     await client.update_edge_weight(
         EventType.MILITARY_CONFLICT,
         "WEAPON_INDUSTRY",
-        alpha=3.0,
-        beta=2.0,
+        weight=0.55,
         condition=ConditionCode.TRANSPORT_AFFECTED,
         target_is_group=True,
     )
@@ -207,17 +230,18 @@ async def test_update_group_edge_missing_raises_naming_group_target() -> None:
     client = _client_with(_FakeDriver([]))
     with pytest.raises(GraphTransportError, match="target AssetGroup"):
         await client.update_edge_weight(
-            EventType.OTHER, "WEAPON_INDUSTRY", alpha=1.0, beta=1.0, target_is_group=True
+            EventType.OTHER, "WEAPON_INDUSTRY", weight=0.5, target_is_group=True
         )
 
 
-async def test_get_group_edge_counts_returns_counts() -> None:
-    driver = _FakeDriver([], group_rows=[{"alpha": 4.0, "beta": 3.0}])
+async def test_get_group_edge_counts_returns_counts_and_weight() -> None:
+    driver = _FakeDriver([], group_rows=[{"alpha": 4.0, "beta": 3.0, "weight": 0.65}])
     client = _client_with(driver)
     counts = await client.get_group_edge_counts(
         EventType.MILITARY_CONFLICT, "WEAPON_INDUSTRY"
     )
-    assert counts == (4.0, 3.0)
+    # weight is the quantity Credibility adjusts; alpha/beta come back for reporting only.
+    assert counts == (4.0, 3.0, 0.65)
     assert driver.last_session is not None
     _, params = driver.last_session.run_calls[0]
     assert params == {
@@ -237,7 +261,57 @@ async def test_get_group_edge_counts_returns_none_when_absent() -> None:
 async def test_update_edge_weight_missing_edge_raises() -> None:
     client = _client_with(_FakeDriver([]))
     with pytest.raises(GraphTransportError, match="no CAUSES edge"):
-        await client.update_edge_weight(EventType.OTHER, AssetId.NEM_NYSE, alpha=1.0, beta=1.0)
+        await client.update_edge_weight(EventType.OTHER, AssetId.NEM_NYSE, weight=0.5)
+
+
+async def test_learner_upserts_are_add_only() -> None:
+    # The offline learner may DISCOVER edges but never revise one that already exists: a bare SET
+    # let a batch run overwrite an expert-seeded edge (and the online weight) from a few samples.
+    from shared.graph.client import (
+        _UPSERT_CONDITIONED_EDGE_CYPHER,
+        _UPSERT_CORRELATION_EDGE_CYPHER,
+    )
+
+    for cypher in (_UPSERT_CONDITIONED_EDGE_CYPHER, _UPSERT_CORRELATION_EDGE_CYPHER):
+        assert "ON CREATE SET" in cypher
+        # No unguarded SET clause that would fire on an existing edge.
+        assert "\nSET " not in cypher
+        # No ON MATCH either: even a bookkeeping property would mutate a protected edge.
+        assert "ON MATCH" not in cypher
+
+
+async def test_upsert_reports_whether_it_created_the_edge() -> None:
+    # The learner logs edges CREATED, not upserts attempted, so this flag has to be honest: an
+    # estimate for an existing edge changes nothing and must come back False.
+    created = _FakeDriver([{"alpha": 1.0, "beta": 1.0}], relationships_created=1)
+    assert (
+        await _client_with(created).upsert_correlation_edge(
+            AssetId.XOM_NYSE,
+            ConditionCode.UPSTREAM_UP,
+            AssetId.NEM_NYSE,
+            direction=Direction.DOWN,
+            weight=0.45,
+            confidence=0.6,
+            alpha=1.0,
+            beta=1.0,
+        )
+        is True
+    )
+
+    existing = _FakeDriver([{"alpha": 1.0, "beta": 1.0}], relationships_created=0)
+    assert (
+        await _client_with(existing).upsert_correlation_edge(
+            AssetId.XOM_NYSE,
+            ConditionCode.UPSTREAM_UP,
+            AssetId.NEM_NYSE,
+            direction=Direction.DOWN,
+            weight=0.45,
+            confidence=0.6,
+            alpha=1.0,
+            beta=1.0,
+        )
+        is False
+    )
 
 
 async def test_verify_connectivity_false_without_driver() -> None:
@@ -323,12 +397,12 @@ async def test_get_correlation_edges_transport_error_is_normalized() -> None:
 
 
 async def test_get_correlation_edge_counts_returns_tuple_when_present() -> None:
-    driver = _FakeDriver([{"alpha": 3.0, "beta": 2.0}])
+    driver = _FakeDriver([{"alpha": 3.0, "beta": 2.0, "weight": 0.45}])
     client = _client_with(driver)
     counts = await client.get_correlation_edge_counts(
         AssetId.XOM_NYSE, AssetId.NEM_NYSE, ConditionCode.UPSTREAM_UP
     )
-    assert counts == (3.0, 2.0)
+    assert counts == (3.0, 2.0, 0.45)
     assert driver.last_session is not None
     _, params = driver.last_session.run_calls[0]
     assert params == {
@@ -350,24 +424,24 @@ async def test_get_correlation_edge_counts_returns_none_when_absent() -> None:
 
 
 async def test_update_correlation_weight_sends_correct_params() -> None:
-    driver = _FakeDriver([{"alpha": 4.0, "beta": 1.0}])
+    driver = _FakeDriver([{"weight": 0.38}])
     client = _client_with(driver)
     await client.update_correlation_weight(
         AssetId.XOM_NYSE,
         AssetId.NEM_NYSE,
         ConditionCode.UPSTREAM_UP,
-        alpha=4.0,
-        beta=1.0,
+        weight=0.38,
     )
     assert driver.last_session is not None
     cypher, params = driver.last_session.run_calls[0]
     assert "CORRELATES_WITH" in cypher
+    assert "r.weight = $weight" in cypher
+    assert "r.alpha" not in cypher  # reliability is frozen for KG edges
     assert params == {
         "source_asset_id": "XOM_NYSE",
         "target_asset_id": "NEM_NYSE",
         "condition": "UPSTREAM_UP",
-        "alpha": 4.0,
-        "beta": 1.0,
+        "weight": 0.38,
     }
 
 
@@ -378,8 +452,7 @@ async def test_update_correlation_weight_missing_edge_raises() -> None:
             AssetId.XOM_NYSE,
             AssetId.NEM_NYSE,
             ConditionCode.UPSTREAM_UP,
-            alpha=1.0,
-            beta=1.0,
+            weight=0.5,
         )
 
 

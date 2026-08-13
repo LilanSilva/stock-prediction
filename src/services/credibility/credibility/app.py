@@ -105,7 +105,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await graph.connect()
 
     repository = CredibilityRepository(pool)
-    pipeline = CredibilityPipeline(repository, graph, prior_floor=settings.prior_floor)
+    pipeline = CredibilityPipeline(
+        repository,
+        graph,
+        prior_floor=settings.prior_floor,
+        weight_step=settings.weight_step,
+        weight_floor=settings.weight_floor,
+    )
 
     consumer_task = asyncio.create_task(
         rabbit.consume(settings.scored_queue, _make_scored_consumer(app))

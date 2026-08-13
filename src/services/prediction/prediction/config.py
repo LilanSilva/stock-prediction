@@ -29,7 +29,17 @@ class PredictionSettings(BaseSettings):
 
     # Decision policy (graph-only). A firing set with net directional ratio below the deadband is
     # reported as NEUTRAL; magnitude buckets split the agreeing-edge average expert weight.
+    # Applies to the evidence-weighted confidence (see decision.decide), not to a bare agreement
+    # ratio: below it the decision is NEUTRAL. The old ratio-based form was unreachable for a single
+    # firing edge, so NEUTRAL was never emitted.
     decision_deadband: float = Field(default=0.15, ge=0.0, lt=1.0)
+    # Evidence half-point for the confidence mass term: total edge strength equal to this value
+    # yields a mass of 0.5. Lower makes the system more confident on thin evidence.
+    confidence_evidence_halfpoint: float = Field(default=0.5, gt=0.0)
+    # Per-asset stances allowed on one local trading day. A further stance is emitted only when the
+    # direction changes, so the cap is reached at two opposing calls. A non-trading day is always
+    # collapsed to a single active stance regardless of this value (supersede-and-withdraw).
+    max_daily_predictions_per_asset: int = Field(default=2, ge=1)
     magnitude_small_max: float = Field(default=0.40, gt=0.0, lt=1.0)
     magnitude_medium_max: float = Field(default=0.70, gt=0.0, le=1.0)
 

@@ -63,11 +63,11 @@ async def test_get_correlation_edges_filters_by_condition() -> None:
 
 @pytest.mark.skipif(NEO4J_PASSWORD is None, reason="NEO4J_PASSWORD not set")
 async def test_update_and_read_back_correlation_weight() -> None:
-    """update_correlation_weight persists alpha/beta; get_correlation_edge_counts reads it back."""
+    """update_correlation_weight persists the weight; get_correlation_edge_counts reads it back."""
     graph = CausalGraphClient(Neo4jSettings())
     await graph.connect()
     try:
-        # Read the current counts so we can restore them afterward.
+        # Read the current state so we can restore it afterward.
         original = await graph.get_correlation_edge_counts(
             AssetId.XOM_NYSE, AssetId.NEM_NYSE, ConditionCode.UPSTREAM_UP
         )
@@ -75,33 +75,30 @@ async def test_update_and_read_back_correlation_weight() -> None:
             "XOM_NYSE→NEM_NYSE UPSTREAM_UP edge not found. "
             "Has 08-seed-correlation-edges.cypher been applied?"
         )
-        alpha_orig, beta_orig = original
+        alpha_orig, beta_orig, weight_orig = original
 
-        # Write new counts.
-        new_alpha = alpha_orig + 1.0
-        new_beta = beta_orig + 0.5
+        # Write a new weight.
+        new_weight = min(1.0, weight_orig + 0.05)
         await graph.update_correlation_weight(
             AssetId.XOM_NYSE,
             AssetId.NEM_NYSE,
             ConditionCode.UPSTREAM_UP,
-            alpha=new_alpha,
-            beta=new_beta,
+            weight=new_weight,
         )
 
-        # Read back and verify.
+        # Read back and verify: the weight moved and the counts did not.
         updated = await graph.get_correlation_edge_counts(
             AssetId.XOM_NYSE, AssetId.NEM_NYSE, ConditionCode.UPSTREAM_UP
         )
         assert updated is not None
-        assert updated == pytest.approx((new_alpha, new_beta))
+        assert updated == pytest.approx((alpha_orig, beta_orig, new_weight))
 
         # Restore to original so repeated test runs stay idempotent.
         await graph.update_correlation_weight(
             AssetId.XOM_NYSE,
             AssetId.NEM_NYSE,
             ConditionCode.UPSTREAM_UP,
-            alpha=alpha_orig,
-            beta=beta_orig,
+            weight=weight_orig,
         )
     finally:
         await graph.close()

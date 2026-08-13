@@ -2,7 +2,14 @@
 
 The ``neo4j`` driver is imported lazily so the base shared package installs without the optional
 ``graph`` extra. Read access (``get_firing_edges``) is used by Prediction; write access
-(``update_edge_weight``) is used by Credibility to persist Beta-Bernoulli updates.
+(``update_edge_weight``) is used by Credibility to persist outcome-driven edge ``weight`` changes.
+
+Two kinds of write exist and they are deliberately different:
+
+  - ``update_*`` — ``MATCH`` + ``SET``: Credibility revising an existing edge's ``weight`` from a
+    scored prediction's outcome.
+  - ``upsert_*`` — ``MERGE`` + ``ON CREATE SET``: the offline structure learner *discovering* an
+    edge. These never touch an edge that already exists.
 """
 
 from __future__ import annotations
@@ -47,18 +54,22 @@ RETURN cf.id AS factor_id, a.id AS asset_id, r.direction AS direction,
        r.condition AS condition, g.id AS group_id
 """
 
+# Outcome-driven edge updates move `weight`, not the Beta-Bernoulli counts. `weight` is what
+# `decide()` actually consumes for magnitude, whereas `reliability` (alpha/beta) cancels out of the
+# net/total ratio whenever a single edge fires — which is 92% of predictions — so counting outcomes
+# there had no observable effect. alpha/beta are deliberately left untouched here.
 _UPDATE_EDGE_CYPHER = """
 MATCH (cf:CausalFactor {id: $factor_id})-[r:CAUSES]->(a:Asset {id: $target_id})
 WHERE r.condition IS NULL
-SET r.alpha = $alpha, r.beta = $beta, r.last_updated = datetime()
-RETURN r.alpha AS alpha, r.beta AS beta
+SET r.weight = $weight, r.last_updated = datetime()
+RETURN r.weight AS weight
 """
 
 _UPDATE_CONDITIONED_EDGE_CYPHER = """
 MATCH (cf:CausalFactor {id: $factor_id})-[r:CAUSES {condition: $condition}]->
       (a:Asset {id: $target_id})
-SET r.alpha = $alpha, r.beta = $beta, r.last_updated = datetime()
-RETURN r.alpha AS alpha, r.beta AS beta
+SET r.weight = $weight, r.last_updated = datetime()
+RETURN r.weight AS weight
 """
 
 # Industry-level (inherited) edges target an :AssetGroup, not an :Asset. A prediction that fired an
@@ -67,15 +78,15 @@ RETURN r.alpha AS alpha, r.beta AS beta
 _UPDATE_GROUP_EDGE_CYPHER = """
 MATCH (cf:CausalFactor {id: $factor_id})-[r:CAUSES]->(g:AssetGroup {id: $target_id})
 WHERE r.condition IS NULL
-SET r.alpha = $alpha, r.beta = $beta, r.last_updated = datetime()
-RETURN r.alpha AS alpha, r.beta AS beta
+SET r.weight = $weight, r.last_updated = datetime()
+RETURN r.weight AS weight
 """
 
 _UPDATE_CONDITIONED_GROUP_EDGE_CYPHER = """
 MATCH (cf:CausalFactor {id: $factor_id})-[r:CAUSES {condition: $condition}]->
       (g:AssetGroup {id: $target_id})
-SET r.alpha = $alpha, r.beta = $beta, r.last_updated = datetime()
-RETURN r.alpha AS alpha, r.beta AS beta
+SET r.weight = $weight, r.last_updated = datetime()
+RETURN r.weight AS weight
 """
 
 # Current counts for one group edge, addressed directly by (factor, group, condition). Reading it
@@ -84,14 +95,18 @@ RETURN r.alpha AS alpha, r.beta AS beta
 _GROUP_EDGE_COUNTS_CYPHER = """
 MATCH (cf:CausalFactor {id: $factor_id})-[r:CAUSES]->(g:AssetGroup {id: $group_id})
 WHERE ($condition IS NULL AND r.condition IS NULL) OR r.condition = $condition
-RETURN r.alpha AS alpha, r.beta AS beta
+RETURN r.alpha AS alpha, r.beta AS beta, r.weight AS weight
 """
 
+# ON CREATE SET, never a bare SET: the offline learner may only DISCOVER edges, never revise one
+# that already exists. A bare SET let a batch run overwrite an expert-seeded edge — and the online
+# outcome-driven weight — from a handful of samples, flipping direction in one case. Existing edges
+# are owned by the seed and by Credibility's per-outcome updates; the learner only widens coverage.
 _UPSERT_CONDITIONED_EDGE_CYPHER = """
 MERGE (cf:CausalFactor {id: $factor_id})
 MERGE (a:Asset {id: $asset_id})
 MERGE (cf)-[r:CAUSES {condition: $condition}]->(a)
-SET r.direction = $direction, r.weight = $weight, r.confidence = $confidence,
+ON CREATE SET r.direction = $direction, r.weight = $weight, r.confidence = $confidence,
     r.alpha = $alpha, r.beta = $beta, r.last_updated = datetime()
 RETURN r.alpha AS alpha, r.beta AS beta
 """
@@ -107,21 +122,23 @@ RETURN a1.id AS source_asset_id, a2.id AS target_asset_id,
 _UPDATE_CORRELATION_EDGE_CYPHER = """
 MATCH (a1:Asset {id: $source_asset_id})-[r:CORRELATES_WITH {condition: $condition}]->
       (a2:Asset {id: $target_asset_id})
-SET r.alpha = $alpha, r.beta = $beta, r.last_updated = datetime()
-RETURN r.alpha AS alpha, r.beta AS beta
+SET r.weight = $weight, r.last_updated = datetime()
+RETURN r.weight AS weight
 """
 
 _CORRELATION_EDGE_COUNTS_CYPHER = """
 MATCH (a1:Asset {id: $source_asset_id})-[r:CORRELATES_WITH {condition: $condition}]->
       (a2:Asset {id: $target_asset_id})
-RETURN r.alpha AS alpha, r.beta AS beta
+RETURN r.alpha AS alpha, r.beta AS beta, r.weight AS weight
 """
 
+# Add-only, for the same reason as _UPSERT_CONDITIONED_EDGE_CYPHER above: this is the query that
+# rewrote the seeded XOM_NYSE->NEM_NYSE edge from DOWN/0.45 to UP/0.107 on ~10 samples.
 _UPSERT_CORRELATION_EDGE_CYPHER = """
 MERGE (a1:Asset {id: $source_asset_id})
 MERGE (a2:Asset {id: $target_asset_id})
 MERGE (a1)-[r:CORRELATES_WITH {condition: $condition}]->(a2)
-SET r.direction    = $direction,
+ON CREATE SET r.direction    = $direction,
     r.weight       = $weight,
     r.confidence   = $confidence,
     r.alpha        = $alpha,
@@ -242,8 +259,11 @@ class CausalGraphClient:
         factor_id: EventType,
         group_id: str,
         condition: ConditionCode | None = None,
-    ) -> tuple[float, float] | None:
-        """Return ``(alpha, beta)`` for one industry-group edge, or ``None`` when it does not exist.
+    ) -> tuple[float, float, float] | None:
+        """Return ``(alpha, beta, weight)`` for one industry-group edge, or ``None`` if absent.
+
+        ``weight`` is what Credibility adjusts from an outcome; ``alpha``/``beta`` are returned for
+        reporting only, since they are no longer moved by outcomes.
 
         Addressed directly by (factor, group, condition) rather than through a member asset:
         ``get_firing_edges`` deliberately hides a group edge from any member that has its own edge
@@ -263,19 +283,22 @@ class CausalGraphClient:
             raise GraphTransportError(f"neo4j group-edge count query failed: {exc}") from exc
         if row is None:
             return None
-        return float(row["alpha"]), float(row["beta"])
+        return float(row["alpha"]), float(row["beta"]), float(row["weight"])
 
     async def update_edge_weight(
         self,
         factor_id: EventType,
         asset_id: AssetId | str,
         *,
-        alpha: float,
-        beta: float,
+        weight: float,
         condition: ConditionCode | None = None,
         target_is_group: bool = False,
     ) -> None:
-        """Persist Beta-Bernoulli counts for a CAUSES edge (used by Credibility).
+        """Persist the outcome-adjusted ``weight`` for a CAUSES edge (used by Credibility).
+
+        Only ``weight`` is written: ``alpha``/``beta`` are frozen because reliability cancels out of
+        the decision's net/total ratio for a single firing edge, so counting outcomes there changed
+        nothing observable. ``weight`` is what feeds magnitude.
 
         When ``condition`` is given the conditioned edge is updated; otherwise the legacy
         unconditional edge is updated (keeps older scored messages working).
@@ -291,8 +314,7 @@ class CausalGraphClient:
             params: dict[str, Any] = {
                 "factor_id": factor_id.value,
                 "target_id": target_id,
-                "alpha": alpha,
-                "beta": beta,
+                "weight": weight,
             }
             edge_label = f"{factor_id.value}->{target_id}"
         else:
@@ -305,8 +327,7 @@ class CausalGraphClient:
                 "factor_id": factor_id.value,
                 "target_id": target_id,
                 "condition": condition.value,
-                "alpha": alpha,
-                "beta": beta,
+                "weight": weight,
             }
             edge_label = f"{factor_id.value}|{condition.value}->{target_id}"
         try:
@@ -330,12 +351,14 @@ class CausalGraphClient:
         confidence: float,
         alpha: float,
         beta: float,
-    ) -> None:
-        """Create or refine a conditioned edge (used by the offline structure learner).
+    ) -> bool:
+        """Create a conditioned edge if absent (used by the offline structure learner).
 
-        Idempotent MERGE: keeps expert-seeded edges as the prior and overwrites their statistics
-        with data-derived values. Creates the factor/condition/asset nodes and ``UNDER`` link if
-        absent.
+        Add-only: ``ON CREATE SET`` means an edge that already exists is left completely untouched.
+        Creates the factor/asset nodes if absent.
+
+        Returns **True only when a relationship was actually created**, so the caller can report how
+        much new structure was discovered rather than how many upserts it attempted.
         """
         driver = self._require_driver()
         params = {
@@ -350,7 +373,8 @@ class CausalGraphClient:
         }
         try:
             async with driver.session() as session:
-                await session.run(_UPSERT_CONDITIONED_EDGE_CYPHER, params)
+                result = await session.run(_UPSERT_CONDITIONED_EDGE_CYPHER, params)
+                return await self._relationship_created(result)
         except Exception as exc:  # noqa: BLE001 - normalized to a typed transport error
             raise GraphTransportError(f"neo4j conditioned-edge upsert failed: {exc}") from exc
 
@@ -400,11 +424,12 @@ class CausalGraphClient:
         source_asset_id: AssetId,
         target_asset_id: AssetId,
         condition: ConditionCode,
-    ) -> tuple[float, float] | None:
-        """Return ``(alpha, beta)`` for one CORRELATES_WITH edge, or ``None`` when absent.
+    ) -> tuple[float, float, float] | None:
+        """Return ``(alpha, beta, weight)`` for one CORRELATES_WITH edge, or ``None`` when absent.
 
-        Mirrors ``get_group_edge_counts``; used by Credibility to read current counts before
-        applying a Beta-Bernoulli update for a propagated prediction.
+        Mirrors ``get_group_edge_counts``. ``weight`` is what Credibility adjusts from an outcome;
+        ``alpha``/``beta`` are returned for reporting only, since they are no longer moved by
+        outcomes.
         """
         driver = self._require_driver()
         params: dict[str, Any] = {
@@ -422,7 +447,7 @@ class CausalGraphClient:
             ) from exc
         if row is None:
             return None
-        return float(row["alpha"]), float(row["beta"])
+        return float(row["alpha"]), float(row["beta"]), float(row["weight"])
 
     async def update_correlation_weight(
         self,
@@ -430,10 +455,11 @@ class CausalGraphClient:
         target_asset_id: AssetId,
         condition: ConditionCode,
         *,
-        alpha: float,
-        beta: float,
+        weight: float,
     ) -> None:
-        """Persist Beta-Bernoulli counts for a CORRELATES_WITH edge (used by Credibility).
+        """Persist the outcome-adjusted ``weight`` for a CORRELATES_WITH edge (used by Credibility).
+
+        Only ``weight`` is written; ``alpha``/``beta`` are frozen. See ``update_edge_weight``.
 
         Raises GraphTransportError when the edge does not exist.
         """
@@ -442,8 +468,7 @@ class CausalGraphClient:
             "source_asset_id": source_asset_id.value,
             "target_asset_id": target_asset_id.value,
             "condition": condition.value,
-            "alpha": alpha,
-            "beta": beta,
+            "weight": weight,
         }
         edge_label = (
             f"{source_asset_id.value}|{condition.value}->{target_asset_id.value}"
@@ -472,11 +497,14 @@ class CausalGraphClient:
         confidence: float,
         alpha: float,
         beta: float,
-    ) -> None:
-        """Create or refine a CORRELATES_WITH edge (used by the offline structure learner).
+    ) -> bool:
+        """Create a CORRELATES_WITH edge if absent (used by the offline structure learner).
 
-        Idempotent MERGE: keeps expert-seeded edges as the prior and overwrites their statistics
-        with data-derived values. Creates Asset nodes if absent.
+        Add-only: ``ON CREATE SET`` means an edge that already exists is left completely untouched.
+        Creates Asset nodes if absent.
+
+        Returns **True only when a relationship was actually created** — see
+        ``upsert_conditioned_edge``.
         """
         driver = self._require_driver()
         params = {
@@ -491,8 +519,20 @@ class CausalGraphClient:
         }
         try:
             async with driver.session() as session:
-                await session.run(_UPSERT_CORRELATION_EDGE_CYPHER, params)
+                result = await session.run(_UPSERT_CORRELATION_EDGE_CYPHER, params)
+                return await self._relationship_created(result)
         except Exception as exc:  # noqa: BLE001 - normalized to a typed transport error
             raise GraphTransportError(
                 f"neo4j correlation-edge upsert failed: {exc}"
             ) from exc
+
+    @staticmethod
+    async def _relationship_created(result: Any) -> bool:
+        """True when the just-run statement created a relationship.
+
+        Read from the driver's own write counters rather than from a marker property on the edge: a
+        marker would require an ``ON MATCH SET``, which would mutate the very edges the add-only
+        rule exists to protect.
+        """
+        summary = await result.consume()
+        return bool(getattr(summary.counters, "relationships_created", 0))
