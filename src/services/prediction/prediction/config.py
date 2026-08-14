@@ -56,3 +56,29 @@ class PredictionSettings(BaseSettings):
 
     # Cross-asset propagation depth cap (S03/T02). Depth 1 = one hop, 10 = safety ceiling.
     max_propagation_depth: Annotated[int, Field(ge=1, le=10)] = 3
+    # Minimum confidence a DIRECT decision needs before its direction is propagated across
+    # CORRELATES_WITH edges (E12 PRD-60). A propagated prediction carries no causal factor — it
+    # is an inference drawn from another asset's inference — so a weak source is amplified rather
+    # than diluted. On 2026-08-12 propagation produced 39 of 113 predictions (35%) at a 32% hit
+    # rate, against 47% for direct ones.
+    #
+    # Choosing the value needs the confidence arithmetic, because the usable range is narrow. With
+    # alpha=beta=1 on every edge (Credibility moves `weight`, never the Beta counts), reliability
+    # is a constant 0.5, so a single firing edge of expert weight w gives:
+    #     total = 0.5w,  consensus = 1.0,  mass = 0.5w / (0.5w + 0.5),  confidence = w / (w + 1)
+    # which is 0.33 at w=0.5 and cannot exceed 0.50 even at w=1.0. So the whole single-edge range
+    # lives below 0.5, and a threshold of 0.5 would disable propagation outright — 92% of decisions
+    # rest on one edge — rather than gate it.
+    #
+    # 0.30 is set at the boundary that separates expert-strength evidence from evidence the learner
+    # has walked DOWN. It admits a single edge of weight >= 0.43, so every seeded prior still
+    # propagates (the 0.50 group priors give 0.33), while an edge Credibility has driven down does
+    # not: NEM_NYSE's learned MILITARY_CONFLICT weight of 0.107 gives 0.10, and LMT_NYSE's 0.374
+    # gives 0.27. Those are the edges that kept being wrong, so they are exactly the ones that must
+    # not seed a second, derivative prediction.
+    #
+    # It is deliberately a floor on evidence strength and NOT a contradiction filter. The audit's
+    # propagated predictions were mostly contradictions, and those are handled by the suppression
+    # rule in the pipeline (PRD-61); no confidence threshold would have caught them without also
+    # switching off propagation for the seeded graph.
+    propagation_min_confidence: float = Field(default=0.30, ge=0.0, le=1.0)

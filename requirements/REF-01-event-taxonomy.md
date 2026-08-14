@@ -94,11 +94,58 @@ These types therefore:
   resolve to zero assets and Prediction drops them (`event_no_assets`);
 - are **excluded from Gate 2** like `OTHER`, so they never form clusters — a cluster of them could
   never produce a prediction;
-- are matched **before** generic taxonomy keywords but **after** a company-keyword match, so a
-  headline naming a listed company is never rejected as sport.
+- are matched **before every taxonomy keyword tier** (specific and generic alike) but **after** a
+  company-keyword match, so a headline naming a listed company is never rejected as sport.
+
+  The reject tier used to run after the *specific* tier, which made it useless for the exact articles it
+  was written for: a wrestling headline reading "The **War** Raiders and The MFTs clash in title bout"
+  was typed `MILITARY_CONFLICT` on "war" before "wwe" could reject it, and it then moved gold and every
+  weapons maker. Rejecting before classifying is the only order in which these types do their job
+  (CLN-63, 2026-08-14).
+
+- also apply as a **body-level veto**: a market type derived from a title is rejected when the body
+  matches a non-financial keyword and the title names neither a company nor an industry (CLN-64a). Some
+  headlines are indistinguishable from market news by keyword alone.
 
 Keep the keywords that select these types specific. Broad words such as "game", "season", "transfer"
 or "cup" also occur in market copy and would suppress real news.
+
+### 2.1 Generic keywords need corroboration
+
+A keyword in `GENERIC_KEYWORDS` (`close`, `gold`, `contract`, `penalty`, `rates`, `default` …) is
+trustworthy only in a headline, and since 2026-08-14 only in a headline that carries some *other* market
+signal: a registered company, an industry keyword, a money or percentage figure, an institutional market
+term, or a `FALLBACK_CUES` domain cue (CLN-64).
+
+Without corroboration, "Over 200 Mozart Figurines Stolen … Forcing Early **Closure** Of Garden Display"
+was a `STRAIT_CLOSURE` that moved oil, and "lower overuse injury **rates** for new parents" was a
+`RATE_DECISION` that moved gold. With it, "**Gold** expected to trade around $4,500/oz" still classifies
+— corroborated twice over, by the money figure and by the `SAFE_HAVEN` cue.
+
+`"default"` was removed from the taxonomy entirely rather than corroborated. In English it is far more
+often a settings default than a credit event, and `DEBT_CRISIS` seeds an edge to *every* asset group, so
+one false match moves the whole registry: a Twitch story headlined "…On Your Channel By Default"
+produced an `AMZN_NASDAQ` DOWN MEDIUM prediction. The unambiguous forms (`sovereign default`,
+`debt default`, `defaults on`) carry the real signal.
+
+### 2.2 `REGULATORY_ACTION` conflates two opposite events
+
+The type covers approvals and enforcement under one name, and therefore under one causal edge with one
+sign. The seed signs it DOWN because enforcement is more common, so an approval was predicted as a
+penalty: "FDA approves AstraZeneca's new drug" produced AZN_STO DOWN 0.35, identical to a fine.
+
+Since 2026-08-14 an approval is assigned `RESOLUTION` polarity instead (CLN-68), which negates the
+factor's stored direction at decision time and yields UP. Enforcement keeps `OCCURRENCE`, and an
+enforcement cue wins when a text carries both ("approval withdrawn after record fine"). The inversion is
+scoped to this event type: these cues cannot join the global `RESOLUTION_CUES`, because "Merger approved"
+would then flip `CORPORATE_ACQUISITION`'s UP prior to DOWN.
+
+**This is a workaround, not the target model.** Using `RESOLUTION` — which means "the event was called
+off" — to express "the opposite-signed event occurred" is a semantic stretch that happens to be
+mechanically correct. The clean fix is to split the type into `REGULATORY_APPROVAL` and
+`REGULATORY_ENFORCEMENT`, each with its own sign and its own learnable weight, so Credibility can learn
+the two cases independently instead of learning one blended prior. That is a taxonomy version bump and a
+message-contract change across every service, so it is recorded here as the intended direction.
 
 ## 3. Event polarity and conditions
 

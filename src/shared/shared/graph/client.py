@@ -40,14 +40,21 @@ RETURN cf.id AS factor_id, a.id AS asset_id, r.direction AS direction,
 # Industry-level edges, returned against each member asset so the caller sees a normal FiringEdge.
 # `inherited` marks the provenance: a newly listed company has no evidence of its own yet, so it
 # predicts from its group's edges until the offline learner writes company-specific ones.
+#
+# The override is by (factor, asset), NOT by (factor, asset, condition): if the asset has ANY of its
+# own edges for this factor that is eligible under the active condition set, every group edge for
+# that factor is suppressed. Matching on condition equality instead let a learned conditioned asset
+# edge sit alongside the unconditional group edge, and BOTH fired — one causal factor counted twice,
+# inflating both the confidence mass and the magnitude average. That was live on 2026-08-14: a
+# SAFE_HAVEN_ONLY conflict returned two UP edges for NEM_NYSE (its own learned 0.11 plus
+# PRECIOUS_METALS' 0.50).
 _GROUP_FIRING_EDGES_CYPHER = """
 MATCH (cf:CausalFactor {id: $event_type})-[r:CAUSES]->(g:AssetGroup)<-[:MEMBER_OF]-(a:Asset)
 WHERE ($asset_ids IS NULL OR a.id IN $asset_ids)
   AND (r.condition IS NULL OR $conditions IS NULL OR r.condition IN $conditions)
   AND NOT EXISTS {
     MATCH (cf)-[own:CAUSES]->(a)
-    WHERE (own.condition IS NULL AND r.condition IS NULL)
-       OR own.condition = r.condition
+    WHERE own.condition IS NULL OR $conditions IS NULL OR own.condition IN $conditions
   }
 RETURN cf.id AS factor_id, a.id AS asset_id, r.direction AS direction,
        r.weight AS weight, r.confidence AS confidence, r.alpha AS alpha, r.beta AS beta,

@@ -22,7 +22,7 @@ from shared.schemas.messages import (
 )
 
 from verification.config import VerificationSettings
-from verification.exceptions import PriceValidationError
+from verification.exceptions import OrphanedObservationError, PriceValidationError
 from verification.models import EvaluationRecord, EvaluationStatus
 from verification.pipeline import VerificationPipeline
 
@@ -232,10 +232,35 @@ async def test_process_price_scores_and_publishes() -> None:
     assert len(repo.observations) == 1
 
 
-async def test_process_price_without_evaluation_is_rejected() -> None:
+async def test_process_price_without_evaluation_raises_orphaned_not_validation() -> None:
+    """An orphan is NOT a PriceValidationError, so the consumer can acknowledge it.
+
+    Both conditions used to raise PriceValidationError, which the consumer maps to a poison message.
+    Every orphan was therefore dead-lettered, and the queue filled with messages no retry and no
+    inspection could resolve — the missing evaluation row is the evidence, not the message.
+    """
     repo = _FakeRepo(evaluation=None)
-    with pytest.raises(PriceValidationError, match="no evaluation"):
+    with pytest.raises(OrphanedObservationError, match="no evaluation"):
         await _pipeline(repo).process_price(_observed(uuid.uuid4(), "100", "103"))
+
+
+async def test_orphaned_error_is_not_a_price_validation_error() -> None:
+    # Pins the type split: PriceValidationError must still dead-letter, so the two must not be
+    # related by inheritance in a way that makes the consumer's `except` order load-bearing.
+    assert not issubclass(OrphanedObservationError, PriceValidationError)
+    assert not issubclass(PriceValidationError, OrphanedObservationError)
+
+
+async def test_orphaned_error_names_what_is_missing() -> None:
+    # The log line is the only trace an orphan leaves, so the message must identify the row to look
+    # for: request, prediction and asset.
+    request_id = uuid.uuid4()
+    repo = _FakeRepo(evaluation=None)
+    with pytest.raises(OrphanedObservationError) as exc:
+        await _pipeline(repo).process_price(_observed(request_id, "100", "103"))
+    text = str(exc.value)
+    assert str(request_id) in text
+    assert "NEM_NYSE" in text
 
 
 async def test_process_price_session_mismatch_is_rejected() -> None:

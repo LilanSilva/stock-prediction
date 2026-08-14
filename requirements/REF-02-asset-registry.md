@@ -148,13 +148,27 @@ Cleansing resolves which assets an article affects by scope, **most specific fir
 |---|---|---|
 | `COMPANY` | a company's own keyword | that asset alone |
 | `INDUSTRY` | a group keyword | **every member of the group**, across markets |
-| `EVENT_TYPE` | neither | the event type's graph assets (`EVENT_TYPE_ASSETS` + `EVENT_TYPE_GROUPS`) |
-| `NONE` | nothing matches | no assets; no prediction |
+| `EVENT_TYPE` | neither, **and** the title evidences the target's cue family | the event type's graph assets (`EVENT_TYPE_ASSETS` + `EVENT_TYPE_GROUPS`), filtered to cue-evidenced targets |
+| `NONE` | nothing matches, or no cue family is evidenced | no assets; no prediction |
 
 ```text
 "Tesla acquired by rival"     -> COMPANY   -> TSLA_NASDAQ
 "Missile strikes hit airbase" -> INDUSTRY  -> LMT_NYSE, SAAB_B_STO, AM_EPA
 ```
+
+**Keywords are matched punctuation-normalised, on both sides** (CLN-65, 2026-08-14). Write them in
+whatever form reads naturally — `"saab-b"` is fine — because normalisation replaces punctuation with
+spaces in the keyword and in the text before matching. Scope resolution previously skipped that
+normalisation, so `"Exxon, Inc. lifts full-year guidance"` missed its company entirely and
+`"Lockheed-Martin wins missile contract"` fell through to an industry fan-out that predicted Lockheed's
+competitors — inverting the precedence this section documents.
+
+**`GOLD` and `BRENT_OIL` are not registry assets** and must not be reintroduced. Market Data cannot
+price a bare commodity and Verification cannot score one, so a prediction on either would never resolve.
+`NEM_NYSE` (Newmont) is the gold proxy and `XOM_NYSE` (Exxon) the oil proxy. Two Neo4j seed files
+targeted those ids for months after the migration; because Cypher's `MATCH ... MERGE` is a silent no-op
+when the `MATCH` binds nothing, every expert prior in them was discarded with no error
+(`infra/neo4j/init/09-verify-seed.cypher` now aborts the seed if it recurs).
 
 A company keyword always beats an industry keyword in the same text, so a Saab-specific story does not
 move the whole defence sector. Single-token keywords match whole-word with English/Swedish plural

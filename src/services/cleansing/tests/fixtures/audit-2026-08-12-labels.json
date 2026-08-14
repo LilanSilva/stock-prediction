@@ -1,0 +1,689 @@
+{
+  "source_corpus": "audit-2026-08-12-articles.json",
+  "rubric": "expected_event_type null means 'any non-financial or unmapped type'; expected_assets is exact and order-insensitive.",
+  "labels": [
+    {
+      "ref": "A1",
+      "article_id": "f7e7ea4b-2379-4f0a-aff4-c66679824d33",
+      "title": "Guldlyft efter USA-inflationen: ”Perfekt läge”",
+      "expected_event_type": "INFLATION_CHANGE",
+      "expected_assets": [
+        "NEM_NYSE"
+      ],
+      "verdict": "justified",
+      "rationale": "US CPI in line lifts gold; monetary cue \"inflation\" gates the precious-metals fallback."
+    },
+    {
+      "ref": "A2",
+      "article_id": "f66b4b19-af13-4424-b6f5-1ba5e9861614",
+      "title": "Brist på Patriot även i Europa: ”Vidtar åtgärder”",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "accepted_limitation",
+      "rationale": "A Patriot missile shortage is not an oil supply disruption, and the asset outcome is correct: no energy cue in the title, so no assets. The TYPE also degrades from SUPPLY_DISRUPTION to OTHER, because the Swedish \"brist\" is a generic keyword and the title carries no corroborating company, industry, cue or money figure (CLN-64). Accepted: the type is only used for clustering here, and no prediction was possible either way. The cost is that a Swedish shortage headline with no domain cue no longer clusters."
+    },
+    {
+      "ref": "A3",
+      "article_id": "6d9eaf8a-4c04-480f-98c2-6172d768e997",
+      "title": "Kvällens solförmörkelse kan bli extra dramatisk",
+      "expected_event_type": "MILITARY_CONFLICT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Solar eclipse feature; MILITARY_CONFLICT comes from \"krig\" in body prose, and the title carries no conflict cue."
+    },
+    {
+      "ref": "A4",
+      "article_id": "b3e22b04-cb66-45f3-9936-c7c35f3e3352",
+      "title": "Sanna: Jag tog mig in i Ukraina utan papper, med en sovande chaufför",
+      "expected_event_type": "MILITARY_CONFLICT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Personal travel column; \"krig\" appears only in body prose and the title names no conflict."
+    },
+    {
+      "ref": "A5",
+      "article_id": "be7e4c86-ad3a-4c1e-9426-c77ecb2ae505",
+      "title": "Nytt ryskt drag – luftkriget mot Ukraina trappas upp",
+      "expected_event_type": "MILITARY_CONFLICT",
+      "expected_assets": [
+        "NEM_NYSE",
+        "LMT_NYSE",
+        "LMT_NYSE_YH",
+        "SAAB_B_STO"
+      ],
+      "verdict": "justified",
+      "rationale": "Russian escalation of the air war; \"luftkriget\" is a compound conflict cue in the title."
+    },
+    {
+      "ref": "A6",
+      "article_id": "1a45fb4b-687b-45e1-a92b-394f02b2fc62",
+      "title": "UNITED DAIRY FARMERS, INC. AND GRIPPO FOODS, INC. TEAM UP FOR ONE-OF-A-KIND HOMEMADE BRAND",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A7",
+      "article_id": "cbd509e0-1aed-428d-81fb-891190c7e3b4",
+      "title": "Jenna Ortega on Why She’d Go “All Day” Without Eating or Drinking on Set in Early Career",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A8",
+      "article_id": "ebe900b5-f14d-4799-944e-b952767647ac",
+      "title": "Canucks Army is no more as popular website gets a new name",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A9",
+      "article_id": "6de7b1ef-c138-4567-bf12-6ddba34fd033",
+      "title": "Knicks-Sixers, Lakers-Warriors highlight first day of NBA Cup",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A10",
+      "article_id": "dd6a157a-d6e5-4d2c-851a-10d4fcd30bfd",
+      "title": "Knicks-Sixers, Lakers-Warriors highlight first day of NBA Cup",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A11",
+      "article_id": "b1f90fd5-b8e5-4b50-82be-f3c4929cab6f",
+      "title": "Ny israelisk attack på Gazaremsan",
+      "expected_event_type": "MILITARY_CONFLICT",
+      "expected_assets": [
+        "NEM_NYSE",
+        "LMT_NYSE",
+        "LMT_NYSE_YH",
+        "SAAB_B_STO"
+      ],
+      "verdict": "justified",
+      "rationale": "Israeli strike on Gaza; \"attack\" is a conflict cue in the title."
+    },
+    {
+      "ref": "A12",
+      "article_id": "c23ecf12-c17e-4f8f-b3cd-786ab7590294",
+      "title": "He bet on 61 matches: Everton's young striker in the grip of the English FA",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A13",
+      "article_id": "e1f04ad9-222a-4764-afba-9cf93604f00a",
+      "title": "Gemballa Marsien GT is an 830 hp modern Porsche 959",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A14",
+      "article_id": "2050bf65-f840-4af9-a05e-8f0168e041bf",
+      "title": "Bitmine Immersion Technologies (BMNR) Buys More Ethereum, Is The Stock Cheap Or Pricey?",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A15",
+      "article_id": "11c0d788-5efd-42f8-b1a2-58ae95a2fe5c",
+      "title": "Chattanooga Baseball History Night Aug. 18 Honors Chattanooga Icon Wanda Goins",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A16",
+      "article_id": "45f9c278-178b-427e-b503-02033d758733",
+      "title": "UNITED DAIRY FARMERS, INC. AND GRIPPO FOODS, INC. TEAM UP FOR ONE-OF-A-KIND HOMEMADE BRAND",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A17",
+      "article_id": "0ab85373-4830-447d-b852-907bb54d4759",
+      "title": "'A Tale of Two Cities': Kit Harington stars in new Dickens adaptation",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A18",
+      "article_id": "371f4d2c-d44f-4607-805f-c0d51370240c",
+      "title": "Twitch streamers can now opt out from training Amazon’s AI",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A19",
+      "article_id": "fd11a339-f186-4902-8d0b-c6be4510a788",
+      "title": "Twitch Now Trains Amazon's Generative AI Models On Your Channel By Default – Here's How To",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A20",
+      "article_id": "742d8f09-2179-4fd4-922d-a3f749895731",
+      "title": "CoreWeave reports $2.575B Q2 revenue, $104B bac...",
+      "expected_event_type": "CORPORATE_EARNINGS",
+      "expected_assets": [],
+      "verdict": "known_recall_gap",
+      "rationale": "CoreWeave/NVIDIA demand should reach NVDA, but company keywords are matched in the title only. Follow-up, not E12."
+    },
+    {
+      "ref": "A21",
+      "article_id": "4572a708-5abf-46c3-abb6-664feff04c5e",
+      "title": "Sabyasachi x Met Debuts Art-Inspired High Jewelry Collection",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A22",
+      "article_id": "9e0ebb20-9522-4b52-ae7f-1d1443df53ed",
+      "title": "Gold expected to trade around $4,500/oz by end of 2026 amid geopolitical and Fed rate conc",
+      "expected_event_type": "COMMODITY_PRICE_SHOCK",
+      "expected_assets": [
+        "LUG_STO",
+        "NEM_NYSE"
+      ],
+      "verdict": "justified",
+      "rationale": "LBMA gold forecast; \"gold\" gates the precious-metals fallback and must not reach oil."
+    },
+    {
+      "ref": "A23",
+      "article_id": "4c99c7c7-af36-432c-af5f-fde0ac247219",
+      "title": "DN Debatt. ”En hel generation är på väg att stängas ute från villorna”",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Housing-market debate column. \"stängas\" matches the STRAIT_CLOSURE keyword \"stänga\" by suffix tolerance; only visible after the corpus encoding was repaired, so the mojibake in the export was masking it."
+    },
+    {
+      "ref": "A24",
+      "article_id": "b5808c05-d7c5-4689-b581-5d0701b3d87f",
+      "title": "Gapet har halverats – ”psykologisk skillnad”",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A25",
+      "article_id": "419946db-a7b7-43db-9059-755cf101c3fd",
+      "title": "Body Fat Patterns Show Similar T2D Predictive Value",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A26",
+      "article_id": "74f42df1-7b42-432c-ab3b-39e71ed21a06",
+      "title": "Reddit Unveils Pregnant Women's Tdap Vaccine Queries",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A27",
+      "article_id": "dca67484-8441-4311-9560-f61bf506b0a8",
+      "title": "UofM to replace first-semester letter grades with pass, no credit for LSA students",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A28",
+      "article_id": "6652015b-bfd9-4c2f-ad38-cf709b84145c",
+      "title": "Are peptides the future of aging? What to know about the popular unregulated supplements",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A29",
+      "article_id": "d993eead-2591-4bf8-9e6f-7c2dea24973d",
+      "title": "Uzbekistan Discusses New Projects With Chinese Firms",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A30",
+      "article_id": "2c06dd1d-f030-430b-b8c0-c890255e86f1",
+      "title": "Researchers find unexpected protein regulator of leukemia drug sensitivity",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A31",
+      "article_id": "3b0a5b5f-b1de-4a39-87fd-c6c34107c1ca",
+      "title": "Senaste nytt om kriget i Ukraina",
+      "expected_event_type": "MILITARY_CONFLICT",
+      "expected_assets": [
+        "NEM_NYSE",
+        "LMT_NYSE",
+        "LMT_NYSE_YH",
+        "SAAB_B_STO"
+      ],
+      "verdict": "justified",
+      "rationale": "Ukraine war live blog; \"kriget\" is a conflict cue in the title."
+    },
+    {
+      "ref": "A32",
+      "article_id": "d0e043a4-fd1a-44a2-b9a0-110123233ee2",
+      "title": "Over 200 Mozart Figurines Stolen From Salzburg Art Installation, Forcing Early Closure Of ",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Stolen Mozart figurines; \"Closure\" in the title must not select STRAIT_CLOSURE."
+    },
+    {
+      "ref": "A33",
+      "article_id": "83a3b725-8e00-4871-846a-2bec97efd3ef",
+      "title": "Players celebrate after taking a wicket during the National Champions Cup 2026–27 match be",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A34",
+      "article_id": "05c4e354-a23e-4d9c-87de-a2329f4472c2",
+      "title": "Counselling plan for schoolchildren shelved over shortage of mental health professionals",
+      "expected_event_type": "SUPPLY_DISRUPTION",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Shortage of counsellors is not an energy supply disruption; no energy cue."
+    },
+    {
+      "ref": "A35",
+      "article_id": "6ed8eb2e-ff7f-45de-b844-1175d26b8689",
+      "title": "Stroller running linked to lower overuse injury rates for new parents",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "\"injury rates\" must not select RATE_DECISION."
+    },
+    {
+      "ref": "A36",
+      "article_id": "844d6b33-d3fa-41cd-93a7-35b6259cfeac",
+      "title": "SOL Price Prediction: $77 Ceiling Won't Hold — A $73 Flush Is the Most Likely Next Move",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A37",
+      "article_id": "ce9a088a-557e-402c-a5ff-60a7beea121a",
+      "title": "Florida High School Football Program Fined Following FHSAA Investigation",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A38",
+      "article_id": "5642cfa9-c882-459c-8c7c-9be15a02ebbc",
+      "title": "S efter minskade gapet: ”Otroligt hoppfull”",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A39",
+      "article_id": "62c86831-56e8-451f-b8f6-062a8e40e56f",
+      "title": "Michael Winiarski: Trump har kört fast – och Iran använder sitt nya vapen",
+      "expected_event_type": "MILITARY_CONFLICT",
+      "expected_assets": [
+        "LMT_NYSE",
+        "LMT_NYSE_YH",
+        "SAAB_B_STO"
+      ],
+      "verdict": "justified",
+      "rationale": "Iran war analysis; industry keyword \"vapen\" selects the weapons group by industry scope, not by fallback."
+    },
+    {
+      "ref": "A40",
+      "article_id": "8538e92b-bd62-4320-86ba-83f69630ac63",
+      "title": "UFC 330: Comparing Islam Makhachev's career to his legendary coach and mentor Khabib Nurma",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A41",
+      "article_id": "9b661dbc-43a1-4b25-8475-15c4d9b0668f",
+      "title": "Mitochondrial gene RTN4IP1 drives triple-negative breast cancer metastasis",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A42",
+      "article_id": "aaf958f0-23cf-4046-8c2d-26b21e036c78",
+      "title": "Students wait for A-level, T-level and BTec grades",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A43",
+      "article_id": "6c286f5c-a300-46a3-b339-1fcd86813451",
+      "title": "One Running Back To Target In Every Round Of Your Fantasy Football Draft: Quinshon Judkins",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A44",
+      "article_id": "0cb989bb-dc07-4743-98d0-38615d6c8828",
+      "title": "If you love Field of Dreams, these baseball movies are even better",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A45",
+      "article_id": "974b29c3-d243-4826-9b10-dab8f380fd92",
+      "title": "Cleveland State Women's Soccer Opens Season at Kent State",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A46",
+      "article_id": "57a127c6-8c6d-4857-bb05-6904495928a2",
+      "title": "Men's Basketball Announces 2026-27 Non-Conference Schedule",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A47",
+      "article_id": "9cdef957-39e1-4d48-8138-d20532de2408",
+      "title": "Estrogen therapy is linked to fewer signs of Alzheimer’s in the brain",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A48",
+      "article_id": "0d3f6f2d-e631-4e0a-a7f0-755aed72c066",
+      "title": "Calhoun County Couple to Compete on Season 39 of ‘The Amazing Race’",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A49",
+      "article_id": "3a711771-1bf3-433d-b148-6d81ee20ce02",
+      "title": "Cruise ships, quiet towns and an all-day festival: millions flock to eclipse viewing spots",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A50",
+      "article_id": "a755f7ae-0fbc-4736-8b5b-80169fd2bc8f",
+      "title": "Edmonton Oilers have a logjam of goalies after latest signing",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A51",
+      "article_id": "de174b16-43b0-4ea7-8ee9-24167896c76e",
+      "title": "Penny Hardaway says Memphis basketball roster is set no matter what",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A52",
+      "article_id": "4cb651f5-cca3-4dcd-818e-bb573a7ded94",
+      "title": "Damian Priest & R-Truth, The War Raiders and The MFTs clash in title bout",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "WWE title bout; the non-financial tier must reject before \"war\" can type it as MILITARY_CONFLICT."
+    },
+    {
+      "ref": "A53",
+      "article_id": "6475a872-da27-4338-bcb3-93a7d302f881",
+      "title": "Boulevard Bio launches to tackle B-cell-driven autoimmune disease",
+      "expected_event_type": "SUPPLY_DISRUPTION",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A biotech drug \"pipeline\" is not an oil pipeline; no energy cue in the title."
+    },
+    {
+      "ref": "A54",
+      "article_id": "42cb371e-3070-4dee-b481-881f3c0b97f9",
+      "title": "Triple-double king Russell Westbrook calls time on 18-year NBA career",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A55",
+      "article_id": "44257aa4-dc9b-432f-8633-9b8800fca372",
+      "title": "Former Nuggets guard Russell Westbrook retires from the NBA with a farewell video narrated",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A56",
+      "article_id": "1776316d-2350-49fb-8b80-26129601599d",
+      "title": "How real was the Vikings’ quarterback competition?",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A57",
+      "article_id": "cfc239c7-5805-44bc-ad00-bad1f077d5dd",
+      "title": "John Hinckley shares message for Jodie Foster: 'I wish her well'",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A58",
+      "article_id": "0a7c59d2-0489-4f5b-ba43-d618b3c76fc0",
+      "title": "Xavi Hernandez appointed Netherlands head coach until 2030",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A59",
+      "article_id": "2bddd57f-62b1-4b6a-a4af-e3bce5a8243a",
+      "title": "Yellowstone National Park lifts fishing restrictions",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A60",
+      "article_id": "73e77014-cfc0-4c3b-8237-be8262381b77",
+      "title": "Yellow Jackets picked close second in G-MAC preseason poll",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A61",
+      "article_id": "da12a5a8-249b-4525-9ff7-f8c6a5822cfe",
+      "title": "Indian fencing team secures five more medals at Commonwealth championships",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A62",
+      "article_id": "4351dc24-5607-470e-843b-b3f149e8336c",
+      "title": "Vests Tested on Artemis Could Cut Radiation Risk",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A63",
+      "article_id": "39d468dc-4bb7-4113-94e8-4c8c951af6b5",
+      "title": "Zimmerman, Gators Set to Gauge 'Process' in Debut at UCF",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A64",
+      "article_id": "8a303f79-2893-4787-aa72-8857501f7ec2",
+      "title": "Suspensions extended for four players acquitted in Hockey Canada trial",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A65",
+      "article_id": "abc23362-47d7-4c2b-afc6-7a9a92fa5b08",
+      "title": "Ice hockey-Hockey Canada upholds suspensions for four players acquitted of sexual assault ",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A66",
+      "article_id": "cb54ad3b-01b7-491f-b3fe-35496fa8e24d",
+      "title": "5 players from 2018 junior team breached Hockey Canada code of conduct",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A67",
+      "article_id": "f22a5bce-ecc2-4dfa-aeef-d32bdb9d69a3",
+      "title": "PS Plus Is Loaded With Great Games for August, Including Helldivers 2, Hell Is Us, Kingdom",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A68",
+      "article_id": "9c8c27f2-280b-4496-8302-a5400e4b61cc",
+      "title": "SpaceX Stock Just Rallied 12% in a Single Day. Did Elon Musk Survive the Lockup Expiration",
+      "expected_event_type": "IPO_LISTING",
+      "expected_assets": [
+        "TSLA_NASDAQ"
+      ],
+      "verdict": "accepted_limitation",
+      "rationale": "SpaceX lockup expiry reaches TSLA through the registry keyword \"elon musk\"; registry scope is out of E12."
+    },
+    {
+      "ref": "A69",
+      "article_id": "c9914fbd-ea49-44ed-8e48-ebed1c89584d",
+      "title": "LeBron James unveils new signature shoe ahead of 24th NBA season and Sixers debut",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A70",
+      "article_id": "128c5427-5cb3-4eb8-9d46-30be2c853b3c",
+      "title": "Tactics Talk: Order and chaos in North Carolina vs. Washington",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A71",
+      "article_id": "093a4f0f-dac0-4c20-a191-5be603629bec",
+      "title": "Ice hockey-Hockey Canada upholds suspensions for four players acquitted of sexual assault ",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A72",
+      "article_id": "cc390b61-5bc9-46eb-988f-fec6dcc51686",
+      "title": "Russell Westbrook retires: His NBA legacy after 18 electric seasons",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    },
+    {
+      "ref": "A73",
+      "article_id": "0aabe237-f575-4533-8678-516f5db7e28e",
+      "title": "expert reaction to study looking at the effect of nanomolar vanillin (an e-cigarette flavo",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-market article: must resolve to no assets."
+    }
+  ]
+}

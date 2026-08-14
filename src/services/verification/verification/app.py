@@ -27,7 +27,11 @@ from shared.schemas.messages import PredictionMade, PriceObserved
 
 from verification.config import VerificationSettings
 from verification.db import apply_schema, create_pool
-from verification.exceptions import InvalidPredictionError, PriceValidationError
+from verification.exceptions import (
+    InvalidPredictionError,
+    OrphanedObservationError,
+    PriceValidationError,
+)
 from verification.outbox import VerificationOutboxPublisher
 from verification.pipeline import VerificationPipeline
 from verification.repository import VerificationRepository
@@ -39,6 +43,9 @@ logger = structlog.get_logger(__name__)
 class ServiceState:
     predictions_seen: int = 0
     prices_seen: int = 0
+    # Observations acknowledged without scoring because their evaluation row was gone. Surfaced on
+    # /health so the condition is visible without a growing dead-letter queue to notice it by.
+    prices_orphaned: int = 0
     last_sweep_at: datetime | None = None
     last_published: int = 0
 
@@ -91,6 +98,26 @@ def _make_price_consumer(app: FastAPI) -> ConsumerCallback:
             raise MessagePoisonError(f"invalid PriceObserved: {exc}") from exc
         try:
             await ctx.pipeline.process_price(observed)
+        except OrphanedObservationError as exc:
+            # Acknowledged, not dead-lettered. The evaluation row this observation needs is gone, so
+            # no retry can succeed and the message itself holds no evidence a human could act on —
+            # the missing row is the evidence. Dead-lettering it filled the DLQ with unactionable
+            # traffic and drowned out the mismatches that DO need inspection.
+            #
+            # Same treatment as a WITHDRAWN evaluation, which is also "nothing to score"; the
+            # difference is the log level, because an orphan is unexpected in production. It is
+            # routine in local testing, where an integration test deletes its own predictions and
+            # evaluations while a PriceObserved for them is still in flight.
+            ctx.state.prices_orphaned += 1
+            logger.warning(
+                "price_observed_orphaned",
+                request_id=str(observed.request_id),
+                prediction_id=str(observed.prediction_id),
+                asset_id=observed.asset_id.value,
+                orphaned_total=ctx.state.prices_orphaned,
+                reason=str(exc),
+            )
+            return
         except PriceValidationError as exc:
             raise MessagePoisonError(str(exc)) from exc
         ctx.state.prices_seen += 1
@@ -186,6 +213,7 @@ async def health() -> dict[str, object]:
         "status": "ok",
         "predictions_seen": state.predictions_seen,
         "prices_seen": state.prices_seen,
+        "prices_orphaned": state.prices_orphaned,
         "last_sweep_at": state.last_sweep_at.isoformat() if state.last_sweep_at else None,
         "last_published": state.last_published,
     }

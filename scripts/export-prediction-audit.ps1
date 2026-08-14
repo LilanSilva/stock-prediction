@@ -51,6 +51,13 @@ param(
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 
+# psql emits UTF-8, but PowerShell decodes a native command's stdout using the console's OEM code
+# page (cp437/cp850 on a Windows-EN host). Without this every non-ASCII character in an article was
+# double-encoded on the way out: the 2026-08-12 export contains "l├ñge" where the database holds
+# "läge". Set it for the duration of the script so the captured text matches the database.
+$previousOutputEncoding = [Console]::OutputEncoding
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+
 # --- Load credentials from infra/.env -------------------------------------------------------
 $envPath = Join-Path $repoRoot "infra\.env"
 if (-not (Test-Path $envPath)) {
@@ -211,6 +218,8 @@ $pending   = @($predRows | Where-Object { $_.verification -eq "pending" }).Count
     )
     predictions      = @($predictions)
 } | ConvertTo-Json -Depth 8 | Out-File -FilePath $out -Encoding utf8
+
+[Console]::OutputEncoding = $previousOutputEncoding
 
 Write-Host ""
 Write-Host "Written to: $out" -ForegroundColor Green

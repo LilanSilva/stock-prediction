@@ -65,7 +65,7 @@ def _build_action(
         original_lemma=original_lemma,
         event_type=event_type,
         affected_asset_ids=scope.assets,
-        polarity=classify_polarity(text),
+        polarity=classify_polarity(text, event_type),
         context_tags=tuple(infer_conditions(text, event_type)),
     )
 

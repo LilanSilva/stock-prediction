@@ -78,6 +78,30 @@ per scored prediction and offline by a deterministic structure learner that mine
 against realized price moves; the initial graph is still an idempotent expert seed, and the learner
 only refines or adds edges (non-destructive `MERGE`).
 
+**Amended 2026-08-14 (E12 S02).** Conditioned edges are attached to `:AssetGroup` nodes, not to the
+commodity `:Asset` nodes the design originally named. `infra/neo4j/init/04` and all of `05` targeted
+`(:Asset {id: 'GOLD'})` and `BRENT_OIL`, which `02-seed-assets.cypher` never creates — the registry had
+migrated to equity proxies (`NEM_NYSE`, `XOM_NYSE`) because Market Data can price an equity and
+Verification can score it. Cypher's `MATCH ... MERGE` is a silent no-op when the `MATCH` binds nothing
+and `cypher-shell` still exits 0, so every prior in those two files was discarded at seed time, with no
+error, for as long as they existed. `09-verify-seed.cypher` now aborts the seed on that class of fault.
+
+Two further constraints were established while fixing it, both verified against the live graph:
+
+- **A `(factor, target)` pair is declared in exactly one seed file.** `MERGE (cf)-[r:CAUSES]->(g)` with
+  no properties matches ANY existing `CAUSES` relationship between the two nodes, including a
+  conditioned one — so an unconditional statement running after a conditioned one does not create a
+  second edge, it silently rebinds and overwrites the conditioned edge's weight. `05` owns every
+  conditioned edge; `06` owns every unconditional one.
+- **A target carries a conditioned edge only where the condition changes the outcome**, meaning only
+  where one condition implies no edge at all. Condition tags are unioned across the events in a context,
+  so both `SAFE_HAVEN_ONLY` and `TRANSPORT_AFFECTED` can be active at once; a target holding one edge
+  per condition would then fire both and count the factor twice. Oil qualifies (a distant conflict
+  leaves it untouched); gold does not (it rises either way), so gold's prior stays unconditional.
+
+The gating itself was already working for the case it was designed for: a `SAFE_HAVEN_ONLY` conflict
+fires no oil edge, because `06` conditions the `OIL_GAS` edge independently of the dead files.
+
 ## ADR-007: Multi-market coverage via a file-driven asset registry
 
 Every tradeable asset was priced by a US bellwether, so Swedish news about SAAB or Volvo could not
@@ -171,6 +195,24 @@ constraint (`REQUIRE r.condition IS NOT NULL`) requires Neo4j Enterprise Edition
 Verified live: a `MILITARY_CONFLICT`/`TRANSPORT_AFFECTED` context produced `XOM_NYSE` UP at depth 0,
 then `NEM_NYSE` DOWN and `LUG_STO` DOWN at depth 1, with the seeded `NEM_NYSE → XOM_NYSE` back-edge
 correctly silenced by the visited set.
+
+**Amended 2026-08-14 (E12 S03): propagation is now gated.** The 2026-08-12 audit found 39 of 113
+predictions (35%) were purely propagated and scored 10 correct / 21 wrong, against 27/30 for direct
+predictions — materially worse than the mechanism they were derived from. Three guards were added:
+
+1. A confidence floor on the source decision (`PREDICTION_PROPAGATION_MIN_CONFIDENCE`, default 0.30).
+2. All direct decisions in a claimed batch are made before any propagation runs, and the visited set is
+   seeded with every directly-decided asset. A propagated prediction is also refused when it would
+   overturn a standing opposing stance.
+3. The depth cap, unchanged.
+
+Guard 2 is the important one, and it closes a hole in the visited-set design recorded above. The guard
+is per **context**, and sibling contexts are invisible to each other: one macro event reaches both ends
+of an anti-correlated pair, each asset opens its own context in the same batch, and each propagates a
+contradiction onto the other. The result was NEM_NYSE holding 16 UP and 13 DOWN predictions, XOM_NYSE 16
+DOWN and 13 UP, and LUG_STO 9 and 9 — all from one day's news. No confidence threshold could have caught
+this without also switching off propagation for the seeded graph, because the contradicting predictions
+were exactly as confident as the ones they contradicted.
 
 **Cost accepted.** Two new graph methods and a propagation loop in the pipeline increase code
 surface. The visited-set guard is simple but must be per-run (not global), or it would prevent the

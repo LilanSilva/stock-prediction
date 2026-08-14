@@ -290,6 +290,7 @@ Per-source obligations are in [SRS-02 §5.8](SRS-02-ingestion.md#58-source-gover
 | `SYS-74` | The system **shall** store the minimum article text the POC requires. | Must | Approved |
 | `SYS-75` | The system **shall** document a retention period for stored article text. | Must | Implemented |
 | `SYS-76` | Any presentation of a prediction **shall** carry a financial-information disclaimer stating that the output is experimental and is not financial advice. | Must | Approved |
+| `SYS-77` | The system **shall not** hold two opposing active predictions for the same asset when both derive from the same event set. | Must | Implemented |
 
 Deletion automation, backup/restore automation, and long-term audit infrastructure are deferred until
 the POC graduates — see 13.4.
@@ -650,6 +651,7 @@ System-level behaviours and the tests that prove them.
 | `SYS-70`, `SYS-71` | Demonstration | `ruff check` and `mypy --strict` in CI |
 | `SYS-75` | Inspection | [SRS-02 §10.5](SRS-02-ingestion.md#10-configuration) — `ARTICLE_RETENTION_DAYS` default 30, `OUTBOX_RETENTION_DAYS` default 7 |
 | `SYS-73`, `SYS-74`, `SYS-76` | Inspection | **Not yet enforced.** Source terms are not modelled on a source record, and no Gateway or Dashboard exists to carry the disclaimer — `Approved`, not `Implemented` |
+| `SYS-77` | Test | [SRS-04 PRD-61](SRS-04-prediction.md#5-functional-requirements) — `prediction/tests/test_pipeline_e12.py::test_a_directly_decided_asset_is_not_reached_by_propagation`. Violated in production until 2026-08-14: one macro event reached both ends of an anti-correlated asset pair and each propagated a contradiction onto the other, so NEM_NYSE held 16 UP and 13 DOWN predictions from one day's news |
 
 ## 12. Failure handling
 

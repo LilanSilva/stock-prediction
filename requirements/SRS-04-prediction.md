@@ -231,6 +231,9 @@ Specific responsibilities:
 | PRD-57 | Propagated predictions shall pass through the same stance management as direct ones (market-open duplicate skip, market-closed supersede-and-withdraw) | Implemented |
 | PRD-58 | A `GraphError` raised while querying correlation edges for one source asset shall be caught, logged as `propagation_graph_error` with the source asset and depth, and that source skipped; the remaining sources, the direct prediction, and the rest of the close sweep are unaffected and the context is **not** marked `ERROR_RETRYABLE` | Implemented |
 | PRD-59 | `max_propagation_depth` shall be configurable via `PREDICTION_MAX_PROPAGATION_DEPTH`, default 3, and validated to the inclusive range 1–10 | Implemented |
+| PRD-60 | A direct decision whose confidence is below `propagation_min_confidence` shall not be propagated; the skip shall be logged as `propagation_skipped_low_confidence` with the asset, confidence and threshold | Implemented |
+| PRD-61 | A propagated prediction shall not be stored for an asset that already holds an active prediction in the opposing direction; the suppression shall be logged as `propagation_contradicts_active_stance`. Direct decisions for the whole claimed batch shall be made before any propagation runs, so a sibling context's direct stance is visible to it | Implemented |
+| PRD-62 | `event_ids` shall contain only the events whose causal factor contributed a firing edge to the decision. A propagated decision has no causal factor and shall fall back to its source context's events; `event_ids` shall never be empty | Implemented |
 
 ### 5.9 Health and readiness
 
@@ -546,9 +549,26 @@ The market-closed collapse means there is always at most one active (non-withdra
 
 ### 7.10 Cross-asset propagation algorithm (_run_propagation)
 
-Propagation runs after the direct (pass 0) prediction and before the context is marked PREDICTED. It
-is a breadth-first sweep: each pass takes the assets decided directionally in the previous pass and
-walks their outgoing `CORRELATES_WITH` edges.
+Propagation runs after **every** direct decision in the claimed batch has been made and stored, and
+before each context is marked PREDICTED. It is a breadth-first sweep: each pass takes the assets decided
+directionally in the previous pass and walks their outgoing `CORRELATES_WITH` edges.
+
+**Three guards apply, all added by E12 after the 2026-08-12 audit found that 39 of 113 predictions (35%)
+were purely propagated, at a 32% hit rate against 47% for direct ones:**
+
+1. **Confidence floor (PRD-60).** A source decision below `propagation_min_confidence` does not
+   propagate at all. A propagated prediction carries no causal factor — it is an inference drawn from
+   another asset's inference — so a weak source is amplified rather than diluted.
+2. **Batch ordering + contradiction suppression (PRD-61).** All direct decisions are made first, and
+   `visited` is seeded with every asset that decided directly in the batch, not just the source. A
+   propagated prediction is also refused when the target already holds an opposing active stance.
+
+   This is what fixes the audit's structural contradiction. One macro event reaches both the gold and
+   the oil proxy; each opens its own context in the same batch; each would propagate a contradiction
+   onto the other. On 2026-08-12 that produced NEM_NYSE 16 UP / 13 DOWN, XOM_NYSE 16 DOWN / 13 UP and
+   LUG_STO 9 / 9 — all from the same news. The per-context `visited` set could not prevent it because it
+   is scoped to one context and is blind to its siblings.
+3. **Depth cap (PRD-59)**, unchanged.
 
 ```
 Input: record (the source context), direct_decisions {asset: direction},
@@ -801,6 +821,7 @@ All variables use the `PREDICTION_` prefix unless noted. Infrastructure variable
 | `PREDICTION_DB_POOL_MIN_SIZE` | `1` | asyncpg minimum pool connections |
 | `PREDICTION_DB_POOL_MAX_SIZE` | `5` | asyncpg maximum pool connections |
 | `PREDICTION_MAX_PROPAGATION_DEPTH` | `3` | Maximum `CORRELATES_WITH` hops from the direct asset; validated to 1–10 inclusive |
+| `PREDICTION_PROPAGATION_MIN_CONFIDENCE` | `0.30` | Minimum confidence a direct decision needs before it is propagated. Set at the boundary separating expert-strength evidence from evidence Credibility has walked down: it admits a single edge of weight ≥ 0.43, so seeded 0.50 priors still propagate (they give 0.33), while a learned-down edge does not (NEM_NYSE's 0.107 gives 0.10). Because reliability is a constant 0.5, a single-edge confidence is `w / (w + 1)` and cannot exceed 0.50 — a threshold of 0.5 would disable propagation rather than gate it |
 
 Neo4j connection variables are from the shared `Neo4jSettings` class: `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`, `NEO4J_CONNECTION_TIMEOUT_SECONDS`, `NEO4J_MAX_CONNECTION_POOL_SIZE` (see SRS-01).
 
@@ -823,6 +844,9 @@ Neo4j connection variables are from the shared `Neo4jSettings` class: `NEO4J_URI
 | [§13.2](#132-known-limitations) summation scoped to one depth level | `tests/test_pipeline.py` | `test_first_wins_still_applies_across_different_depths` — a target decided at depth 1 is not revised by a heavier edge arriving at depth 2 |
 | Proportional credit across converging correlation edges | `../credibility/tests/test_pipeline.py` | `test_converging_edges_receive_proportional_credit`; `test_converging_edges_share_the_blame_when_wrong`; `test_single_edge_propagation_still_gets_full_credit` |
 | PRD-59 (depth configuration) | `tests/test_config.py` | Default of 3; override accepted; `ValidationError` below 1 and above 10 |
+| PRD-60 (propagation gate) | `tests/test_pipeline_e12.py` | Weak source does not propagate; strong source still does; two corroborating edges clear the floor |
+| PRD-61 (contradiction suppression) | `tests/test_pipeline_e12.py` | A propagated stance opposing an active one is suppressed; two sibling contexts from one event never take opposing stances |
+| PRD-62 (edge-level provenance) | `tests/test_pipeline_e12.py` | `event_ids` names only contributing events; names every contributing factor; a propagated prediction still carries evidence |
 | End-to-end | `tests/test_integration.py` | Full EventDetected → PredictionMade flow using fakes |
 | End-to-end propagation | `tests/test_integration.py` | `test_propagation_produces_downstream_prediction_for_nem` — live graph: `MILITARY_CONFLICT`/`TRANSPORT_AFFECTED` → `XOM_NYSE` UP at depth 0, then `NEM_NYSE` DOWN at depth 1 |
 
@@ -919,3 +943,4 @@ Update this document whenever any of the following changes:
 |---|---|
 | 2026-08-05 | Initial as-built specification for E04 (Prediction Service); PRD-1 through PRD-47 |
 | 2026-08-12 | **Feature: cross-asset propagation (E10).** `close_ready_contexts` now runs pass 0 (the direct CAUSES prediction) followed by a depth-capped breadth-first sweep over `CORRELATES_WITH` edges, so a directional prediction on one asset produces secondary predictions on its correlated assets. `decide()` is reused verbatim — a correlation edge is wrapped as a `FiringEdge` with `factor_id = None`, and only two helpers in `decision.py` gained None-guards (`_effective_direction` skips the polarity flip, `_rationale` renders `CORRELATION`). Cycles are prevented by a per-pipeline-run `visited` set seeded with the direct asset; a `GraphError` in a propagation pass skips one source instead of failing the run. M1 / GRAPH_ONLY is unchanged: zero LLM calls added. New section 5.8 with PRD-48…PRD-59; section 5.8 (health and readiness) renumbered to 5.9; §2.1, §3, §4, §7.3, §8.2, §10, §11, §12, §13 and §14.1 updated; §7.10 (propagation algorithm) and §7.11 (worked propagation example) added |
+| 2026-08-14 | **Defect fix (E12 S03).** An audit of 2026-08-12 found that 39 of 113 predictions (35%) carried no causal factor at all — they were synthesised by correlation propagation — and scored 10 correct / 21 wrong against 27/30 for direct predictions. Worse, the contradictions were structural: `EVENT_TYPE_ASSETS` sent one macro event to both ends of an anti-correlated pair, each opened its own context, and each propagated a contradiction onto the other, so NEM_NYSE held 16 UP and 13 DOWN from the same news. Three changes: a confidence floor on the source decision (PRD-60); direct decisions for the whole batch made before any propagation, plus refusal to overturn a standing opposing stance (PRD-61); and `event_ids` narrowed to the events whose factor actually fired (PRD-62) — it had been every event in the 15-minute window, so a prediction driven by one article cited up to five unrelated headlines, and Notification showed them to users. §7.10 updated; PRD-60 through PRD-62 added |

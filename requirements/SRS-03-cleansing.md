@@ -159,6 +159,16 @@ Specific responsibilities:
 | CLN-15b | A non-financial event type shall resolve to zero affected assets, regardless of any company or industry keyword in the text | Implemented |
 | CLN-61 | The keyword scan shall select the earliest positional match, and on a positional tie the longest keyword, so a specific phrase wins over a generic token that starts at the same word (e.g. `"appoints new cfo"` → `EXECUTIVE_CHANGE`, not `"appoint"` → `POLITICAL_TRANSITION`) | Implemented |
 | CLN-62 | Taxonomy keywords shall be declared in the punctuation-normalised form the scanner sees, since normalisation replaces punctuation with spaces (`"spin off"`, never `"spin-off"`) | Implemented |
+| CLN-63 | The non-financial reject tier shall be evaluated before any taxonomy keyword tier, except when the title matches a registered company keyword | Implemented |
+| CLN-64 | A generic keyword in a title shall classify only when that title is corroborated by a registered company, an industry keyword, a money or percentage figure, an institutional market term, or a `FALLBACK_CUES` domain cue | Implemented |
+| CLN-64a | A market event type derived from a title shall be rejected when the body matches a non-financial keyword and the title names neither a company nor an industry | Implemented |
+| CLN-65 | Text shall be punctuation-normalised before company, industry, and asset-keyword matching, on the same terms as the taxonomy scan | Implemented |
+| CLN-66 | The event-type asset fallback shall select a target only when the title evidences that target's own cue family (`SAFE_HAVEN`, `ENERGY`, `DEFENCE`); an event type with no evidenced family shall resolve to zero affected assets | Implemented |
+| CLN-66a | Every target in `EVENT_TYPE_ASSETS` and `EVENT_TYPE_GROUPS` shall declare a cue family, enforced at import | Implemented |
+| CLN-66b | The cluster-level asset fallback in event construction shall apply the same cue gate as per-article scope resolution, using the cluster's article titles | Implemented |
+| CLN-66c | An `OTHER` event type shall resolve to zero affected assets, since it has no causal factor and can never produce a prediction | Implemented |
+| CLN-67 | An `EVENT_TYPE`-scoped resolution shall record the cue families that admitted its assets alongside the event type in `AssetScope.matched` | Implemented |
+| CLN-68 | A `REGULATORY_ACTION` article describing an approval shall be assigned `RESOLUTION` polarity, so the factor's enforcement-signed prior is negated at decision time. An enforcement cue in the same text shall take precedence. The inversion shall apply to no other event type | Implemented |
 | CLN-16 | The service shall resolve the news scope and affected asset IDs using the precedence: COMPANY → INDUSTRY → EVENT_TYPE → NONE (see 7.5 for the full algorithm) | Implemented |
 | CLN-17 | The service shall assign a polarity (`OCCURRENCE` or `RESOLUTION`) by scanning for de-escalation cues (see 7.6) | Implemented |
 | CLN-18 | The service shall infer context tags (`TRANSPORT_AFFECTED`, `SAFE_HAVEN_ONLY`) by scanning for transport cues and checking the event type (see 7.7); `RISK_PREMIUM_ELEVATED` is added later by the Prediction Service, never here | Implemented |
@@ -265,12 +275,16 @@ This runs once per incoming `ArticleIngested` message from the `cleansing.articl
 **Step 4 — Action extraction**
 - Call the configured NLP backend with `(text, language)`:
   - `keyword` backend: punctuation-normalise and lowercase the text; scan for taxonomy keywords using suffix-tolerant word-boundary matching. Evidence is tiered, first hit wins, because position within body prose is not a measure of relevance:
-    1. a **specific** keyword in the title;
-    2. a **non-financial** keyword in the title, skipped when the title names a registered company;
-    3. a **generic** keyword in the title — words such as `close`, `gold`, `contract` or `penalty`, trustworthy only in a headline;
+    1. a **non-financial** keyword in the title, skipped when the title names a registered company (CLN-63);
+    2. a **specific** keyword in the title;
+    3. a **generic** keyword in the title — words such as `close`, `gold`, `contract` or `penalty` — and only when the title is **corroborated** by a company, an industry keyword, a money/percentage figure, an institutional market term, or a domain cue (CLN-64);
     4. a **specific** keyword in the body. Generic keywords are never honoured here: matching them against body prose is what previously typed sports reports as `STRAIT_CLOSURE`.
 
     Within a tier, the earliest positional match wins, and on a positional tie the **longest** keyword. Nothing matched → `OTHER`
+
+    The reject tier runs **first** (CLN-63). It used to run second, so a wrestling headline containing "The **War** Raiders" was typed `MILITARY_CONFLICT` by tier 2 before `"wwe"` could reject it, and the match then moved gold and every weapons maker. Rejecting before classifying is the only order in which the reject buckets do the job they exist for.
+
+    A market type derived from the title is additionally **vetoed** when the body matches a non-financial keyword and the title names neither a company nor an industry (CLN-64a). Some headlines are indistinguishable from market news by keyword alone — only the body reveals the subject. The company/industry escape hatch is what keeps a genuine earnings story alive when its body happens to mention a sport; the residual risk is a company-less market headline whose body names a sport, accepted deliberately.
   - `spacy` backend: load `en_core_web_sm` or `sv_core_news_sm`; extract subject/verb/object via dependency tags; map verb lemma to event type; fall back to keyword scan if unmapped
 - After extraction, call `resolve_scope`, `classify_polarity`, and `infer_conditions` to complete the `ExtractedAction`
 
@@ -387,14 +401,47 @@ Determines which assets an article affects. Uses a strict precedence, first matc
 - Example: a war headline with "weapons" → returns every member of `WEAPON_INDUSTRY` group
 - If any group matches → return all member asset IDs with `scope=INDUSTRY`
 
-**Level 3 — EVENT_TYPE scope**
-- Look up `EVENT_TYPE_ASSETS` for the canonical event type (hardcoded fallback table)
-- Also expand any `EVENT_TYPE_GROUPS` entries for that type
-- If the event type has known downstream assets → return them with `scope=EVENT_TYPE`
-- Example: `MILITARY_CONFLICT` → `[GOLD, BRENT_OIL]` + all members of `WEAPON_INDUSTRY`
+**Level 0 — non-clusterable types resolve to nothing**
+- `SPORT`, `ENTERTAINMENT`, `LIFESTYLE` and `OTHER` return `scope=NONE` immediately, before any keyword
+  matching (CLN-15b, CLN-66c)
+- `OTHER` is included because it has no causal factor in the graph and therefore can never produce a
+  prediction. Resolving assets for it only created contexts that collected unrelated events; it also
+  attached AAK to a private ice-cream maker's press release through the `FOOD_INGREDIENTS` keyword
+  `"food"`
+
+**Level 3 — EVENT_TYPE scope (cue-gated, CLN-66)**
+- Look up `EVENT_TYPE_ASSETS` and `EVENT_TYPE_GROUPS` for the canonical event type
+- **Each candidate target is admitted only when the title evidences that target's own cue family.**
+  Families are declared in `FALLBACK_CUES` and mapped to targets by `FALLBACK_TARGET_FAMILY`:
+
+  | Family | Gates | Evidenced by |
+  |---|---|---|
+  | `SAFE_HAVEN` | `NEM_NYSE`, `PRECIOUS_METALS` | conflict, sanctions, inflation, policy-rate, gold terms |
+  | `ENERGY` | `XOM_NYSE`, `OIL_GAS` | oil price, crude, OPEC, refinery, pipeline, strait, Hormuz |
+  | `DEFENCE` | `WEAPON_INDUSTRY` | war, military, missile, defence, troops, weapons |
+
+- Cues are domain nouns, deliberately **not** the taxonomy keywords that selected the event type —
+  reusing those would be circular and would re-admit the false positives the gate exists to stop.
+  `"rates"` types an article as `RATE_DECISION`; only `"interest rate"` or `"central bank"` evidences one
+- Swedish compounds are matched as substrings for a documented subset of stems (`COMPOUND_CUES`), because
+  `"luftkriget"` contains `"krig"` with no word boundary
+- The gate mirrors, at the asset-selection layer, what ADR-006's conditioned edges do at the edge layer:
+  a conflict with no transport cue is a safe-haven bid for gold and must not reach the oil proxy. Before
+  this, the two layers disagreed — `infer_conditions` tagged the event `SAFE_HAVEN_ONLY` while scope
+  resolution attached the oil proxy anyway, which then propagated a contradictory stance back onto gold
+- If any target is admitted → return them with `scope=EVENT_TYPE`, and record the admitting cue families
+  in `matched` alongside the event type (CLN-67)
+- Example: `MILITARY_CONFLICT` with `"luftkriget"` in the title → `NEM_NYSE` + all members of
+  `WEAPON_INDUSTRY`, but **not** `XOM_NYSE`
 
 **Level 4 — NONE scope**
 - No asset resolved; return empty tuple with `scope=NONE`
+- Prediction drops asset-less events, so this is how an unrelated article stops producing predictions
+
+**The same gate applies at cluster level (CLN-66b).** `merge._resolved_assets` re-applies the fallback
+when no article in a cluster named an asset. That second fallback was ungated and silently undid the
+first: an article that correctly resolved to no assets was merged into a cluster that attached the gold
+and oil proxies anyway. It now gates on the cluster's own article titles.
 
 ### 7.6 Polarity classification (classify_polarity)
 
@@ -744,6 +791,10 @@ When using `bge-m3`, the `ml` Python extra must be installed (`pip install .[ml]
 | CLN-12 (taxonomy completeness) | `tests/test_taxonomy.py` | All 32 event types reachable from taxonomy keywords |
 | CLN-61 (tie → longest keyword) | `tests/test_taxonomy.py` | `test_classify_text_executive_change_english` — "Board appoints new CFO" → `EXECUTIVE_CHANGE`; "Prime minister appoints new cabinet" stays `POLITICAL_TRANSITION` |
 | CLN-62 (normalised keywords) | `tests/test_taxonomy.py` | `test_classify_text_restructuring_english` — both "spin-off" and "spin off" → `RESTRUCTURING` |
+| CLN-63 – CLN-67 (E12 precision rules) | `tests/test_taxonomy_e12.py` | One test per rule, each citing the 2026-08-12 article it was written from |
+| CLN-63 – CLN-67 (end to end) | `tests/test_audit_replay.py` | All 73 articles of the 2026-08-12 audit replayed against labelled expectations; asserts precision (65 must resolve to no assets) **and** recall (6 justified cases must keep resolving) |
+| CLN-66b (cluster fallback gate) | `tests/test_merge.py` | `test_build_local_event_fallback_is_cue_gated`, `test_build_local_event_gives_no_assets_to_an_unclusterable_type` |
+| CLN-68 (regulatory polarity) | `tests/test_taxonomy_e12.py` | Approval → `RESOLUTION`; enforcement → `OCCURRENCE`; enforcement wins when both present; Swedish `godkänner`; no leakage to `CORPORATE_ACQUISITION` |
 | End-to-end | `tests/test_integration.py` | Full article → event path using in-memory fakes |
 
 ---
@@ -827,3 +878,5 @@ Update this document whenever any of the following changes:
 |---|---|
 | 2026-08-05 | Initial as-built specification for E03 (Cleansing Service); CLN-1 through CLN-60 |
 | 2026-08-07 | **Defect fix.** Two taxonomy keywords were unreachable: `"spin-off"` could never match because normalisation turns punctuation into spaces, and `"appoints new cfo"` always lost to the generic `"appoint"` because single-token positions were compared one character early. Both event types are in REF-01 (`RESTRUCTURING`: spin-off; `EXECUTIVE_CHANGE`: appointed), so the code was the defect. CLN-61 and CLN-62 added; §7 step 4 updated |
+| 2026-08-14 | **Defect fix (E12 S01).** An audit of 2026-08-12 found 93 of 113 predictions were not justified by their news, and cleansing was the root cause. Four independent defects: (1) the non-financial reject tier ran *after* the specific-keyword tier, so a WWE headline containing "The **War** Raiders" was typed `MILITARY_CONFLICT` before `"wwe"` could reject it; (2) generic keywords were trusted in any headline, so "Forcing Early **Closure** Of Garden Display" became `STRAIT_CLOSURE` and "lower overuse injury **rates**" became `RATE_DECISION`; (3) `resolve_scope` skipped the punctuation normalisation that `_keyword_present` documents as a precondition, so `"Exxon, Inc."` missed its company and `"Lockheed-Martin wins missile contract"` fell through to an industry fan-out that predicted its competitors; (4) the event-type fallback fired on event type alone, so any article typed as a macro event reached the gold and oil proxies — three assets carried 76 of 113 predictions. CLN-63 through CLN-67 added. Also: `"default"` removed from the taxonomy (a settings default is not a credit event, and `DEBT_CRISIS` seeds an edge to every asset group), and `COMMODITY_PRICE_SHOCK` given a cue-gated fallback so a gold forecast reaches gold miners again — it had been producing nothing at all. §7.5 rewritten |
+| 2026-08-14 | **Defect fix (E12 follow-up).** `REGULATORY_ACTION` conflates two opposite events: its keywords cover approvals (`approved`, `cleared`, `godkänd`) and enforcement (`fined`, `penalty`, `böter`) alike, and the factor carries a single DOWN prior to every asset group because enforcement is the more common case. So "FDA approves AstraZeneca's new drug" predicted AZN_STO DOWN 0.35 — the same call as a fine, and systematically wrong on drug approvals. An approval is now reported as `RESOLUTION`, which negates the factor's stored sign at decision time (verified end to end: approval → UP, fine → DOWN). Scoped to this one event type: the cues cannot join the global `RESOLUTION_CUES`, because "Merger approved" would then flip `CORPORATE_ACQUISITION`'s UP prior to DOWN. Swedish `godkänner` added to the taxonomy — `godkänd` does not suffix-match it. CLN-68 added |

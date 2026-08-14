@@ -234,6 +234,29 @@ class PredictionPipeline:
         count = int(await self._repo.count_predictions_on(asset_id, today, timezone_name))
         return count < self._settings.max_daily_predictions_per_asset
 
+    @staticmethod
+    def _contributing_events(
+        decision: Decision, events: list[ContextEvent]
+    ) -> list[ContextEvent]:
+        """The events whose factor fired an edge in this decision (E12 PRD-62).
+
+        ``event_ids`` used to be every event in the asset's context window, so a prediction driven
+        by
+        one article cited every unrelated headline that happened to arrive in the same 15 minutes —
+        up
+        to five, spanning baseball, opinion polls and fantasy football on 2026-08-12. The same field
+        feeds Notification's headline lookup, so users saw them too.
+
+        Falls back to the full window when the filter would empty the list. That can only happen for
+        a
+        purely propagated decision (no factor) reached through this path, and a prediction with no
+        recorded evidence is worse than one with imprecise evidence.
+        """
+        if not decision.contributing_factors:
+            return events
+        filtered = [e for e in events if e.event_type in decision.contributing_factors]
+        return filtered or events
+
     async def _store_prediction(
         self,
         record: ContextRecord,
@@ -247,6 +270,26 @@ class PredictionPipeline:
         """Persist one prediction (direct or propagated) via the outbox; True when stored."""
         active = await self._repo.latest_active_prediction(record.asset_id)
         market_open = await self._is_market_open(record.asset_id, now)
+
+        # A propagated prediction never overturns a standing stance (E12 PRD-61). It carries no
+        # causal factor — it is an inference from another asset's inference — so when it contradicts
+        # what the asset already holds, the existing stance wins. Without this, one event reaching
+        # both ends of an anti-correlated pair produced UP and DOWN on the same asset from the same
+        # news: on 2026-08-12 NEM_NYSE held 16 UP and 13 DOWN, XOM_NYSE 16 DOWN and 13 UP.
+        if (
+            propagation_depth > 0
+            and active is not None
+            and active.direction != decision.direction
+        ):
+            logger.info(
+                "propagation_contradicts_active_stance",
+                context_id=str(record.context_id),
+                asset_id=record.asset_id.value,
+                active_direction=active.direction.value,
+                propagated_direction=decision.direction.value,
+                depth=propagation_depth,
+            )
+            return False
 
         if market_open:
             # A trading day allows at most `max_daily_predictions_per_asset` stances per asset,
@@ -286,7 +329,7 @@ class PredictionPipeline:
             prediction_id=uuid.uuid4(),
             context_id=record.context_id,
             context_version=record.context_version,
-            event_ids=[e.event_id for e in events],
+            event_ids=[e.event_id for e in self._contributing_events(decision, events)],
             asset_id=record.asset_id,
             direction=decision.direction,
             magnitude=decision.magnitude,
@@ -456,12 +499,27 @@ class PredictionPipeline:
         return inbound
 
     async def close_ready_contexts(self, now: datetime | None = None) -> int:
-        """Close all due contexts into predictions. Returns the number of predictions produced."""
+        """Close all due contexts into predictions. Returns the number of predictions produced.
+
+        Two passes over the claimed batch (E12 PRD-61). Every DIRECT decision is made and stored
+        first,
+        then propagation runs. The order matters because sibling contexts arrive in the same batch:
+        one
+        macro event reaches both the gold and the oil proxy, each opens its own context, and each
+        would
+        propagate a contradiction onto the other. Deciding all the direct stances first means
+        propagation can see them and stand down, which the per-context ``visited`` set cannot do —
+        it is
+        scoped to one context and is blind to its siblings.
+        """
         now = now or datetime.now(UTC)
         claimed = await self._repo.claim_ready_contexts(
             now, grace_minutes=self._settings.close_grace_minutes
         )
         produced = 0
+        # Pass 0 results, kept for the propagation pass: asset -> the direction decided directly.
+        direct_by_asset: dict[AssetId, Direction] = {}
+        deferred: list[tuple[ContextRecord, Decision, list[ContextEvent]]] = []
         for record in claimed:
             events = await self._repo.load_context_events(record.context_id)
             elevated = await self._price_reader.is_elevated(record.asset_id)
@@ -499,18 +557,34 @@ class PredictionPipeline:
                 continue
 
             # Pass 0: direct prediction from CAUSES edges.
-            # Visited set is seeded with the direct asset so propagation cannot loop back to it.
-            visited: set[AssetId] = {record.asset_id}
             stored = await self._store_prediction(record, decision, now, events)
             if stored:
                 produced += 1
-
-            # Passes 1+: propagate through CORRELATES_WITH edges when decision is directional.
             if decision.direction in (Direction.UP, Direction.DOWN):
-                direct_decisions = {record.asset_id: decision.direction}
-                produced += await self._run_propagation(
-                    record, direct_decisions, visited, now, events
-                )
+                direct_by_asset[record.asset_id] = decision.direction
+                deferred.append((record, decision, events))
+            else:
+                await self._repo.set_context_state(record.context_id, ContextState.PREDICTED)
 
+        # Passes 1+: propagate through CORRELATES_WITH edges, now that every direct stance is known.
+        for record, decision, events in deferred:
+            if decision.confidence < self._settings.propagation_min_confidence:
+                # A propagated prediction is an inference from an inference, so a weak source is
+                # amplified rather than diluted (E12 PRD-60).
+                logger.info(
+                    "propagation_skipped_low_confidence",
+                    context_id=str(record.context_id),
+                    asset_id=record.asset_id.value,
+                    confidence=decision.confidence,
+                    minimum=self._settings.propagation_min_confidence,
+                )
+            else:
+                # Seed `visited` with the source asset AND every asset that already decided directly
+                # in this batch: a direct decision has a causal factor behind it and outranks
+                # anything propagation would infer for the same asset.
+                visited: set[AssetId] = {record.asset_id} | set(direct_by_asset)
+                produced += await self._run_propagation(
+                    record, {record.asset_id: decision.direction}, visited, now, events
+                )
             await self._repo.set_context_state(record.context_id, ContextState.PREDICTED)
         return produced

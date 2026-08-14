@@ -153,13 +153,37 @@ def test_build_local_event_context_tags_are_unioned() -> None:
 
 
 def test_build_local_event_asset_fallback_from_event_type() -> None:
-    # Geopolitical cluster whose actions named no asset still resolves to its graph assets: the
-    # safe-haven commodities plus the weapons makers a conflict moves, in every market.
+    # Geopolitical cluster whose actions named no asset still resolves to its graph assets: the gold
+    # proxy plus the weapons makers a conflict moves, in every market. The fallback is gated on the
+    # cluster's own headlines (E12 CLN-66), so the cluster needs an article to be gated against.
     record = _record(EventType.MILITARY_CONFLICT)
     actions: list[Any] = [_action("USA", "attack", [])]
-    event = build_local_event(ClusterInputs(record=record, articles=[], actions=actions))
-    assert {AssetId.NEM_NYSE, AssetId.XOM_NYSE} <= set(event.affected_asset_ids)
+    articles: list[Any] = [_article("Missile attack escalates the war", "dn")]
+    event = build_local_event(ClusterInputs(record=record, articles=articles, actions=actions))
+    assert AssetId.NEM_NYSE in event.affected_asset_ids
     assert set(members_of("WEAPON_INDUSTRY")) <= set(event.affected_asset_ids)
+    # No transport cue, so the oil proxy stays out — the same rule resolve_scope applies per
+    # article.
+    assert AssetId.XOM_NYSE not in event.affected_asset_ids
+
+
+def test_build_local_event_fallback_is_cue_gated() -> None:
+    # The second fallback used to be ungated, silently undoing the per-article gate: an article that
+    # correctly resolved to no assets was merged into a cluster that attached the gold and oil
+    # proxies anyway, purely because its event type had a table entry.
+    record = _record(EventType.STRAIT_CLOSURE)
+    actions: list[Any] = [_action(None, "closure", [])]
+    articles: list[Any] = [_article("Forcing Early Closure Of Garden Display", "ap")]
+    event = build_local_event(ClusterInputs(record=record, articles=articles, actions=actions))
+    assert event.affected_asset_ids == []
+
+
+def test_build_local_event_gives_no_assets_to_an_unclusterable_type() -> None:
+    record = _record(EventType.OTHER)
+    actions: list[Any] = [_action(None, "collaborate", [])]
+    articles: list[Any] = [_article("GRIPPO FOODS teams up for an ice cream collaboration", "pr")]
+    event = build_local_event(ClusterInputs(record=record, articles=articles, actions=actions))
+    assert event.affected_asset_ids == []
 
 
 class _FakeGateway:

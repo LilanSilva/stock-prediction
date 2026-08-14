@@ -51,7 +51,9 @@ def test_non_us_company_is_recognised() -> None:
 
 
 def test_industry_news_fans_out_to_every_member_across_markets() -> None:
-    scope = resolve_scope("Defence spending rises across NATO", EventType.OTHER)
+    # FISCAL_POLICY, not OTHER: an OTHER event has no causal factor and so resolves to no assets at
+    # all (E12 CLN-66). This test only ever used OTHER as a "don't care" placeholder.
+    scope = resolve_scope("Defence spending rises across NATO", EventType.FISCAL_POLICY)
     assert scope.scope is NewsScope.INDUSTRY
     assert set(scope.assets) == set(members_of("WEAPON_INDUSTRY"))
     # Fan-out must cross markets, not just hit the US listing.
@@ -79,7 +81,37 @@ def test_falls_back_to_event_type_assets_when_nothing_is_named() -> None:
     scope = resolve_scope("USA calls off Iran attack", EventType.MILITARY_CONFLICT)
     assert scope.scope is NewsScope.EVENT_TYPE
     assert AssetId.NEM_NYSE in scope.assets
+    # The oil proxy is NOT selected. A conflict with no transport cue is a safe-haven bid for gold
+    # and nothing more — the same rule ADR-006's conditioned edges apply at the edge layer, now
+    # applied at the asset-selection layer too (E12 CLN-66). Before this the two layers disagreed:
+    # infer_conditions tagged the event SAFE_HAVEN_ONLY while scope resolution still attached the
+    # oil proxy, which then propagated a contradictory stance back onto gold.
+    assert AssetId.XOM_NYSE not in scope.assets
+
+
+def test_conflict_with_a_transport_cue_does_reach_the_oil_proxy() -> None:
+    # The other half of the rule above: once the headline threatens oil logistics, oil is in scope.
+    scope = resolve_scope("Missiles strike an oil refinery", EventType.MILITARY_CONFLICT)
     assert AssetId.XOM_NYSE in scope.assets
+
+
+def test_fallback_requires_a_domain_cue_not_just_the_event_type() -> None:
+    # The defect this gate closes: a stolen-figurines story classified as STRAIT_CLOSURE and moved
+    # oil, because the event type alone was treated as evidence that the article was about a strait.
+    scope = resolve_scope(
+        "Over 200 Mozart Figurines Stolen From Salzburg Art Installation, "
+        "Forcing Early Closure Of Garden Display",
+        EventType.STRAIT_CLOSURE,
+    )
+    assert scope.scope is NewsScope.NONE
+    assert scope.assets == ()
+
+
+def test_fallback_records_the_cue_family_that_admitted_the_assets() -> None:
+    scope = resolve_scope("Gold holds near record as war fears mount", EventType.MILITARY_CONFLICT)
+    assert scope.scope is NewsScope.EVENT_TYPE
+    assert "SAFE_HAVEN" in scope.matched
+    assert "MILITARY_CONFLICT" in scope.matched
 
 
 def test_military_conflict_fallback_also_reaches_weapons_makers() -> None:
@@ -102,7 +134,7 @@ def test_resolved_assets_are_unique() -> None:
     # Overlapping industry keywords must not list an asset twice: a duplicate would double-count
     # the same instrument in one context.
     for text, event_type in [
-        ("Defence and aerospace budgets climb", EventType.OTHER),
+        ("Defence and aerospace budgets climb", EventType.FISCAL_POLICY),
         ("Missiles strike an oil refinery", EventType.MILITARY_CONFLICT),
         ("USA calls off Iran attack", EventType.MILITARY_CONFLICT),
     ]:
@@ -113,7 +145,7 @@ def test_resolved_assets_are_unique() -> None:
 def test_every_resolved_asset_is_in_the_registry() -> None:
     for text, event_type in [
         ("Tesla acquired", EventType.CORPORATE_EARNINGS),
-        ("Defence spending rises", EventType.OTHER),
+        ("Defence spending rises", EventType.FISCAL_POLICY),
         ("USA calls off Iran attack", EventType.MILITARY_CONFLICT),
     ]:
         for asset in resolve_scope(text, event_type).assets:

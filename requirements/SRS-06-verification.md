@@ -134,6 +134,7 @@ Specific responsibilities:
 | VER-4 | The service shall create an `EvaluationRecord` and a `PriceRequested` outbox row in one atomic database transaction; if the `prediction_id` already exists in `evaluations`, the insert is skipped (`ON CONFLICT DO NOTHING`) | Implemented |
 | VER-5 | If the incoming `PredictionMade` carries a non-null `supersedes_prediction_id`, the service shall mark the prior evaluation as WITHDRAWN so it is never scored | Implemented |
 | VER-6 | An unknown asset ID in a `PredictionMade` message shall raise `InvalidPredictionError`; the message shall be dead-lettered | Implemented |
+| VER-38 | A `PriceObserved` whose `request_id` has no evaluation row shall raise `OrphanedObservationError`, be **acknowledged** (not dead-lettered), logged at WARNING as `price_observed_orphaned` with the request, prediction and asset, and counted in `prices_orphaned` on `/health` | Implemented |
 
 ### 5.2 Session resolution
 
@@ -324,6 +325,22 @@ The service validates each `PriceObserved` against the stored evaluation:
 
 Any mismatch raises `PriceValidationError`; the message is dead-lettered.
 
+A **missing** evaluation is a different condition and is handled differently (VER-38). A mismatch means
+the observation and its evaluation disagree — a contract violation, and the message is the evidence, so
+it belongs in the dead-letter queue for inspection. An orphan means there is nothing to compare
+against: no retry can succeed, and the evidence needed is the absent row, not the message. It is
+therefore acknowledged and surfaced through a WARNING log and the `prices_orphaned` counter instead.
+
+Both conditions previously raised `PriceValidationError`, so orphans were dead-lettered as poison. The
+queue accumulated 14 such messages between 2026-08-13 and 2026-08-14 — every one an orphan, none a real
+defect. That is the failure mode this split exists to prevent: a dead-letter queue full of unactionable
+traffic is one an operator stops reading.
+
+Orphans are expected in local testing, where an integration test deletes the predictions and
+evaluations it created while a `PriceObserved` for them is still in flight. In production an orphan is
+unexpected — nothing deletes an evaluation, and a superseded one becomes `WITHDRAWN` rather than
+disappearing — which is why it is logged at WARNING rather than INFO.
+
 ### 7.5 Worked example
 
 **Scenario:** AAPL prediction was UP for 2024-03-18. Baseline = 2024-03-15 (close $170.50), Settlement = 2024-03-18 (close $175.20).
@@ -494,7 +511,7 @@ All variables use the `VERIFICATION_` prefix unless noted.
 | Unknown asset in `PredictionMade` | `InvalidPredictionError`; message dead-lettered |
 | Duplicate `PredictionMade` (same prediction_id) | `ON CONFLICT DO NOTHING`; silently idempotent; `evaluation_duplicate` log |
 | Superseded prediction (supersedes_prediction_id set) | Prior evaluation marked WITHDRAWN; it will never be scored |
-| `PriceObserved` for unknown request_id | `PriceValidationError`; message dead-lettered |
+| `PriceObserved` for unknown request_id | `OrphanedObservationError`; message **acknowledged**, logged WARNING `price_observed_orphaned`, counted in `/health.prices_orphaned` (VER-38) |
 | `PriceObserved` for WITHDRAWN evaluation | Skipped with log `score_skipped_withdrawn`; no score emitted |
 | Observation validation failure (session/version/kind mismatch) | `PriceValidationError`; message dead-lettered |
 | Duplicate `PriceObserved` (score already exists) | `ON CONFLICT DO NOTHING`; `score_duplicate` log; no second score emitted |
@@ -556,3 +573,4 @@ Update this document whenever any of the following changes:
 | Date | Description |
 |---|---|
 | 2026-08-05 | Initial as-built specification for E06 (Verification Service); VER-1 through VER-37 |
+| 2026-08-14 | **Defect fix.** `PriceObserved` for a missing evaluation and `PriceObserved` that contradicts its evaluation both raised `PriceValidationError`, so both were dead-lettered as poison. Orphans can never be resolved by retry or by inspecting the message, so the `verification.prices.dlq` queue filled with unactionable traffic (14 messages, all orphans, zero real defects) while genuine mismatches would have been indistinguishable in it. Split into `OrphanedObservationError`, which is acknowledged, logged at WARNING as `price_observed_orphaned`, and counted in `/health.prices_orphaned`. `PriceValidationError` still dead-letters. VER-38 added; §12 and the scoring section updated |

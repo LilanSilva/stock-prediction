@@ -1,80 +1,25 @@
-// Seed CAUSES edges between canonical factors and the two POC assets (GOLD, BRENT_OIL).
+// Retired: this file seeded CAUSES edges to the commodity assets GOLD and BRENT_OIL (E12 S02).
 //
-// Contract alignment (requirements/SyRS-system.md sec 9.2 edge business key, SRS-04/SRS-07):
-//   - weight is MAGNITUDE in [0,1]; sign is carried by the separate `direction` field, not the weight.
-//   - Beta-Bernoulli learnable state starts at alpha=1.0, beta=1.0 (NOT 2/2).
-//   - direction is UP | DOWN | NEUTRAL.
-//   - last_updated lets Credibility track edge modification time.
+// WHY IT IS EMPTY
+// ---------------
+// Every statement here matched `(:Asset {id: 'GOLD'})` or `(:Asset {id: 'BRENT_OIL'})`. Those nodes are
+// not created by 02-seed-assets.cypher: the asset registry dropped the commodity instruments in favour
+// of equity proxies — NEM_NYSE (Newmont) for gold and XOM_NYSE (Exxon) for oil — because Market Data
+// can price an equity and Verification can score it, and it could do neither for a bare commodity.
 //
-// These edges intentionally create compound/conflicting forces so the graph-only M1 policy has real
-// decisions to resolve (e.g. MILITARY_CONFLICT pushes GOLD up while SANCTIONS-driven USD strength is
-// a competing macro force handled via future arbitration, deferred by POC-6). MERGE keeps it idempotent.
-
-// --- MILITARY_CONFLICT ---
-MATCH (cf:CausalFactor {id: 'MILITARY_CONFLICT'}), (a:Asset {id: 'GOLD'})
-MERGE (cf)-[r:CAUSES]->(a)
-SET r.direction = 'UP', r.weight = 0.75, r.confidence = 0.80, r.alpha = 1.0, r.beta = 1.0, r.last_updated = datetime();
-
-MATCH (cf:CausalFactor {id: 'MILITARY_CONFLICT'}), (a:Asset {id: 'BRENT_OIL'})
-MERGE (cf)-[r:CAUSES]->(a)
-SET r.direction = 'UP', r.weight = 0.65, r.confidence = 0.75, r.alpha = 1.0, r.beta = 1.0, r.last_updated = datetime();
-
-// --- STRAIT_CLOSURE (e.g. Hormuz): strong oil supply-side force ---
-MATCH (cf:CausalFactor {id: 'STRAIT_CLOSURE'}), (a:Asset {id: 'BRENT_OIL'})
-MERGE (cf)-[r:CAUSES]->(a)
-SET r.direction = 'UP', r.weight = 0.80, r.confidence = 0.80, r.alpha = 1.0, r.beta = 1.0, r.last_updated = datetime();
-
-MATCH (cf:CausalFactor {id: 'STRAIT_CLOSURE'}), (a:Asset {id: 'GOLD'})
-MERGE (cf)-[r:CAUSES]->(a)
-SET r.direction = 'UP', r.weight = 0.45, r.confidence = 0.65, r.alpha = 1.0, r.beta = 1.0, r.last_updated = datetime();
-
-// --- SUPPLY_DISRUPTION ---
-MATCH (cf:CausalFactor {id: 'SUPPLY_DISRUPTION'}), (a:Asset {id: 'BRENT_OIL'})
-MERGE (cf)-[r:CAUSES]->(a)
-SET r.direction = 'UP', r.weight = 0.85, r.confidence = 0.85, r.alpha = 1.0, r.beta = 1.0, r.last_updated = datetime();
-
-// --- SANCTIONS ---
-MATCH (cf:CausalFactor {id: 'SANCTIONS'}), (a:Asset {id: 'BRENT_OIL'})
-MERGE (cf)-[r:CAUSES]->(a)
-SET r.direction = 'UP', r.weight = 0.55, r.confidence = 0.65, r.alpha = 1.0, r.beta = 1.0, r.last_updated = datetime();
-
-MATCH (cf:CausalFactor {id: 'SANCTIONS'}), (a:Asset {id: 'GOLD'})
-MERGE (cf)-[r:CAUSES]->(a)
-SET r.direction = 'UP', r.weight = 0.40, r.confidence = 0.60, r.alpha = 1.0, r.beta = 1.0, r.last_updated = datetime();
-
-// --- RATE_DECISION: higher rates lift USD, pressuring gold; softer for oil ---
-MATCH (cf:CausalFactor {id: 'RATE_DECISION'}), (a:Asset {id: 'GOLD'})
-MERGE (cf)-[r:CAUSES]->(a)
-SET r.direction = 'DOWN', r.weight = 0.60, r.confidence = 0.75, r.alpha = 1.0, r.beta = 1.0, r.last_updated = datetime();
-
-MATCH (cf:CausalFactor {id: 'RATE_DECISION'}), (a:Asset {id: 'BRENT_OIL'})
-MERGE (cf)-[r:CAUSES]->(a)
-SET r.direction = 'DOWN', r.weight = 0.40, r.confidence = 0.60, r.alpha = 1.0, r.beta = 1.0, r.last_updated = datetime();
-
-// --- INFLATION_CHANGE: inflation supports gold as a hedge ---
-MATCH (cf:CausalFactor {id: 'INFLATION_CHANGE'}), (a:Asset {id: 'GOLD'})
-MERGE (cf)-[r:CAUSES]->(a)
-SET r.direction = 'UP', r.weight = 0.50, r.confidence = 0.65, r.alpha = 1.0, r.beta = 1.0, r.last_updated = datetime();
-
-// --- RECESSION_SIGNAL: demand fear weighs on oil; mild safe-haven bid for gold ---
-MATCH (cf:CausalFactor {id: 'RECESSION_SIGNAL'}), (a:Asset {id: 'BRENT_OIL'})
-MERGE (cf)-[r:CAUSES]->(a)
-SET r.direction = 'DOWN', r.weight = 0.60, r.confidence = 0.70, r.alpha = 1.0, r.beta = 1.0, r.last_updated = datetime();
-
-MATCH (cf:CausalFactor {id: 'RECESSION_SIGNAL'}), (a:Asset {id: 'GOLD'})
-MERGE (cf)-[r:CAUSES]->(a)
-SET r.direction = 'UP', r.weight = 0.45, r.confidence = 0.60, r.alpha = 1.0, r.beta = 1.0, r.last_updated = datetime();
-
-// --- NATURAL_DISASTER: infrastructure damage can disrupt oil supply ---
-MATCH (cf:CausalFactor {id: 'NATURAL_DISASTER'}), (a:Asset {id: 'BRENT_OIL'})
-MERGE (cf)-[r:CAUSES]->(a)
-SET r.direction = 'UP', r.weight = 0.45, r.confidence = 0.55, r.alpha = 1.0, r.beta = 1.0, r.last_updated = datetime();
-
-MATCH (cf:CausalFactor {id: 'NATURAL_DISASTER'}), (a:Asset {id: 'GOLD'})
-MERGE (cf)-[r:CAUSES]->(a)
-SET r.direction = 'UP', r.weight = 0.25, r.confidence = 0.50, r.alpha = 1.0, r.beta = 1.0, r.last_updated = datetime();
-
-// --- POLITICAL_TRANSITION: uncertainty gives gold a modest safe-haven bid ---
-MATCH (cf:CausalFactor {id: 'POLITICAL_TRANSITION'}), (a:Asset {id: 'GOLD'})
-MERGE (cf)-[r:CAUSES]->(a)
-SET r.direction = 'UP', r.weight = 0.35, r.confidence = 0.55, r.alpha = 1.0, r.beta = 1.0, r.last_updated = datetime();
+// Cypher's MATCH...MERGE is a silent no-op when the MATCH binds nothing, and cypher-shell exits 0, so
+// this file's twelve expert priors were discarded at seed time with no error for as long as it existed.
+// Confirmed against the live graph on 2026-08-14: no CAUSES edge targeted either id, and every weight
+// observed in the 2026-08-12 prediction audit traced to a group edge in 06/07 instead.
+//
+// WHERE THOSE PRIORS LIVE NOW
+// ---------------------------
+//   * Unconditional industry priors: 06-seed-group-edges.cypher (PRECIOUS_METALS, OIL_GAS, and others).
+//   * Conditioned priors: 05-seed-conditioned-edges.cypher, retargeted onto the same groups.
+//
+// The file is kept rather than deleted so the numbering in 01..09 stays stable and so this explanation
+// sits where the next reader will look for it. 09-verify-seed.cypher now fails the seed if any
+// statement targets a node id that does not exist, so this class of silent loss cannot recur.
+//
+// Deliberately no statements below this line.
+RETURN 'retired: see 05 and 06 for these priors' AS note;

@@ -21,6 +21,20 @@
 //     industry priors are unconditional and always fire.
 //
 // MERGE keeps this idempotent so the seed container can re-run safely.
+//
+// OWNERSHIP: THIS FILE SEEDS UNCONDITIONAL EDGES ONLY (E12 S02)
+// ------------------------------------------------------------
+// Every conditioned edge lives in 05-seed-conditioned-edges.cypher. The split is not cosmetic:
+// `MERGE (cf)-[r:CAUSES]->(g)` with no properties MATCHES ANY existing CAUSES relationship between the
+// two nodes — including a conditioned one. So an unconditional statement here, running after 05, does
+// not create a second edge; it silently binds one of 05's conditioned edges (arbitrarily, when there
+// are several) and overwrites its weight and confidence, leaving `condition` in place. Verified on
+// 2026-08-14: re-seeding an unconditional MILITARY_CONFLICT -> PRECIOUS_METALS edge rewrote the
+// TRANSPORT_AFFECTED variant's 0.55/0.65 to 0.50/0.60.
+//
+// Consequence for reviewers: a (factor, target) pair must be declared in exactly ONE of 05 or 06,
+// never both. 09-verify-seed.cypher cannot catch a violation — the corrupted edge is structurally
+// valid — so this is enforced by the file split and by review.
 
 // --- Defence: conflict and sanctions lift weapons makers (order books, budget expectations) --------
 MATCH (cf:CausalFactor {id: 'MILITARY_CONFLICT'}), (g:AssetGroup {id: 'WEAPON_INDUSTRY'})
@@ -53,17 +67,17 @@ MATCH (cf:CausalFactor {id: 'STRAIT_CLOSURE'}), (g:AssetGroup {id: 'OIL_GAS'})
 MERGE (cf)-[r:CAUSES]->(g)
 SET r.direction = 'UP', r.weight = 0.55, r.confidence = 0.65, r.alpha = 1.0, r.beta = 1.0, r.last_updated = datetime();
 
-// A conflict lifts oil producers only when it actually threatens transport/supply; a distant conflict
-// is a safe-haven story with no production impact, so there is no SAFE_HAVEN_ONLY edge here.
-MATCH (cf:CausalFactor {id: 'MILITARY_CONFLICT'}), (g:AssetGroup {id: 'OIL_GAS'})
-MERGE (cf)-[r:CAUSES {condition: 'TRANSPORT_AFFECTED'}]->(g)
-SET r.direction = 'UP', r.weight = 0.50, r.confidence = 0.60, r.alpha = 1.0, r.beta = 1.0, r.last_updated = datetime();
+// MILITARY_CONFLICT on OIL_GAS is CONDITIONED and lives in 05, which owns every conditioned edge.
+// It is not repeated here: see the ownership note in this file's header.
 
 MATCH (cf:CausalFactor {id: 'RECESSION_SIGNAL'}), (g:AssetGroup {id: 'OIL_GAS'})
 MERGE (cf)-[r:CAUSES]->(g)
 SET r.direction = 'DOWN', r.weight = 0.45, r.confidence = 0.60, r.alpha = 1.0, r.beta = 1.0, r.last_updated = datetime();
 
 // --- Precious metals: miners lever the metal price -------------------------------------------------
+// Unconditional on purpose: gold gets a safe-haven bid from a conflict whether or not oil logistics are
+// threatened, so the condition does not change the outcome and conditioning it would only open a
+// double-count path (see the header note in 05). The gating that matters is on OIL_GAS, in 05.
 MATCH (cf:CausalFactor {id: 'MILITARY_CONFLICT'}), (g:AssetGroup {id: 'PRECIOUS_METALS'})
 MERGE (cf)-[r:CAUSES]->(g)
 SET r.direction = 'UP', r.weight = 0.50, r.confidence = 0.60, r.alpha = 1.0, r.beta = 1.0, r.last_updated = datetime();

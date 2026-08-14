@@ -61,12 +61,78 @@ filename order once Neo4j is healthy. All use `MERGE`, so re-runs are safe.
 | `01-constraints-indexes.cypher` | Uniqueness constraints and indexes |
 | `02-seed-assets.cypher` | Asset and group nodes — **generated**, see below |
 | `03-seed-causal-factors.cypher` | One node per event taxonomy type |
-| `04-seed-causal-edges.cypher` | Expert-assigned unconditional edges |
-| `05-seed-conditioned-edges.cypher` | Condition-qualified edges |
-| `06-seed-group-edges.cypher` | Industry-level priors, inherited by members |
+| `04-seed-causal-edges.cypher` | **Retired** — targeted `GOLD`/`BRENT_OIL`, which `02` never creates |
+| `05-seed-conditioned-edges.cypher` | Condition-qualified edges. **Owns every conditioned edge** |
+| `06-seed-group-edges.cypher` | Industry-level priors, inherited by members. **Owns every unconditional edge** |
 | `07-seed-new-event-type-edges.cypher` | Edges for later taxonomy additions |
+| `08-seed-correlation-edges.cypher` | Cross-asset `CORRELATES_WITH` edges (propagation) |
+| `09-verify-seed.cypher` | Structural assertions; **aborts the seed** on failure |
 
 Every seeded edge starts at `alpha = 1.0`, `beta = 1.0`.
+
+### A `(factor, target)` pair belongs to exactly one file
+
+`MERGE (cf)-[r:CAUSES]->(g)` with no properties matches **any** existing `CAUSES` relationship between
+the two nodes, including a conditioned one. So an unconditional statement running after a conditioned one
+does not create a second edge — it silently rebinds the conditioned edge and overwrites its `weight` and
+`confidence`, leaving `condition` in place. Verified on 2026-08-14: re-seeding an unconditional
+`MILITARY_CONFLICT → PRECIOUS_METALS` edge rewrote the `TRANSPORT_AFFECTED` variant's 0.55/0.65 to
+0.50/0.60.
+
+`09-verify-seed.cypher` cannot catch this — the corrupted edge is structurally valid — so it is enforced
+by the file split above and by review.
+
+A target should carry a conditioned edge only where the condition changes the **outcome**, meaning only
+where one condition implies no edge at all. Condition tags are unioned across the events in a context, so
+`SAFE_HAVEN_ONLY` and `TRANSPORT_AFFECTED` can both be active; a target holding one edge per condition
+would fire both and count the factor twice.
+
+### `09-verify-seed.cypher`
+
+Cypher's `MATCH ... MERGE` is a silent no-op when the `MATCH` binds nothing, and `cypher-shell` exits 0
+regardless. `04` targeted `(:Asset {id: 'GOLD'})` and `BRENT_OIL`, which the registry migration removed,
+so a whole file of expert priors was discarded at seed time with no error for as long as it existed.
+
+The verifier runs last (it sorts last in the `for f in /seed/*.cypher` glob) and asserts:
+
+1. every `CausalFactor` has at least one outgoing `CAUSES` edge;
+2. no `CAUSES`/`CORRELATES_WITH` edge is missing `direction`, `weight`, `alpha` or `beta`;
+3. no `(factor, target)` pair carries both a conditioned and an unconditional edge;
+4. the retired `GOLD`/`BRENT_OIL` ids have not reappeared;
+5. every asset belongs to exactly one group;
+6. every `CORRELATES_WITH` edge carries a condition.
+
+Each check uses `apoc.util.validate`, which raises and makes `cypher-shell` exit non-zero, so `set -e` in
+the seed container's entrypoint fails the whole seed. To confirm it still bites:
+
+```bash
+# Inject the original defect, then re-run the verifier — it must exit 1.
+docker exec feed-neo4j cypher-shell -u neo4j -p "$NEO4J_PASSWORD" "CREATE (:Asset {id:'GOLD'});"
+docker exec -i feed-neo4j cypher-shell -u neo4j -p "$NEO4J_PASSWORD" < neo4j/init/09-verify-seed.cypher
+echo "exit=$?"   # 1, with: seed check 4: retired commodity nodes are present again: [Asset GOLD]
+docker exec feed-neo4j cypher-shell -u neo4j -p "$NEO4J_PASSWORD" "MATCH (n:Asset {id:'GOLD'}) DETACH DELETE n;"
+```
+
+### Re-seeding an existing volume
+
+`MERGE` is idempotent, but it **cannot undo a deletion**: `05` deletes the unconditional edges its
+conditioned edges supersede, and re-running the files will not restore anything removed by an earlier
+version of them. Before re-seeding a graph whose weights Credibility has been learning, dump them:
+
+```bash
+docker exec feed-neo4j cypher-shell -u neo4j -p "$NEO4J_PASSWORD" --format plain \
+  "MATCH (cf:CausalFactor)-[r:CAUSES]->(t)
+   RETURN cf.id, labels(t)[0], t.id, r.condition, r.direction, r.weight, r.alpha, r.beta;" \
+  > graph-causes-backup.csv
+```
+
+To rebuild from scratch instead, remove the volume — this discards every learned weight:
+
+```bash
+docker compose down
+docker volume rm feed-neo4j-data feed-neo4j-logs
+docker compose up -d
+```
 
 **`02-seed-assets.cypher` is generated, not hand-edited.** Regenerate it after any registry change:
 
@@ -110,8 +176,9 @@ python -m json.tool infra/rabbitmq/definitions.json
 ```
 
 When Docker is available, also start the stack, wait for healthy services, verify the Postgres schemas
-and pgvector, verify the Neo4j constraints and seeds and at least 15 `CAUSES` edges, inspect the
-RabbitMQ exchanges/queues/bindings, then tear down the test volumes.
+and pgvector, confirm the `feed-neo4j-seed` container exited 0 (which now includes
+`09-verify-seed.cypher`'s assertions), inspect the RabbitMQ exchanges/queues/bindings, then tear down the
+test volumes.
 
 Specification: [SRS-01](../requirements/SRS-01-shared-foundation.md) covers the shared foundation and
 this local infrastructure. System-wide topology is in

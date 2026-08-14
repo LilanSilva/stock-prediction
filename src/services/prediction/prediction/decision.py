@@ -179,10 +179,15 @@ def decide(
     # polarity-adjusted direction so the contributions sum to the net decision.
     contributing = [_contributing_edge(e, eff) for e, eff in effective]
     rationale = _rationale(asset_id, direction, magnitude, confidence, effective)
+    # Only the factors of edges that actually contributed. A propagated edge has no factor_id, so a
+    # purely propagated decision reports an empty set — the caller resolves its provenance from the
+    # upstream asset instead of from this context's window.
+    factors = frozenset(e.factor_id for e, _ in effective if e.factor_id is not None)
     return Decision(
         direction=direction,
         magnitude=magnitude,
         confidence=confidence,
         rationale=rationale,
         contributing_edges=contributing,
+        contributing_factors=factors,
     )

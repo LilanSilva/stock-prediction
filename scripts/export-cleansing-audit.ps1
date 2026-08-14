@@ -35,6 +35,11 @@ param(
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 
+# See export-prediction-audit.ps1: PowerShell decodes a native command's stdout with the console OEM
+# code page, which double-encodes psql's UTF-8 output. Force UTF-8 so article text matches the database.
+$previousOutputEncoding = [Console]::OutputEncoding
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+
 # --- Load credentials from infra/.env -------------------------------------------------------
 $envPath = Join-Path $repoRoot "infra\.env"
 if (-not (Test-Path $envPath)) {
@@ -152,6 +157,8 @@ $clusters = @($clusterMap.Values)
     cluster_count    = $clusters.Count
     clusters         = $clusters
 } | ConvertTo-Json -Depth 6 | Out-File -FilePath $out -Encoding utf8
+
+[Console]::OutputEncoding = $previousOutputEncoding
 
 Write-Host "Written to: $out" -ForegroundColor Green
 Write-Host "  Event types: $($eventTypes.Count) distinct"

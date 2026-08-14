@@ -18,7 +18,11 @@ from shared.schemas.messages import (
 )
 
 from verification.config import VerificationSettings
-from verification.exceptions import InvalidPredictionError, PriceValidationError
+from verification.exceptions import (
+    InvalidPredictionError,
+    OrphanedObservationError,
+    PriceValidationError,
+)
 from verification.models import EvaluationRecord, EvaluationStatus
 from verification.scoring import score
 
@@ -146,7 +150,10 @@ class VerificationPipeline:
         """Validate the dual-close observation and publish exactly one PredictionScored."""
         evaluation = await self._repo.load_evaluation_by_request_id(message.request_id)
         if evaluation is None:
-            raise PriceValidationError(f"no evaluation for request {message.request_id}")
+            raise OrphanedObservationError(
+                f"no evaluation for request {message.request_id} "
+                f"(prediction {message.prediction_id}, asset {message.asset_id.value})"
+            )
         if evaluation.status is EvaluationStatus.WITHDRAWN:
             # The prediction was superseded by a market-closed collapse; do not score it.
             logger.info(

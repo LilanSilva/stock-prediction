@@ -201,8 +201,27 @@ async def test_assign_and_close_produces_graph_only_prediction() -> None:
         )
         assert row is not None
         assert row["decision_method"] == "GRAPH_ONLY"
-        assert row["direction"] == "UP"
         assert row["status"] == "PENDING"
+
+        # The direction is NOT pinned to the seeded UP, for the same reason the propagation test below
+        # reads its expectation from the graph: Credibility rewrites `weight` from outcomes, and a
+        # weight it has walked down far enough yields NEUTRAL through the confidence deadband rather
+        # than a weak UP. NEM_NYSE's learned MILITARY_CONFLICT weight is 0.107 at the time of writing,
+        # which gives confidence 0.10 against a 0.15 deadband — so NEUTRAL here is correct behaviour,
+        # not a regression.
+        #
+        # What is still asserted is the sign: the firing edge says UP, so DOWN would be wrong however
+        # the weights have evolved.
+        firing = await graph.get_firing_edges(
+            EventType.MILITARY_CONFLICT,
+            [AssetId.NEM_NYSE],
+            conditions={ConditionCode.SAFE_HAVEN_ONLY},
+        )
+        assert firing, "no MILITARY_CONFLICT edge for NEM_NYSE; has the seed been applied?"
+        assert {e.direction.value for e in firing} == {"UP"}
+        assert row["direction"] in ("UP", "NEUTRAL"), (
+            f"expected UP or NEUTRAL from an UP edge, got {row['direction']}"
+        )
 
         # Exactly one outbox event for the DIRECT prediction. Propagated predictions from this
         # same context are counted separately (see the propagation test below).

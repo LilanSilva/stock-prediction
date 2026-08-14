@@ -34,7 +34,7 @@ from shared.schemas.messages import (
 
 from cleansing.exceptions import AmbiguousMergeError
 from cleansing.models import ClusterRecord
-from cleansing.taxonomy import assets_for_event_type
+from cleansing.taxonomy import NON_CLUSTERING_EVENT_TYPES, gated_assets_for_event_type
 
 logger = structlog.get_logger(__name__)
 
@@ -108,13 +108,29 @@ def _affected_assets(actions: list[asyncpg.Record]) -> list[AssetId]:
     return collected
 
 
-def _resolved_assets(actions: list[asyncpg.Record], event_type: EventType) -> list[AssetId]:
+def _resolved_assets(
+    actions: list[asyncpg.Record], event_type: EventType, articles: list[asyncpg.Record]
+) -> list[AssetId]:
     """Assets from the cluster's actions, falling back to the event type's graph assets when none
-    were named, so geopolitical clusters still carry downstream assets."""
+    were named, so geopolitical clusters still carry downstream assets.
+
+    The fallback is cue-gated on the cluster's own headlines, exactly as ``resolve_scope`` gates it
+    per
+    article (E12 CLN-66). Without the gate this second fallback silently undid the first: an article
+    that correctly resolved to no assets was merged into a cluster that then attached the gold and
+    oil
+    proxies anyway, purely because its event type had an entry in the table.
+
+    A non-clusterable event type gets nothing at all: it has no causal factor, so it cannot predict.
+    """
     assets = _affected_assets(actions)
     if assets:
         return assets
-    return list(assets_for_event_type(event_type))
+    if event_type in NON_CLUSTERING_EVENT_TYPES:
+        return []
+    titles = " ".join(row["title"] for row in articles if row["title"])
+    fallback, _ = gated_assets_for_event_type(event_type, titles)
+    return list(fallback)
 
 
 def _event_polarity(actions: list[asyncpg.Record]) -> EventPolarity:
@@ -164,7 +180,7 @@ def build_local_event(inputs: ClusterInputs) -> EventDetected:
         action=_majority([row["action_lemma"] for row in inputs.actions]),
         object=_majority([row["object"] for row in inputs.actions]),
         entities=[],
-        affected_asset_ids=_resolved_assets(inputs.actions, record.event_type),
+        affected_asset_ids=_resolved_assets(inputs.actions, record.event_type, articles),
         polarity=_event_polarity(inputs.actions),
         context_tags=_context_tags(inputs.actions),
         first_seen_at=first_seen,
@@ -274,7 +290,9 @@ class LlmMerger:
             action=_opt_str(content.get("action")),
             object=_opt_str(content.get("object")),
             entities=[],
-            affected_asset_ids=_resolved_assets(inputs.actions, inputs.record.event_type),
+            affected_asset_ids=_resolved_assets(
+                inputs.actions, inputs.record.event_type, inputs.articles
+            ),
             polarity=_event_polarity(inputs.actions),
             context_tags=_context_tags(inputs.actions),
             first_seen_at=first_seen,

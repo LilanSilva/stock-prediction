@@ -73,3 +73,8 @@ class Decision:
     confidence: float
     rationale: str
     contributing_edges: list[ContributingEdge] = field(default_factory=list)
+    # Event types whose factor actually contributed a firing edge to this decision. The pipeline
+    # uses it to record only the events that drove the prediction, instead of every event that
+    # happened to be in the same context window (E12 PRD-62). Empty for a purely propagated
+    # decision, whose edges carry no causal factor at all.
+    contributing_factors: frozenset[EventType] = frozenset()
