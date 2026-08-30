@@ -87,6 +87,54 @@ python scripts/generate-asset-seed.py --check  # verify the seed matches the reg
 
 Registry rules and field definitions: [REF-02](../requirements/REF-02-asset-registry.md).
 
+## Knowledge graph snapshot
+
+`infra/neo4j/init/*.cypher` seeds expert **priors**: every causal edge starts at `alpha=1.0,
+beta=1.0`. The live graph then moves away from them — Credibility refines the Beta counts online per
+scored prediction, and the offline structure learner adds asset-level edges that no seed file
+declares at all. None of that exists on disk, so a re-seed onto a fresh volume silently reverts to
+the priors. Measured 2026-08-30: 11 learned asset edges, one at `alpha=65, beta=8`.
+
+These two scripts close that gap. They do **not** change how the stack boots — `feed-neo4j-seed`
+still runs `init/*.cypher` exactly as before.
+
+| Script | Purpose |
+|---|---|
+| [export-kg-snapshot.ps1](export-kg-snapshot.ps1) | Live graph → `infra/neo4j/snapshot/kg-snapshot.cypher` (overwritten each run) |
+| [import-kg-snapshot.ps1](import-kg-snapshot.ps1) | Snapshot → live graph, after reporting exactly what changes |
+
+```powershell
+powershell -File scripts\export-kg-snapshot.ps1              # capture current state
+powershell -File scripts\export-kg-snapshot.ps1 -Check       # fail if the snapshot is stale (CI)
+powershell -File scripts\import-kg-snapshot.ps1 -DryRun      # show the diff, write nothing
+powershell -File scripts\import-kg-snapshot.ps1              # apply new + changed edges
+powershell -File scripts\import-kg-snapshot.ps1 -Prune       # also delete edges absent from the snapshot
+```
+
+**Scope.** The snapshot owns `CausalFactor` nodes, `CAUSES` edges and `CORRELATES_WITH` edges. It
+deliberately excludes `Asset`, `AssetGroup` and `MEMBER_OF`: those come from `assets.json` via
+`generate-asset-seed.py`, which stays the single source of truth for the registry. Restoring a fresh
+volume is therefore `01-constraints` + `02-seed-assets` + the snapshot.
+
+**The import always diffs before it writes**, classifying every row as `NEW` / `CHANGED` /
+`UNCHANGED` / `MISSING_ENDPOINT` / `LIVE_ONLY`, because overwriting an edge that has learned *more*
+than the snapshot throws away evidence that nothing downstream would report. It warns when the live
+`alpha+beta` exceeds the snapshot's — the signal that the snapshot is stale and you want `export`,
+not `import`.
+
+`LIVE_ONLY` edges are **kept** unless you pass `-Prune`. An edge learned since the export is not
+garbage, and deleting it is the only irreversible thing these scripts can do.
+
+`MISSING_ENDPOINT` is reported rather than ignored: Cypher's `MATCH` binds nothing when a node is
+absent and `cypher-shell` still exits 0, which is how an entire file of expert priors was once lost
+unnoticed (see [09-verify-seed.cypher](../infra/neo4j/init/09-verify-seed.cypher)). It normally means
+the registry moved on since the export — re-seed assets, then re-import.
+
+**Verified end to end** on 2026-08-30 against a throwaway Neo4j seeded with constraints and assets
+only: importing the snapshot reproduced all 31 factors, 248 `CAUSES` and 5 `CORRELATES_WITH` edges
+with identical weights, Beta counts and timestamps, passed all six assertions in
+`09-verify-seed.cypher`, and was a clean no-op on re-run.
+
 ## Operational reporting
 
 These require the local Docker stack to be running. They read credentials from `infra/.env` and query
