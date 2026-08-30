@@ -182,14 +182,19 @@ class FakeRepository:
 
 
 def _message(
-    title: str, body: str, *, language: str = "en", country: str = "US"
+    title: str,
+    body: str,
+    *,
+    language: str = "en",
+    country: str = "US",
+    canonical_url: str | None = None,
 ) -> ArticleIngested:
     return ArticleIngested(
         correlation_id=uuid.uuid4(),
         occurred_at=datetime.now(UTC),
         article_id=uuid.uuid4(),
         source_id="reuters",
-        canonical_url=f"https://example.com/{uuid.uuid4()}",
+        canonical_url=canonical_url or f"https://example.com/{uuid.uuid4()}",
         title=title,
         body=body,
         published_at=datetime.now(UTC),
@@ -212,6 +217,51 @@ async def test_near_duplicate_is_dropped() -> None:
     # Only the first copy created a fingerprint and a cluster.
     assert len(repo.fingerprints) == 1
     assert len(repo.clusters) == 1
+
+
+async def test_canonical_url_reaches_the_classifier() -> None:
+    """The publisher-section tier is only reachable if the URL is threaded all the way through.
+
+    This asserts the wiring, not the classification: message -> ArticleFacts -> extractor ->
+    classify_text. It matters because the section tier FAILS OPEN (CLN-72). If the URL stopped being
+    passed, tier 0 would silently never fire, every article would classify exactly as it did before,
+    and every other test in this suite would still pass — the 2026-08-17 corpus included, because its
+    replay calls the classifier directly rather than through the pipeline.
+
+    The headline carries no rejectable keyword on purpose, so the section is the only thing that can
+    produce SPORT here.
+    """
+    repo = FakeRepository()
+    pipeline = _pipeline(repo)
+    await pipeline.process_article(
+        _message(
+            "Vilt firande med löparkompisarna",
+            "Andreas Almgren firade vilt med svenska fanan inne på löparbanan.",
+            language="sv",
+            country="SE",
+            canonical_url="https://www.dn.se/sport/vilt-firande-med-loparkompisarna",
+        )
+    )
+    action = next(iter(repo.actions.values()))
+    assert action.event_type is EventType.SPORT
+    assert action.action_lemma == "section:sport"
+    # A rejected article must also carry no assets, so Prediction drops it.
+    assert action.affected_asset_ids == ()
+
+
+async def test_url_without_a_usable_section_changes_nothing() -> None:
+    """The other half of CLN-72: an unmapped URL must not disturb keyword classification."""
+    repo = FakeRepository()
+    pipeline = _pipeline(repo)
+    await pipeline.process_article(
+        _message(
+            "OPEC cuts output",
+            "OPEC agrees to cut oil output by two million barrels per day",
+            canonical_url="https://www.example.com/some/deep/path",
+        )
+    )
+    action = next(iter(repo.actions.values()))
+    assert action.event_type is EventType.COMMODITY_PRICE_SHOCK
 
 
 async def test_distinct_event_types_stay_separate() -> None:

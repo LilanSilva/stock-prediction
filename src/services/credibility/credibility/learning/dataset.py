@@ -239,7 +239,16 @@ async def build_correlation_samples(
     async with pool.acquire() as conn:
         rows = await conn.fetch(_DIRECT_SCORED_PREDICTIONS_QUERY, cutoff)
         for row in rows:
-            source_asset = AssetId(row["source_asset_id"])
+            # An asset retired from the registry keeps its historical scores; they are not
+            # learnable, so skip the row rather than failing the whole batch.
+            try:
+                source_asset = AssetId(row["source_asset_id"])
+            except ValueError:
+                logger.warning(
+                    "corr_learning_skip_unknown_source_asset",
+                    asset_id=row["source_asset_id"],
+                )
+                continue
             direction = Direction(row["predicted_direction"])
             condition = (
                 ConditionCode.UPSTREAM_UP

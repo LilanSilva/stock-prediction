@@ -23,6 +23,8 @@ from decimal import Decimal
 from typing import Protocol
 
 import asyncpg
+import structlog
+from shared.reference.loader import is_known_asset
 from shared.schemas.messages import (
     AssetId,
     CloseObservation,
@@ -31,9 +33,15 @@ from shared.schemas.messages import (
     RoutingKey,
 )
 
+logger = structlog.get_logger(__name__)
+
 STATE_PENDING = "PENDING"
 STATE_BASELINE_OBSERVED = "BASELINE_OBSERVED"
 STATE_COMPLETED = "COMPLETED"
+STATE_ABANDONED = "ABANDONED"
+
+# States a scheduler tick may still act on; mirrors the ix_price_requests_open partial index.
+OPEN_STATES = (STATE_PENDING, STATE_BASELINE_OBSERVED)
 
 # Inclusive bounds for the recent-closes read query; caps the row count a single caller can pull.
 MIN_RECENT_SESSIONS = 1
@@ -128,31 +136,47 @@ class PriceRequestRepository:
         return inserted is not None
 
     async def load_open_requests(self) -> list[PendingRequest]:
-        """Return all requests not yet completed, for startup rehydration and scheduled polling."""
+        """Return requests due for another attempt, oldest first.
+
+        Honours ``next_attempt_at`` so a deferred request is not re-driven before its backoff has
+        elapsed, and skips terminal states.
+        """
         rows = await self._pool.fetch(
             """
             SELECT request_id, prediction_id, asset_id, baseline_session,
                    settlement_session, market_calendar, correlation_id, state, attempts
             FROM market_data.price_requests
-            WHERE state <> $1
+            WHERE state = ANY($1::text[])
+              AND (next_attempt_at IS NULL OR next_attempt_at <= now())
             ORDER BY created_at
             """,
-            STATE_COMPLETED,
+            list(OPEN_STATES),
         )
-        return [
-            PendingRequest(
-                request_id=row["request_id"],
-                prediction_id=row["prediction_id"],
-                asset_id=AssetId(row["asset_id"]),
-                baseline_session=row["baseline_session"],
-                settlement_session=row["settlement_session"],
-                market_calendar=row["market_calendar"],
-                correlation_id=row["correlation_id"],
-                state=row["state"],
-                attempts=row["attempts"],
+        open_requests: list[PendingRequest] = []
+        for row in rows:
+            # A request whose asset was retired from the registry can never be priced. Skipping it
+            # keeps one stale row from raising and aborting the tick for every other request.
+            if not is_known_asset(row["asset_id"]):
+                logger.warning(
+                    "open_request_asset_not_in_registry",
+                    request_id=str(row["request_id"]),
+                    asset_id=row["asset_id"],
+                )
+                continue
+            open_requests.append(
+                PendingRequest(
+                    request_id=row["request_id"],
+                    prediction_id=row["prediction_id"],
+                    asset_id=AssetId(row["asset_id"]),
+                    baseline_session=row["baseline_session"],
+                    settlement_session=row["settlement_session"],
+                    market_calendar=row["market_calendar"],
+                    correlation_id=row["correlation_id"],
+                    state=row["state"],
+                    attempts=row["attempts"],
+                )
             )
-            for row in rows
-        ]
+        return open_requests
 
     async def _upsert_observation(
         self, conn: asyncpg.Connection, asset_id: AssetId, observation: CloseObservation
@@ -252,6 +276,19 @@ class PriceRequestRepository:
             request_id,
             error,
             next_attempt_at,
+        )
+
+    async def abandon_request(self, request_id: uuid.UUID, reason: str) -> None:
+        """Move a request to the terminal ABANDONED state so it is never re-driven."""
+        await self._pool.execute(
+            """
+            UPDATE market_data.price_requests
+            SET state = $2, last_error = $3, next_attempt_at = NULL, updated_at = now()
+            WHERE request_id = $1
+            """,
+            request_id,
+            STATE_ABANDONED,
+            reason,
         )
 
 

@@ -1,16 +1,84 @@
-# tests/fixtures — Frozen audit replay corpus
+# tests/fixtures — Frozen audit replay corpora
 
-## What this is
+Two corpora, from two audits, answering **different questions**. Both are needed; neither subsumes the
+other.
+
+| Corpus | Labelled by | Catches |
+|---|---|---|
+| `audit-2026-08-12-*` (73 articles, `A1`…`A73`) | **asset outcome** | An article that wrongly produces a prediction |
+| `audit-2026-08-17-*` (251 articles, `B1`…`B251`) | **event type** | An article given the wrong type at all |
+
+The 2026-08-12 corpus cannot detect a classification regression: 65 of its 73 labels are
+`must_not_predict`, and an article typed `OTHER` instead of `SPORT` resolves to no assets either way, so
+it passes. The 2026-08-17 corpus exists to close that gap.
+
+## 2026-08-12 — asset outcome
 
 `audit-2026-08-12-articles.json` holds the 73 distinct articles that produced the 113 predictions in
 [`scripts/prediction-audit-2026-08-12.json`](../../../../../scripts/prediction-audit-2026-08-12.json).
 `audit-2026-08-12-labels.json` holds the expected classification for each one.
 
-Together they are the acceptance oracle for
-E12 — Prediction Quality Remediation:
+Together they are the acceptance oracle for the prediction-quality remediation that produced
+CLN-63 – CLN-68 (see [`requirements/SRS-03-cleansing.md`](../../../../../requirements/SRS-03-cleansing.md) §5):
 an audit of that day found 93 of 113 predictions were not justified by their contributing news.
 [`test_audit_replay.py`](../test_audit_replay.py) replays every article through the real classifier and
 asserts the labelled outcome.
+
+## 2026-08-17 — event type
+
+`audit-2026-08-17-articles.json` holds all 251 clusters produced that day, one article each, and
+`audit-2026-08-17-labels.json` the reviewed expected type for each. Source:
+[`scripts/cleansing-audit-2026-08-17.json`](../../../../../scripts/cleansing-audit-2026-08-17.json),
+with the per-cluster verdicts in
+[`scripts/cleansing-misclassified-2026-08-17.md`](../../../../../scripts/cleansing-misclassified-2026-08-17.md).
+It is the oracle for CLN-69 – CLN-72, replayed by
+[`test_audit_replay_2026_08_17.py`](../test_audit_replay_2026_08_17.py).
+
+That audit found **110 of 251 clusters correctly classified**. 222 were typed `OTHER`, including
+roughly 85 sport, culture and lifestyle articles that
+[REF-01](../../../../../requirements/REF-01-event-taxonomy.md) §2.1 requires be *explicitly* rejected —
+the non-financial reject tier fired twice all day, because its keyword vocabulary is English-first and
+every feed is Swedish.
+
+### Provenance and two things a reader must know
+
+**Re-exported before freezing.** The original export capped bodies at 500 characters and omitted
+`canonical_url`. Both are classification inputs, so that export could not reproduce its own results:
+two clusters (`86343317`, `9a05ce28`) took their type from body text past the cut. The corpus is built
+from a re-export with the full stored body and the URL, and now reproduces **251 of 251** stored types.
+`scripts/export-cleansing-audit.ps1` has been fixed; a fresh export needs no repair.
+
+Bodies are capped at 2 000 characters — that is `body_max_chars` in Ingestion, i.e. what the database
+actually holds, not a truncation applied here.
+
+**The corpus is a subset of that day, on purpose.** Ingestion kept running after the audit export, so
+the date now holds 279 articles. The corpus is the 251 that were **audited and labelled**; the 28 later
+arrivals are excluded because no one reviewed them. All 251 were re-verified as still present with
+unchanged stored types before freezing.
+
+### `expected_event_type: null`
+
+19 labels carry `null`, meaning "any non-financial or unmapped type". These are culture-section essays,
+columns and human-interest features where `ENTERTAINMENT`, `LIFESTYLE` and `OTHER` are
+**downstream-equivalent**: all three resolve to zero assets and all three are excluded from Gate 2, so
+Prediction behaves identically. Asserting one of them would entrench a reviewer's opinion without
+protecting any behaviour. Precision is still asserted for these articles.
+
+### Two ratchets, not a single pass/fail
+
+`test_audit_replay_2026_08_17.py` holds two sets of refs that are asserted to be **exactly** the set
+that currently fails:
+
+| Set | Meaning | Severity |
+|---|---|---|
+| `_KNOWN_MISCLASSIFIED` | Labelled type not yet produced | Usually resolves to nothing; costs a missed cluster |
+| `_KNOWN_ASSET_LEAKS` | Misclassified **and** reaches an asset | Produces a false prediction and a notification |
+
+Because each set must match reality exactly, fixing an article breaks the build until its ref is
+removed, and breaking one breaks the build too. Improvements cannot land unrecorded and regressions
+cannot hide. `_KNOWN_ASSET_LEAKS` is the serious list: it currently holds three articles — a
+reader-service graphic moving two mining stocks, a reader's opinion letter moving Tesla, and a White
+House denial moving oil.
 
 ## Provenance
 

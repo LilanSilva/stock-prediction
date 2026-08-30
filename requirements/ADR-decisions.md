@@ -123,15 +123,31 @@ the loader refuses to boot on a malformed file rather than falling back silently
 edit took effect while running on stale data is worse than failing loudly. The cost accepted: mypy can
 no longer prove exhaustive coverage over assets.
 
-**Providers are per asset.** No vendor covers every market. biquote serves a curated list of US
-mega-caps — probed 2026-08-03, every European listing returns 0 bars, including EU giants on US
-exchanges (`ASML`, `SAP`, `NVO`, `SHEL`), plus 8 requested US names. Yahoo covers Stockholm, Euronext
-and Xetra, so the registry's `provider` field routes each asset to its adapter. This also corrects the
-record: the `HTTP 429`s that retired Yahoo in POC-7 were caused by POC-6's custom User-Agent, not IP
-rate limiting (40 concurrent requests with a browser agent all return 200; 8 with curl's default agent
-all return 429). Yahoo remains undocumented and UA-sniffing may change, so US assets stay on biquote —
-Yahoo flakiness cannot regress existing scoring, and switching to a paid vendor such as Finnhub is one
-field in the JSON.
+**Providers are per asset.** No vendor covers every market, so the registry's `provider` field routes
+each asset to its adapter. This also corrects the record: the `HTTP 429`s that retired Yahoo in POC-7
+were caused by POC-6's custom User-Agent, not IP rate limiting (40 concurrent requests with a browser
+agent all return 200; 8 with curl's default agent all return 429).
+
+**Every asset now routes to Yahoo (2026-08-29), reversing the POC-7 choice of biquote.** biquote was
+adopted as a documented API with no anti-scraping measures, but it is a quote/CFD feed rather than
+consolidated exchange trades — its bars carry `volume: 0` with only a `tickVolume`, and its prices sit
+on half-cents (`598.955`), the signature of a bid/ask midpoint. Two consequences made it unusable as a
+reference-price source:
+
+- **It omits roughly 40% of trading sessions.** Measured 2026-08-29 over one 20-day window, biquote
+  returned 8–9 bars where Yahoo returned 15; for `XOM` it had no bar for 17, 18, 19, 21, 24, 25 or 28
+  August, all ordinary weekday sessions. Because a missing bar raises `PriceNotYetAvailableError`,
+  which the scheduler treats as "not ready yet", 12 price requests retried indefinitely — one reaching
+  47 attempts over 12 days — and their predictions were never scored.
+- **Its closes disagree with the exchange.** Where both vendors had the same session, they differed by
+  up to `0.702%` (`LMT` 2026-08-10: biquote `598.955` vs Yahoo `603.160`). Any per-session fallback
+  therefore mixes two price bases inside a single close-to-close return.
+
+Yahoo was verified to serve all 10 affected assets with complete sessions and passing identity
+validation, and it already priced US listings (`NEM_NYSE`, `UAL_NASDAQ`) in production. The router's
+per-asset `provider` dispatch is retained, so re-introducing a second vendor remains one field in the
+JSON. Accepted cost: Yahoo's endpoint is undocumented and its UA-sniffing may change without notice,
+which is now a single point of failure for price data.
 
 **Session calendars are per market.** `shared.calendar` resolves any IANA timezone through stdlib
 `zoneinfo` instead of hand-rolled US DST arithmetic, because the EU and US switch on different dates

@@ -52,11 +52,13 @@ class PriceRequestProcessor:
         *,
         retry_backoff_base_seconds: float = 2.0,
         retry_backoff_max_seconds: float = 8.0,
+        abandon_after_settlement_days: int = 7,
     ) -> None:
         self._repository = repository
         self._adapter = adapter
         self._backoff_base = retry_backoff_base_seconds
         self._backoff_max = retry_backoff_max_seconds
+        self._abandon_after_days = abandon_after_settlement_days
 
     async def process(
         self, request: PendingRequest, *, now: datetime | None = None
@@ -68,8 +70,14 @@ class PriceRequestProcessor:
         try:
             baseline = await self._observe_baseline(request)
         except PriceNotYetAvailableError as exc:
-            await self._defer(request, f"baseline pending: {exc}")
-            return ProcessOutcome(completed=False, published=False, pending_reason="baseline")
+            abandoned = await self._defer_or_abandon(
+                request, f"baseline pending: {exc}", current_time
+            )
+            return ProcessOutcome(
+                completed=False,
+                published=False,
+                pending_reason="abandoned" if abandoned else "baseline",
+            )
 
         # Completion is judged on the asset's own market clock: Stockholm closes hours before
         # New York, so waiting for 17:00 ET would delay every European close.
@@ -88,9 +96,13 @@ class PriceRequestProcessor:
         try:
             settlement = await self._adapter.get_close(request.asset_id, request.settlement_session)
         except PriceNotYetAvailableError as exc:
-            await self._defer(request, f"settlement pending: {exc}")
+            abandoned = await self._defer_or_abandon(
+                request, f"settlement pending: {exc}", current_time
+            )
             return ProcessOutcome(
-                completed=False, published=False, pending_reason="settlement_lag"
+                completed=False,
+                published=False,
+                pending_reason="abandoned" if abandoned else "settlement_lag",
             )
 
         message = build_price_observed(request, baseline, settlement)
@@ -124,6 +136,34 @@ class PriceRequestProcessor:
             reason=reason,
             next_attempt_at=next_attempt.isoformat(),
         )
+
+    async def _defer_or_abandon(
+        self, request: PendingRequest, reason: str, now: datetime
+    ) -> bool:
+        """Defer a missing bar, or abandon it once the provider has had long enough to publish.
+
+        The attempt is always made first, so a provider switch or a backfill can still recover an
+        old request; only a failed attempt past the grace window is terminal.
+        """
+        grace_ends = request.settlement_session + timedelta(days=self._abandon_after_days)
+        if now.date() <= grace_ends:
+            await self._defer(request, reason)
+            return False
+
+        terminal_reason = (
+            f"abandoned after {self._abandon_after_days} days past settlement "
+            f"{request.settlement_session.isoformat()}: {reason}"
+        )
+        await self._repository.abandon_request(request.request_id, terminal_reason)
+        logger.warning(
+            "price_request_abandoned",
+            request_id=str(request.request_id),
+            asset_id=str(request.asset_id),
+            settlement_session=request.settlement_session.isoformat(),
+            attempts=request.attempts,
+            reason=reason,
+        )
+        return True
 
     def _backoff(self, attempts: int) -> timedelta:
         seconds = min(self._backoff_base * (2**attempts), self._backoff_max)

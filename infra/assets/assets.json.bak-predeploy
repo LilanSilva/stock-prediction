@@ -20,6 +20,25 @@
           "asset_id": "LMT_NYSE",
           "name": "Lockheed Martin",
           "code": "NYSE:LMT",
+          "provider": "biquote.io",
+          "provider_symbol": "LMT",
+          "economic_identity": "Lockheed Martin ordinary shares (NYSE)",
+          "expected_exchange": "NYSE",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": "LMT_NYSE_YH",
+          "keywords": [
+            "lockheed",
+            "lmt"
+          ]
+        },
+        {
+          "asset_id": "LMT_NYSE_YH",
+          "name": "Lockheed Martin (Yahoo fallback)",
+          "code": "NYSE:LMT",
           "provider": "yahoo",
           "provider_symbol": "LMT",
           "economic_identity": "Lockheed Martin ordinary shares (NYSE)",
@@ -30,10 +49,7 @@
           "price_kind": "PROVIDER_DAILY_CLOSE",
           "is_adjusted": false,
           "fallback": null,
-          "keywords": [
-            "lockheed",
-            "lmt"
-          ]
+          "keywords": []
         },
         {
           "asset_id": "SAAB_B_STO",
@@ -53,6 +69,25 @@
             "saab",
             "saab-b"
           ]
+        },
+        {
+          "asset_id": "AM_EPA",
+          "name": "Dassault Aviation",
+          "code": "EPA:AM",
+          "provider": "yahoo",
+          "provider_symbol": "AM.PA",
+          "economic_identity": "Dassault Aviation ordinary shares (PAR)",
+          "expected_exchange": "PAR",
+          "currency": "EUR",
+          "timezone": "Europe/Paris",
+          "session_complete_at": "18:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "dassault",
+            "rafale"
+          ]
         }
       ]
     },
@@ -71,7 +106,7 @@
           "asset_id": "BA_NYSE",
           "name": "Boeing",
           "code": "NYSE:BA",
-          "provider": "yahoo",
+          "provider": "biquote.io",
           "provider_symbol": "BA",
           "economic_identity": "Boeing ordinary shares (NYSE)",
           "expected_exchange": "NYSE",
@@ -158,6 +193,24 @@
           ]
         },
         {
+          "asset_id": "BNTX_NASDAQ",
+          "name": "BioNTech",
+          "code": "NASDAQ:BNTX",
+          "provider": "yahoo",
+          "provider_symbol": "BNTX",
+          "economic_identity": "BioNTech ordinary shares (NASDAQ)",
+          "expected_exchange": "NASDAQ",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "biontech"
+          ]
+        },
+        {
           "asset_id": "MRNA_NASDAQ",
           "name": "Moderna",
           "code": "NASDAQ:MRNA",
@@ -194,7 +247,7 @@
           "asset_id": "NVDA_NASDAQ",
           "name": "Nvidia",
           "code": "NASDAQ:NVDA",
-          "provider": "yahoo",
+          "provider": "biquote.io",
           "provider_symbol": "NVDA",
           "economic_identity": "Nvidia ordinary shares (NASDAQ)",
           "expected_exchange": "NASDAQ",
@@ -228,26 +281,6 @@
             "asml",
             "lithography"
           ]
-        },
-        {
-          "asset_id": "SIVE_STO",
-          "name": "Sivers Semiconductors",
-          "code": "STO:SIVE",
-          "provider": "yahoo",
-          "provider_symbol": "SIVE.ST",
-          "economic_identity": "Sivers Semiconductors ordinary shares (STO)",
-          "expected_exchange": "STO",
-          "currency": "SEK",
-          "timezone": "Europe/Stockholm",
-          "session_complete_at": "18:00",
-          "price_kind": "PROVIDER_DAILY_CLOSE",
-          "is_adjusted": false,
-          "fallback": null,
-          "keywords": [
-            "sivers",
-            "sivers semiconductors",
-            "sive"
-          ]
         }
       ]
     },
@@ -266,7 +299,7 @@
           "asset_id": "MSFT_NASDAQ",
           "name": "Microsoft",
           "code": "NASDAQ:MSFT",
-          "provider": "yahoo",
+          "provider": "biquote.io",
           "provider_symbol": "MSFT",
           "economic_identity": "Microsoft ordinary shares (NASDAQ)",
           "expected_exchange": "NASDAQ",
@@ -338,6 +371,26 @@
           "asset_id": "GOOGL_NASDAQ",
           "name": "Alphabet",
           "code": "NASDAQ:GOOGL",
+          "provider": "biquote.io",
+          "provider_symbol": "GOOGL",
+          "economic_identity": "Alphabet ordinary shares (NASDAQ)",
+          "expected_exchange": "NASDAQ",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": "GOOGL_NASDAQ_YH",
+          "keywords": [
+            "alphabet",
+            "android",
+            "googl"
+          ]
+        },
+        {
+          "asset_id": "GOOGL_NASDAQ_YH",
+          "name": "Alphabet (Yahoo fallback)",
+          "code": "NASDAQ:GOOGL",
           "provider": "yahoo",
           "provider_symbol": "GOOGL",
           "economic_identity": "Alphabet ordinary shares (NASDAQ)",
@@ -348,17 +401,13 @@
           "price_kind": "PROVIDER_DAILY_CLOSE",
           "is_adjusted": false,
           "fallback": null,
-          "keywords": [
-            "alphabet",
-            "android",
-            "googl"
-          ]
+          "keywords": []
         },
         {
           "asset_id": "AMZN_NASDAQ",
           "name": "Amazon",
           "code": "NASDAQ:AMZN",
-          "provider": "yahoo",
+          "provider": "biquote.io",
           "provider_symbol": "AMZN",
           "economic_identity": "Amazon ordinary shares (NASDAQ)",
           "expected_exchange": "NASDAQ",
@@ -377,7 +426,7 @@
           "asset_id": "NFLX_NASDAQ",
           "name": "Netflix",
           "code": "NASDAQ:NFLX",
-          "provider": "yahoo",
+          "provider": "biquote.io",
           "provider_symbol": "NFLX",
           "economic_identity": "Netflix ordinary shares (NASDAQ)",
           "expected_exchange": "NASDAQ",
@@ -406,7 +455,7 @@
           "asset_id": "AAPL_NASDAQ",
           "name": "Apple",
           "code": "NASDAQ:AAPL",
-          "provider": "yahoo",
+          "provider": "biquote.io",
           "provider_symbol": "AAPL",
           "economic_identity": "Apple ordinary shares (NASDAQ)",
           "expected_exchange": "NASDAQ",
@@ -440,6 +489,26 @@
           "asset_id": "TSLA_NASDAQ",
           "name": "Tesla",
           "code": "NASDAQ:TSLA",
+          "provider": "biquote.io",
+          "provider_symbol": "TSLA",
+          "economic_identity": "Tesla ordinary shares (NASDAQ)",
+          "expected_exchange": "NASDAQ",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": "TSLA_NASDAQ_YH",
+          "keywords": [
+            "tesla",
+            "tsla",
+            "elon musk"
+          ]
+        },
+        {
+          "asset_id": "TSLA_NASDAQ_YH",
+          "name": "Tesla (Yahoo fallback)",
+          "code": "NASDAQ:TSLA",
           "provider": "yahoo",
           "provider_symbol": "TSLA",
           "economic_identity": "Tesla ordinary shares (NASDAQ)",
@@ -450,11 +519,7 @@
           "price_kind": "PROVIDER_DAILY_CLOSE",
           "is_adjusted": false,
           "fallback": null,
-          "keywords": [
-            "tesla",
-            "tsla",
-            "elon musk"
-          ]
+          "keywords": []
         }
       ]
     },
@@ -465,16 +530,37 @@
         "opec",
         "refinery",
         "shale",
-        "raffinaderi",
-        "brentoil",
-        "brent oil"
+        "raffinaderi"
       ],
       "assets": [
+        {
+          "asset_id": "BRENT_OIL",
+          "name": "Brent crude oil",
+          "code": "NYMEX:UKOIL",
+          "provider": "biquote.io",
+          "provider_symbol": "UKOIL",
+          "economic_identity": "Brent crude oil ordinary shares (NYMEX)",
+          "expected_exchange": "NYMEX",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "oil",
+            "crude",
+            "brent",
+            "olja",
+            "raolja",
+            "petroleum"
+          ]
+        },
         {
           "asset_id": "XOM_NYSE",
           "name": "Exxon Mobil",
           "code": "NYSE:XOM",
-          "provider": "yahoo",
+          "provider": "biquote.io",
           "provider_symbol": "XOM",
           "economic_identity": "Exxon Mobil ordinary shares (NYSE)",
           "expected_exchange": "NYSE",
@@ -490,22 +576,39 @@
           ]
         },
         {
-          "asset_id": "IPCO_STO",
-          "name": "International Petroleum Corp",
-          "code": "STO:IPCO",
+          "asset_id": "FANG_NASDAQ",
+          "name": "Diamondback Energy",
+          "code": "NASDAQ:FANG",
           "provider": "yahoo",
-          "provider_symbol": "IPCO.ST",
-          "economic_identity": "International Petroleum Corp ordinary shares (STO)",
-          "expected_exchange": "STO",
-          "currency": "SEK",
-          "timezone": "Europe/Stockholm",
-          "session_complete_at": "18:00",
+          "provider_symbol": "FANG",
+          "economic_identity": "Diamondback Energy ordinary shares (NASDAQ)",
+          "expected_exchange": "NASDAQ",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
           "price_kind": "PROVIDER_DAILY_CLOSE",
           "is_adjusted": false,
           "fallback": null,
           "keywords": [
-            "international petroleum",
-            "ipco"
+            "diamondback"
+          ]
+        },
+        {
+          "asset_id": "VLO_NYSE",
+          "name": "Valero Energy",
+          "code": "NYSE:VLO",
+          "provider": "yahoo",
+          "provider_symbol": "VLO",
+          "economic_identity": "Valero Energy ordinary shares (NYSE)",
+          "expected_exchange": "NYSE",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "valero"
           ]
         }
       ]
@@ -517,12 +620,30 @@
         "precious metal",
         "safe haven",
         "adelmetall",
-        "gruva",
-        "gold price",
-        "gold mining",
-        "guldpris"
+        "gruva"
       ],
       "assets": [
+        {
+          "asset_id": "GOLD",
+          "name": "Gold",
+          "code": "COMEX:XAUUSD",
+          "provider": "biquote.io",
+          "provider_symbol": "XAUUSD",
+          "economic_identity": "Gold ordinary shares (COMEX)",
+          "expected_exchange": "COMEX",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "gold",
+            "guld",
+            "bullion",
+            "xau"
+          ]
+        },
         {
           "asset_id": "LUG_STO",
           "name": "Lundin Gold",
@@ -539,26 +660,6 @@
           "fallback": null,
           "keywords": [
             "lundin gold"
-          ]
-        },
-        {
-          "asset_id": "NEM_NYSE",
-          "name": "Newmont Corporation",
-          "code": "NYSE:NEM",
-          "provider": "yahoo",
-          "provider_symbol": "NEM",
-          "economic_identity": "Newmont Corporation ordinary shares (NYSE)",
-          "expected_exchange": "NYSE",
-          "currency": "USD",
-          "timezone": "America/New_York",
-          "session_complete_at": "17:00",
-          "price_kind": "PROVIDER_DAILY_CLOSE",
-          "is_adjusted": false,
-          "fallback": null,
-          "keywords": [
-            "newmont",
-            "nem",
-            "gold mining"
           ]
         }
       ]
@@ -589,8 +690,7 @@
           "is_adjusted": false,
           "fallback": null,
           "keywords": [
-            "swedbank",
-            "swed"
+            "swedbank"
           ]
         },
         {
@@ -740,6 +840,69 @@
           "fallback": null,
           "keywords": [
             "aak"
+          ]
+        }
+      ]
+    },
+    {
+      "group_id": "REAL_ESTATE",
+      "display_name": "Real estate",
+      "industry_keywords": [
+        "real estate",
+        "housing",
+        "homebuilder",
+        "property market",
+        "shopping mall",
+        "fastighet",
+        "bostad"
+      ],
+      "assets": [
+        {
+          "asset_id": "SPG_NYSE",
+          "name": "Simon Property Group",
+          "code": "NYSE:SPG",
+          "provider": "yahoo",
+          "provider_symbol": "SPG",
+          "economic_identity": "Simon Property Group ordinary shares (NYSE)",
+          "expected_exchange": "NYSE",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "simon property"
+          ]
+        }
+      ]
+    },
+    {
+      "group_id": "CONSUMER_FITNESS",
+      "display_name": "Consumer fitness & leisure",
+      "industry_keywords": [
+        "fitness",
+        "home exercise",
+        "sportswear",
+        "traning"
+      ],
+      "assets": [
+        {
+          "asset_id": "PTON_NASDAQ",
+          "name": "Peloton Interactive",
+          "code": "NASDAQ:PTON",
+          "provider": "yahoo",
+          "provider_symbol": "PTON",
+          "economic_identity": "Peloton Interactive ordinary shares (NASDAQ)",
+          "expected_exchange": "NASDAQ",
+          "currency": "USD",
+          "timezone": "America/New_York",
+          "session_complete_at": "17:00",
+          "price_kind": "PROVIDER_DAILY_CLOSE",
+          "is_adjusted": false,
+          "fallback": null,
+          "keywords": [
+            "peloton"
           ]
         }
       ]

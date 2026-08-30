@@ -4,7 +4,8 @@ Reuses the fakes from ``test_pipeline`` rather than re-declaring them, so the pi
 wired exactly as it is there.
 
 The three rules pinned here all come from the 2026-08-12 audit
-(backlog/E12-Prediction-Quality-Remediation):
+(``scripts/prediction-audit-2026-08-12.json``; specified as PRD-60 - PRD-62 in
+``requirements/SRS-04-prediction.md``):
 
   * PRD-60 — propagation needs a confident source. 39 of 113 predictions (35%) were purely
   propagated,

@@ -1,0 +1,1773 @@
+{
+  "audit_date": "2026-08-17",
+  "label_count": 251,
+  "labels": [
+    {
+      "ref": "B1",
+      "expected_event_type": "LIFESTYLE",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Consumer-interest feature; REF-01 type 35."
+    },
+    {
+      "ref": "B2",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B3",
+      "expected_event_type": "LIFESTYLE",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Consumer-interest feature; REF-01 type 35."
+    },
+    {
+      "ref": "B4",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B5",
+      "expected_event_type": "LIFESTYLE",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Consumer-interest feature; REF-01 type 35."
+    },
+    {
+      "ref": "B6",
+      "expected_event_type": "SUPPLY_DISRUPTION",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Goods unavailable to buyers; see note - the weakest call in the reviewed set."
+    },
+    {
+      "ref": "B7",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B8",
+      "expected_event_type": "NATURAL_DISASTER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Earthquake, wildfire, flood, drought or heatwave."
+    },
+    {
+      "ref": "B9",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B10",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B11",
+      "expected_event_type": "REGULATORY_ACTION",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Regulator or legislator acting on a licence, approval or enforcement."
+    },
+    {
+      "ref": "B12",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B13",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-financial feature. ENTERTAINMENT, LIFESTYLE and OTHER are downstream-equivalent here - all resolve to zero assets and are excluded from Gate 2 - so the exact type is deliberately not asserted."
+    },
+    {
+      "ref": "B14",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B15",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B16",
+      "expected_event_type": "LEGAL_DISPUTE",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Proceedings have reached court."
+    },
+    {
+      "ref": "B17",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B18",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B19",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B20",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B21",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B22",
+      "expected_event_type": "NATURAL_DISASTER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Earthquake, wildfire, flood, drought or heatwave."
+    },
+    {
+      "ref": "B23",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B24",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B25",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B26",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B27",
+      "expected_event_type": "LEGAL_DISPUTE",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Proceedings have reached court."
+    },
+    {
+      "ref": "B28",
+      "expected_event_type": "NATURAL_DISASTER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Earthquake, wildfire, flood, drought or heatwave."
+    },
+    {
+      "ref": "B29",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B30",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B31",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B32",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B33",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B34",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B35",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B36",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B37",
+      "expected_event_type": "LIFESTYLE",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Consumer-interest feature; REF-01 type 35."
+    },
+    {
+      "ref": "B38",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-financial feature. ENTERTAINMENT, LIFESTYLE and OTHER are downstream-equivalent here - all resolve to zero assets and are excluded from Gate 2 - so the exact type is deliberately not asserted."
+    },
+    {
+      "ref": "B39",
+      "expected_event_type": "CORPORATE_ACQUISITION",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Reports an acquisition or the progress of a public bid."
+    },
+    {
+      "ref": "B40",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-financial feature. ENTERTAINMENT, LIFESTYLE and OTHER are downstream-equivalent here - all resolve to zero assets and are excluded from Gate 2 - so the exact type is deliberately not asserted."
+    },
+    {
+      "ref": "B41",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-financial feature. ENTERTAINMENT, LIFESTYLE and OTHER are downstream-equivalent here - all resolve to zero assets and are excluded from Gate 2 - so the exact type is deliberately not asserted."
+    },
+    {
+      "ref": "B42",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B43",
+      "expected_event_type": "LIFESTYLE",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Consumer-interest feature; REF-01 type 35."
+    },
+    {
+      "ref": "B44",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-financial feature. ENTERTAINMENT, LIFESTYLE and OTHER are downstream-equivalent here - all resolve to zero assets and are excluded from Gate 2 - so the exact type is deliberately not asserted."
+    },
+    {
+      "ref": "B45",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B46",
+      "expected_event_type": "NATURAL_DISASTER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Earthquake, wildfire, flood, drought or heatwave."
+    },
+    {
+      "ref": "B47",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B48",
+      "expected_event_type": "FISCAL_POLICY",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Policy proposal on tax, spending or the labour market."
+    },
+    {
+      "ref": "B49",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B50",
+      "expected_event_type": "NATURAL_DISASTER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Earthquake, wildfire, flood, drought or heatwave."
+    },
+    {
+      "ref": "B51",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-financial feature. ENTERTAINMENT, LIFESTYLE and OTHER are downstream-equivalent here - all resolve to zero assets and are excluded from Gate 2 - so the exact type is deliberately not asserted."
+    },
+    {
+      "ref": "B52",
+      "expected_event_type": "GEOPOLITICAL_TENSION",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Inter-state coercion, military posturing or influence operation short of armed attack."
+    },
+    {
+      "ref": "B53",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B54",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-financial feature. ENTERTAINMENT, LIFESTYLE and OTHER are downstream-equivalent here - all resolve to zero assets and are excluded from Gate 2 - so the exact type is deliberately not asserted."
+    },
+    {
+      "ref": "B55",
+      "expected_event_type": "REGULATORY_ACTION",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Regulator or legislator acting on a licence, approval or enforcement."
+    },
+    {
+      "ref": "B56",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B57",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B58",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B59",
+      "expected_event_type": "LIFESTYLE",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Consumer-interest feature; REF-01 type 35."
+    },
+    {
+      "ref": "B60",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B61",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B62",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B63",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B64",
+      "expected_event_type": "LIFESTYLE",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Consumer-interest feature; REF-01 type 35."
+    },
+    {
+      "ref": "B65",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B66",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B67",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B68",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B69",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B70",
+      "expected_event_type": "ECONOMIC_DATA_RELEASE",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Reports a published statistic."
+    },
+    {
+      "ref": "B71",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-financial feature. ENTERTAINMENT, LIFESTYLE and OTHER are downstream-equivalent here - all resolve to zero assets and are excluded from Gate 2 - so the exact type is deliberately not asserted."
+    },
+    {
+      "ref": "B72",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B73",
+      "expected_event_type": "GEOPOLITICAL_TENSION",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Inter-state coercion, military posturing or influence operation short of armed attack."
+    },
+    {
+      "ref": "B74",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B75",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B76",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B77",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B78",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B79",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B80",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B81",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B82",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B83",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B84",
+      "expected_event_type": "NATURAL_DISASTER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Earthquake, wildfire, flood, drought or heatwave."
+    },
+    {
+      "ref": "B85",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B86",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B87",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B88",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B89",
+      "expected_event_type": "CORPORATE_ACQUISITION",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Reports an acquisition or the progress of a public bid."
+    },
+    {
+      "ref": "B90",
+      "expected_event_type": "MILITARY_CONFLICT",
+      "expected_assets": [
+        "NEM_NYSE",
+        "LMT_NYSE",
+        "SAAB_B_STO"
+      ],
+      "verdict": "justified",
+      "rationale": "Reports an armed attack."
+    },
+    {
+      "ref": "B91",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B92",
+      "expected_event_type": "ECONOMIC_DATA_RELEASE",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Reports a published statistic."
+    },
+    {
+      "ref": "B93",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B94",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B95",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B96",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B97",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B98",
+      "expected_event_type": "NATURAL_DISASTER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Earthquake, wildfire, flood, drought or heatwave."
+    },
+    {
+      "ref": "B99",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B100",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B101",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B102",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B103",
+      "expected_event_type": "NATURAL_DISASTER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Earthquake, wildfire, flood, drought or heatwave."
+    },
+    {
+      "ref": "B104",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B105",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B106",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B107",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B108",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B109",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B110",
+      "expected_event_type": "ECONOMIC_DATA_RELEASE",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Reports a published statistic."
+    },
+    {
+      "ref": "B111",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B112",
+      "expected_event_type": "ECONOMIC_DATA_RELEASE",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Reports a published statistic."
+    },
+    {
+      "ref": "B113",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-financial feature. ENTERTAINMENT, LIFESTYLE and OTHER are downstream-equivalent here - all resolve to zero assets and are excluded from Gate 2 - so the exact type is deliberately not asserted."
+    },
+    {
+      "ref": "B114",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B115",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B116",
+      "expected_event_type": "GEOPOLITICAL_TENSION",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Inter-state coercion, military posturing or influence operation short of armed attack."
+    },
+    {
+      "ref": "B117",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B118",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B119",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B120",
+      "expected_event_type": "LIFESTYLE",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Consumer-interest feature; REF-01 type 35."
+    },
+    {
+      "ref": "B121",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B122",
+      "expected_event_type": "LIFESTYLE",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Consumer-interest feature; REF-01 type 35."
+    },
+    {
+      "ref": "B123",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B124",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B125",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-financial feature. ENTERTAINMENT, LIFESTYLE and OTHER are downstream-equivalent here - all resolve to zero assets and are excluded from Gate 2 - so the exact type is deliberately not asserted."
+    },
+    {
+      "ref": "B126",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B127",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B128",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B129",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B130",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B131",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B132",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-financial feature. ENTERTAINMENT, LIFESTYLE and OTHER are downstream-equivalent here - all resolve to zero assets and are excluded from Gate 2 - so the exact type is deliberately not asserted."
+    },
+    {
+      "ref": "B133",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B134",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B135",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B136",
+      "expected_event_type": "LEGAL_DISPUTE",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Proceedings have reached court."
+    },
+    {
+      "ref": "B137",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B138",
+      "expected_event_type": "PANDEMIC_OUTBREAK",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Disease outbreak."
+    },
+    {
+      "ref": "B139",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B140",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B141",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B142",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B143",
+      "expected_event_type": "CORPORATE_EARNINGS",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Reports a quarterly result for a named company."
+    },
+    {
+      "ref": "B144",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B145",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B146",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B147",
+      "expected_event_type": "GEOPOLITICAL_TENSION",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Inter-state coercion, military posturing or influence operation short of armed attack."
+    },
+    {
+      "ref": "B148",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B149",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B150",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B151",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B152",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B153",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B154",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-financial feature. ENTERTAINMENT, LIFESTYLE and OTHER are downstream-equivalent here - all resolve to zero assets and are excluded from Gate 2 - so the exact type is deliberately not asserted."
+    },
+    {
+      "ref": "B155",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B156",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B157",
+      "expected_event_type": "REGULATORY_ACTION",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Regulator or legislator acting on a licence, approval or enforcement."
+    },
+    {
+      "ref": "B158",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B159",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B160",
+      "expected_event_type": "LIFESTYLE",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Consumer-interest feature; REF-01 type 35."
+    },
+    {
+      "ref": "B161",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B162",
+      "expected_event_type": "NATURAL_DISASTER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Earthquake, wildfire, flood, drought or heatwave."
+    },
+    {
+      "ref": "B163",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B164",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B165",
+      "expected_event_type": "PANDEMIC_OUTBREAK",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Disease outbreak."
+    },
+    {
+      "ref": "B166",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B167",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B168",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B169",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B170",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B171",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-financial feature. ENTERTAINMENT, LIFESTYLE and OTHER are downstream-equivalent here - all resolve to zero assets and are excluded from Gate 2 - so the exact type is deliberately not asserted."
+    },
+    {
+      "ref": "B172",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B173",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B174",
+      "expected_event_type": "GEOPOLITICAL_TENSION",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Inter-state coercion, military posturing or influence operation short of armed attack."
+    },
+    {
+      "ref": "B175",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B176",
+      "expected_event_type": "LIFESTYLE",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Consumer-interest feature; REF-01 type 35."
+    },
+    {
+      "ref": "B177",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B178",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B179",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B180",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B181",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B182",
+      "expected_event_type": "CORPORATE_EARNINGS",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Reports a quarterly result for a named company."
+    },
+    {
+      "ref": "B183",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B184",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B185",
+      "expected_event_type": "GEOPOLITICAL_TENSION",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Inter-state coercion, military posturing or influence operation short of armed attack."
+    },
+    {
+      "ref": "B186",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B187",
+      "expected_event_type": "CORPORATE_EARNINGS",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Reports a quarterly result for a named company."
+    },
+    {
+      "ref": "B188",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B189",
+      "expected_event_type": "PANDEMIC_OUTBREAK",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Disease outbreak."
+    },
+    {
+      "ref": "B190",
+      "expected_event_type": "GEOPOLITICAL_TENSION",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Inter-state coercion, military posturing or influence operation short of armed attack."
+    },
+    {
+      "ref": "B191",
+      "expected_event_type": "GEOPOLITICAL_TENSION",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Inter-state coercion, military posturing or influence operation short of armed attack."
+    },
+    {
+      "ref": "B192",
+      "expected_event_type": "LIFESTYLE",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Consumer-interest feature; REF-01 type 35."
+    },
+    {
+      "ref": "B193",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B194",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B195",
+      "expected_event_type": "LIFESTYLE",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Consumer-interest feature; REF-01 type 35."
+    },
+    {
+      "ref": "B196",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-financial feature. ENTERTAINMENT, LIFESTYLE and OTHER are downstream-equivalent here - all resolve to zero assets and are excluded from Gate 2 - so the exact type is deliberately not asserted."
+    },
+    {
+      "ref": "B197",
+      "expected_event_type": "ECONOMIC_DATA_RELEASE",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Reports a published statistic."
+    },
+    {
+      "ref": "B198",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B199",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B200",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B201",
+      "expected_event_type": "ECONOMIC_DATA_RELEASE",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Reports a published statistic."
+    },
+    {
+      "ref": "B202",
+      "expected_event_type": "ECONOMIC_DATA_RELEASE",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Reports a published statistic."
+    },
+    {
+      "ref": "B203",
+      "expected_event_type": "ECONOMIC_DATA_RELEASE",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Reports a published statistic."
+    },
+    {
+      "ref": "B204",
+      "expected_event_type": "GEOPOLITICAL_TENSION",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Inter-state coercion, military posturing or influence operation short of armed attack."
+    },
+    {
+      "ref": "B205",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B206",
+      "expected_event_type": "MILITARY_CONFLICT",
+      "expected_assets": [
+        "NEM_NYSE",
+        "LMT_NYSE",
+        "SAAB_B_STO"
+      ],
+      "verdict": "justified",
+      "rationale": "Reports an armed attack."
+    },
+    {
+      "ref": "B207",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B208",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B209",
+      "expected_event_type": "MILITARY_CONFLICT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Reports an armed attack."
+    },
+    {
+      "ref": "B210",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B211",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B212",
+      "expected_event_type": "CORPORATE_EARNINGS",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Reports a quarterly result for a named company."
+    },
+    {
+      "ref": "B213",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B214",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-financial feature. ENTERTAINMENT, LIFESTYLE and OTHER are downstream-equivalent here - all resolve to zero assets and are excluded from Gate 2 - so the exact type is deliberately not asserted."
+    },
+    {
+      "ref": "B215",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B216",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B217",
+      "expected_event_type": "INFLATION_CHANGE",
+      "expected_assets": [
+        "NEM_NYSE"
+      ],
+      "verdict": "justified",
+      "rationale": "Reports a change in inflation or inflation expectations."
+    },
+    {
+      "ref": "B218",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B219",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B220",
+      "expected_event_type": "LIFESTYLE",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Consumer-interest feature; REF-01 type 35."
+    },
+    {
+      "ref": "B221",
+      "expected_event_type": "RATE_DECISION",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Subject is a central bank policy stance; inflation is context, not the event."
+    },
+    {
+      "ref": "B222",
+      "expected_event_type": "GEOPOLITICAL_TENSION",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Inter-state coercion, military posturing or influence operation short of armed attack."
+    },
+    {
+      "ref": "B223",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B224",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-financial feature. ENTERTAINMENT, LIFESTYLE and OTHER are downstream-equivalent here - all resolve to zero assets and are excluded from Gate 2 - so the exact type is deliberately not asserted."
+    },
+    {
+      "ref": "B225",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B226",
+      "expected_event_type": "NATURAL_DISASTER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Earthquake, wildfire, flood, drought or heatwave."
+    },
+    {
+      "ref": "B227",
+      "expected_event_type": "GEOPOLITICAL_TENSION",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Inter-state coercion, military posturing or influence operation short of armed attack."
+    },
+    {
+      "ref": "B228",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-financial feature. ENTERTAINMENT, LIFESTYLE and OTHER are downstream-equivalent here - all resolve to zero assets and are excluded from Gate 2 - so the exact type is deliberately not asserted."
+    },
+    {
+      "ref": "B229",
+      "expected_event_type": "CORPORATE_EARNINGS",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Reports a quarterly result for a named company."
+    },
+    {
+      "ref": "B230",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B231",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B232",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B233",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-financial feature. ENTERTAINMENT, LIFESTYLE and OTHER are downstream-equivalent here - all resolve to zero assets and are excluded from Gate 2 - so the exact type is deliberately not asserted."
+    },
+    {
+      "ref": "B234",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B235",
+      "expected_event_type": "GEOPOLITICAL_TENSION",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Inter-state coercion, military posturing or influence operation short of armed attack."
+    },
+    {
+      "ref": "B236",
+      "expected_event_type": null,
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Non-financial feature. ENTERTAINMENT, LIFESTYLE and OTHER are downstream-equivalent here - all resolve to zero assets and are excluded from Gate 2 - so the exact type is deliberately not asserted."
+    },
+    {
+      "ref": "B237",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B238",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B239",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B240",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B241",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B242",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B243",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B244",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B245",
+      "expected_event_type": "ENTERTAINMENT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Review, celebrity or cultural-production news; REF-01 type 34."
+    },
+    {
+      "ref": "B246",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B247",
+      "expected_event_type": "SUPPLY_DISRUPTION",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Goods unavailable to buyers; see note - the weakest call in the reviewed set."
+    },
+    {
+      "ref": "B248",
+      "expected_event_type": "SPORT",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Match report, result or athlete feature; REF-01 type 33 is the explicit reject bucket."
+    },
+    {
+      "ref": "B249",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    },
+    {
+      "ref": "B250",
+      "expected_event_type": "GEOPOLITICAL_TENSION",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "Inter-state coercion, military posturing or influence operation short of armed attack."
+    },
+    {
+      "ref": "B251",
+      "expected_event_type": "OTHER",
+      "expected_assets": [],
+      "verdict": "must_not_predict",
+      "rationale": "A real event with no representation in the taxonomy, or an opinion piece that reports no event."
+    }
+  ]
+}

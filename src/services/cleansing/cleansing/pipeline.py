@@ -142,8 +142,15 @@ class CleansingPipeline:
         # (e.g. "a country at war", "solar eclipses have ended wars") which fires the wrong taxonomy
         # keyword. The body is passed as weaker, second-choice evidence — only keywords specific
         # enough to be unambiguous are honoured there, which recovers articles with a vague headline
-        # without reintroducing those false positives. See taxonomy.classify_text for the tiers.
-        action = await self._extractor.extract(facts.title, facts.language, facts.body)
+        # without reintroducing those false positives.
+        #
+        # The canonical URL is consulted BEFORE either, because the section it carries is the
+        # publisher's own filing decision rather than an inference from text, and it can only reject
+        # an article as non-financial, never type it as a market event. See taxonomy.classify_text
+        # for the full tier order.
+        action = await self._extractor.extract(
+            facts.title, facts.language, facts.body, facts.canonical_url
+        )
 
         await self._repo.store_fingerprint(
             facts.article_id, fingerprint, facts.source_id, facts.published_at

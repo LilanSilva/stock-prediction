@@ -11,7 +11,7 @@
 | Version | `1.0.0` |
 | Executable source | [`EventType` in src/shared/shared/schemas/messages.py](../src/shared/shared/schemas/messages.py) |
 | Consumed by | [SRS-01 §8.2](SRS-01-shared-foundation.md#82-shared-enums), [SRS-03](SRS-03-cleansing.md), [SRS-04](SRS-04-prediction.md) |
-| Last verified against code | `2026-08-12` |
+| Last verified against code | `2026-08-18` |
 
 This document is **reference data, not a requirement specification.** It contains no `shall`
 statements. The requirement that constrains it is
@@ -109,6 +109,29 @@ These types therefore:
 
 Keep the keywords that select these types specific. Broad words such as "game", "season", "transfer"
 or "cup" also occur in market copy and would suppress real news.
+
+Three further lessons from the 2026-08-17 audit, where these types fired on 4 of 251 articles while
+roughly 85 were non-financial:
+
+- **A reject vocabulary must match the language of the corpus.** The keyword set was 40 entries, six of
+  them Swedish, with all three `LIFESTYLE` keywords in English (`horoscope`, `recipe`, `star sign`) —
+  against five Swedish-language feeds. The types were present and correct; the vocabulary could not
+  reach the articles they were written for, so those articles fell to `OTHER` and, being excluded from
+  Gate 2, never clustered either.
+- **The publisher's own section is a stronger reject signal than any keyword** (CLN-71). Where a source
+  exposes a section in its article URL it is an editor's filing decision rather than an inference from
+  text: one publisher's sport section was correct 26 times out of 26, and its culture section held no
+  market event in 28 articles. It is consulted ahead of every keyword tier, gated by the same
+  company rule, and may select **only** types 33–35 — a section must never create a market
+  classification. Its limit is coverage: two of five sources expose no section at all.
+- **A reject keyword must have no metaphorical use in political or business prose.** Extending the
+  Swedish vocabulary was measured and rejected on this basis: `lag` means both "team" and "law",
+  `förlust` and `kamp` are everyday political words, and `guld` collides with
+  `COMMODITY_PRICE_SHOCK`. That rules out most of the vocabulary that would be useful.
+
+The same care applies in the other direction: the audit found `krig` matching *"utkämpar ett krig mot
+Bryssels svällande byråkrati"* (an EU equal-pay column) and `"AI-kriget"` in a technology briefing, both
+through the body tier.
 
 ### 2.1 Generic keywords need corroboration
 
@@ -221,3 +244,4 @@ Never renumber or reuse a retired value. A removed event type is a major contrac
 |---|---|---|---|
 | `2026-08-06` | `1.0.0` | Moved into `requirements/` from `docs/reference/event-taxonomy.md`; added document control, `OTHER`/`RISK_PREMIUM_ELEVATED` cross-references, and update rules | Requirements consolidation |
 | `2026-08-13` | `1.3` | Added non-financial types `SPORT`, `ENTERTAINMENT`, `LIFESTYLE` (33-35) and section 2.1. No causal edge or asset mapping by design; excluded from Gate 2 | Audit of one day of Cleansing output found 27 sports articles typed as asset-bearing events, and `OTHER` overloaded as both "unmapped event" and "irrelevant" |
+| `2026-08-18` | `1.3` | **No type change.** Section 2.1 extended with three lessons: a reject vocabulary must match the corpus language, the publisher section is a stronger reject signal than any keyword and is consulted ahead of them (CLN-71, CLN-72), and reject keywords must be free of metaphorical use. Keyword coverage extended for quakes, wildfires, drought and heat, industrial production, retail trade, house prices, EBITA/EBITDA, Ebola and measles, missile strikes, drones and launch ramps, and inflation expectations (CLN-70) | Audit of 2026-08-17 found 110 of 251 clusters correctly classified; types 33–35 fired on 4 articles while roughly 85 were non-financial |

@@ -276,10 +276,9 @@ def test_packaged_registry_is_valid() -> None:
             assert member in reg.assets
 
 
-def test_packaged_registry_covers_both_providers() -> None:
-    # US assets stay on biquote; EU/Nordic assets route to yahoo (biquote serves neither).
+def test_packaged_registry_routes_every_asset_to_a_known_provider() -> None:
     providers = {entry.provider for entry in load_registry().assets.values()}
-    assert {"biquote.io", "yahoo"} <= providers
+    assert providers == {"yahoo"}
 
 
 def test_packaged_registry_has_non_us_assets_with_local_timezones() -> None:

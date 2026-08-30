@@ -22,10 +22,11 @@
 9. [Data Design](#9-data-design)
 10. [Configuration](#10-configuration)
 11. [Verification](#11-verification)
-12. [Failure Handling](#12-failure-handling)
-13. [Assumptions and Limitations](#13-assumptions-and-limitations)
-14. [How to Update This Document](#14-how-to-update-this-document)
-15. [Change History](#15-change-history)
+12. [Classification Accuracy Improvements](#12-classification-accuracy-improvements)
+13. [Failure Handling](#13-failure-handling)
+14. [Assumptions and Limitations](#14-assumptions-and-limitations)
+15. [How to Update This Document](#15-how-to-update-this-document)
+16. [Change History](#16-change-history)
 
 ---
 
@@ -35,7 +36,7 @@
 |---|---|
 | Author | Feed Analyzer project |
 | Created | 2026-08-05 |
-| Last updated | 2026-08-07 |
+| Last updated | 2026-08-18 |
 | Replaces | `docs/functional-documents/cleansing-service-functional-document.md` (deleted 2026-08-06) |
 | Source code | `src/services/cleansing/` |
 | Config class | `cleansing.config.CleansingSettings` |
@@ -169,6 +170,10 @@ Specific responsibilities:
 | CLN-66c | An `OTHER` event type shall resolve to zero affected assets, since it has no causal factor and can never produce a prediction | Implemented |
 | CLN-67 | An `EVENT_TYPE`-scoped resolution shall record the cue families that admitted its assets alongside the event type in `AssetScope.matched` | Implemented |
 | CLN-68 | A `REGULATORY_ACTION` article describing an approval shall be assigned `RESOLUTION` polarity, so the factor's enforcement-signed prior is negated at decision time. An enforcement cue in the same text shall take precedence. The inversion shall apply to no other event type | Implemented |
+| CLN-69 | A multi-word taxonomy keyword shall match only at a word boundary on its **leading** side. The trailing side shall remain unbounded so Swedish compounds still match (`"em guld"` in `EM-guldet`). Without the leading anchor `"bud på"` matched inside `återbud på` (*a withdrawal*) and typed an athlete leaving a final as `CORPORATE_ACQUISITION` | Implemented |
+| CLN-70 | The action taxonomy shall carry Swedish and English forms for quakes, wildfires (plural `bränder` only), drought and heat, industrial production, retail trade, house prices, EBITA/EBITDA and revenues, Ebola and measles, missile strikes, drones and launch ramps, and inflation expectations | Implemented |
+| CLN-71 | Where an article's `canonical_url` names a publisher section measured to be unambiguously non-financial, that section shall determine the event type ahead of every keyword tier. A section shall never select a causal event type; this shall be enforced at import | Implemented |
+| CLN-72 | The section signal shall be skipped when the title names a registered company, and shall fail open: a missing, malformed or unmapped URL shall classify exactly as if no URL had been supplied | Implemented |
 | CLN-16 | The service shall resolve the news scope and affected asset IDs using the precedence: COMPANY → INDUSTRY → EVENT_TYPE → NONE (see 7.5 for the full algorithm) | Implemented |
 | CLN-17 | The service shall assign a polarity (`OCCURRENCE` or `RESOLUTION`) by scanning for de-escalation cues (see 7.6) | Implemented |
 | CLN-18 | The service shall infer context tags (`TRANSPORT_AFFECTED`, `SAFE_HAVEN_ONLY`) by scanning for transport cues and checking the event type (see 7.7); `RISK_PREMIUM_ELEVATED` is added later by the Prediction Service, never here | Implemented |
@@ -273,8 +278,9 @@ This runs once per incoming `ArticleIngested` message from the `cleansing.articl
 - Result: a `list[float]` of length 1024
 
 **Step 4 — Action extraction**
-- Call the configured NLP backend with `(text, language)`:
+- Call the configured NLP backend with `(title, language, body, canonical_url)`:
   - `keyword` backend: punctuation-normalise and lowercase the text; scan for taxonomy keywords using suffix-tolerant word-boundary matching. Evidence is tiered, first hit wins, because position within body prose is not a measure of relevance:
+    0. the **publisher's section**, read from `canonical_url` and skipped when the title names a registered company (CLN-71, CLN-72). An editor's filing decision outranks any inference from text: the DN sport section was correct 26 of 26 times on the 2026-08-17 corpus, while the reject tier below fired twice in 251 articles. Only sections measured unambiguous are mapped, this tier can select **only** a non-financial type, and it fails open — an unmapped or malformed URL classifies as if none were supplied;
     1. a **non-financial** keyword in the title, skipped when the title names a registered company (CLN-63);
     2. a **specific** keyword in the title;
     3. a **generic** keyword in the title — words such as `close`, `gold`, `contract` or `penalty` — and only when the title is **corroborated** by a company, an industry keyword, a money/percentage figure, an institutional market term, or a domain cue (CLN-64);
@@ -795,11 +801,136 @@ When using `bge-m3`, the `ml` Python extra must be installed (`pip install .[ml]
 | CLN-63 – CLN-67 (end to end) | `tests/test_audit_replay.py` | All 73 articles of the 2026-08-12 audit replayed against labelled expectations; asserts precision (65 must resolve to no assets) **and** recall (6 justified cases must keep resolving) |
 | CLN-66b (cluster fallback gate) | `tests/test_merge.py` | `test_build_local_event_fallback_is_cue_gated`, `test_build_local_event_gives_no_assets_to_an_unclusterable_type` |
 | CLN-68 (regulatory polarity) | `tests/test_taxonomy_e12.py` | Approval → `RESOLUTION`; enforcement → `OCCURRENCE`; enforcement wins when both present; Swedish `godkänner`; no leakage to `CORPORATE_ACQUISITION` |
+| CLN-69 (keyword boundary) | `tests/test_taxonomy.py` | `återbud på` is not `CORPORATE_ACQUISITION`; a real `bud på` still is; `interest rates` still matches `interest rate`; the CLN-61 tie-break is undisturbed |
+| CLN-70 (macro vocabulary) | `tests/test_taxonomy.py` | One case per keyword group, each citing its 2026-08-17 cluster; plus singular `brand` must **not** be `NATURAL_DISASTER` |
+| CLN-71, CLN-72 (section parsing) | `tests/test_sections.py` | Mapped, unmapped, deliberately excluded, sectionless and malformed URLs; relative paths rejected; only non-financial types returnable |
+| CLN-71, CLN-72 (section tier) | `tests/test_taxonomy.py` | Section outranks a body keyword; company gate; unmapped URL changes nothing; a rejected article resolves to no assets |
+| CLN-71 (wiring) | `tests/test_pipeline.py` | `canonical_url` reaches the classifier through the real pipeline. The tier fails open, so without this the URL could stop being passed and every other test would still pass |
+| CLN-69 – CLN-72 (end to end) | `tests/test_audit_replay_2026_08_17.py` | All 251 clusters of the 2026-08-17 audit replayed against labelled types, with an accuracy floor and two exact-match ratchets (outstanding misclassifications, and articles that wrongly reach an asset) |
 | End-to-end | `tests/test_integration.py` | Full article → event path using in-memory fakes |
 
 ---
 
-## 12. Failure Handling
+## 12. Classification Accuracy Improvements
+
+Classification quality is measured by auditing one day of real output and labelling every cluster by
+hand. This section records each such round: the approach taken, the measured effect, and the approaches
+that were **rejected**. The rejections are the point — they are what stops the next round re-attempting
+something already shown not to work.
+
+This section is a record of *how the classifier was improved*. What it is required to do now is in §5
+and §7; those always win where they disagree.
+
+### 12.1 Method
+
+1. Export one day of output with [`scripts/export-cleansing-audit.ps1`](../scripts/export-cleansing-audit.ps1).
+   The export must carry the **full body and the canonical URL**: both are classification inputs, and an
+   export missing either cannot reproduce its own results.
+2. Label every cluster against [REF-01](REF-01-event-taxonomy.md) by hand and freeze it as a fixture
+   under `src/services/cleansing/tests/fixtures/`.
+3. Change the classifier, and measure against the fixture rather than by inspection.
+
+Labels are corrected **by review, never to make a test pass**. When the classifier disagrees with a
+label the default assumption is that the classifier is wrong. See `tests/fixtures/README.md`.
+
+Two labelled corpora exist because they catch different faults, and neither subsumes the other:
+
+| Corpus | Labelled by | Catches |
+|---|---|---|
+| 2026-08-12, 73 articles | asset outcome | An article that wrongly **produces a prediction** |
+| 2026-08-17, 251 articles | event type | An article given the **wrong type** at all |
+
+A type error and a false prediction are not equally serious, so both corpora carry a **ratchet**: a set
+of refs asserted to be *exactly* the currently-failing set. Fixing an article fails the build until its
+ref is removed; breaking one fails the build too. Improvements cannot land unrecorded and regressions
+cannot hide.
+
+### 12.2 Round 1 — 2026-08-12: predictions not justified by their news
+
+**Finding.** 93 of 113 predictions were not justified by the articles behind them. Root cause was in
+Cleansing: the non-financial reject tier ran after the specific-keyword tier, generic keywords were
+trusted in any headline, scope resolution skipped punctuation normalisation, and the event-type fallback
+fired on event type alone — three assets carried 76 of 113 predictions.
+
+**Approach.** Reject before classifying; require corroboration for generic keywords; gate the
+event-type fallback on a domain cue. CLN-63 – CLN-68.
+
+**Rejected.** Keeping bare `"default"` as a `DEBT_CRISIS` keyword — in English it is more often a
+settings default, and that type seeds an edge to *every* asset group, so one false match moved the whole
+registry.
+
+### 12.3 Round 2 — 2026-08-17: articles given no type at all
+
+**Finding.** 110 of 251 clusters correctly classified (43.8%). 222 were typed `OTHER`, including roughly
+85 sport, culture and lifestyle articles that REF-01 §2.1 requires be *explicitly* rejected. The reject
+tier fired **twice in 251 articles**, because its vocabulary was 40 English-first keywords — three for
+`LIFESTYLE`, all English — applied to five Swedish-language feeds. Because `OTHER` is excluded from Gate
+2, each type error was also a clustering error: six duplicate story pairs never merged.
+
+**Approach, in the order applied, each measured against the 2026-08-17 fixture:**
+
+| # | Approach | Accuracy | Requirement |
+|---|---|---|---|
+| — | Baseline at audit | 46.6% | — |
+| 1 | Anchor multi-word keywords on their leading side | 45.3%¹ | CLN-69 |
+| 2 | Add missing macro vocabulary (~18 keywords) | 53.9% | CLN-70 |
+| 3 | **Read the publisher's section from `canonical_url`** | **72.4%** | CLN-71, CLN-72 |
+
+¹ The two baselines differ because step 1 was measured over the 232 labels that assert a type, rather
+than all 251 clusters. Step 1 fixes a defect without moving the score: it turns one wrong answer
+(`CORPORATE_ACQUISITION`) into a different wrong answer (`OTHER`) on the audit day. It is still worth
+having — the first is a causal type that can carry an asset, the second cannot.
+
+**Step 3 is the one that mattered, and it needed no new vocabulary.** The section is an editor's filing
+decision rather than an inference from text, and `canonical_url` was already on `ArticleIngested` — so no
+message-contract change, no `schema_version` bump, no migration. Measured: the DN sport section was
+correct **26 times out of 26**, its culture section held **no market event in 28 articles**, and across
+every article the map would type, the number whose true type was causal (REF-01 1–31) was **zero**.
+
+Net effect on one day of output: `OTHER` fell from 222 to 147, and the three reject buckets rose from 4
+articles to 60.
+
+**Rejected, with the measurement:**
+
+| Rejected approach | Why |
+|---|---|
+| Swedish reject vocabulary read from the article **body** | +8 fixes but 1 regression, and an unbounded false-positive rate on unseen days: Swedish political prose is saturated with sport metaphor. `laget` means "the team" *and* inflects from `lag` = "law" — it fired on *"det laget vill driva"* in a politics piece |
+| Individual reject keywords `låt`, `förlusten` | Homographs. `låt` is "song" and the imperative "let" (*"Låt mobilerna stanna hemma"*); `förlusten` is any loss (*"förlusten av arter"*) |
+| `torka` as `NATURAL_DISASTER` | Also the verb "to wipe", and it fired on an election-campaign article as readily as on heatwave coverage |
+| Singular `brand` as `NATURAL_DISASTER` | The ordinary Swedish word for any fire; it matched *"en större brand i Nykvarn"* — burnt cars and an arrest. The **plural** `bränder` separates wildfire coverage from urban `storbrand` headlines cleanly |
+| Anchoring multi-word keywords on **both** sides | Fixes the same defect as step 1 but breaks Swedish compounding: `"em guld"` stops matching `EM-guldet`. Cost 2 correct answers |
+| Mapping the `dn/motor` section | The only section measured to mix consumer features with industry news. *"Eldrivna lastbilar lönsamma — men förlustaffär i Sverige"* is a Scania/Volvo story naming no registered company, so the company gate would not rescue it |
+| Changing the spaCy verb-lemma shortcut | `map_action` on the title's first verb bypasses every tier, including the reject tier and the body veto. On 2026-08-17 it fired twice and **agreed both times**, so there is no evidence-based case for touching it. Quantify the disagreement rate on another audit day first |
+
+### 12.4 Known limitations after round 2
+
+- **Section coverage is partial.** Only one source exposes a reliable section. Two expose none at all
+  (`svd` uses `/a/<id>/<slug>`, `aftonbladet` files nearly everything under `/nyheter/`) and one is a
+  financial wire whose paths are formats, not subjects. Roughly three quarters of a typical day still
+  depends on keyword classification.
+- **Non-financial features have no lexical marker.** Concert reviews, book reviews and columns from a
+  source without a section still fall to `OTHER` — *"Som betraktare är man nästan överflödig"* is an art
+  review whose title contains no art word. Closing this needs a feed-supplied category or a model.
+- **Three articles are misclassified *and* reach an asset,** so they produce a prediction: a
+  reader-service graphic moving two mining stocks, a reader's opinion letter moving Tesla, and a White
+  House statement that a remark **was a joke** moving oil. This is the more serious failure mode and is
+  not addressed by anything in round 2. Tracked by `_KNOWN_ASSET_LEAKS` in
+  `tests/test_audit_replay_2026_08_17.py`.
+
+### 12.5 Two traps for the next round
+
+- **`_keyword_present` appends suffixes and never strips them.** Swedish definite plurals (`-erna`,
+  `-arna`) fall outside its suffix set, so `bopris` never matches `Bopriserna` and
+  `inflationsförväntning` never matches `Inflationsförväntningarna`. List the inflected form explicitly;
+  widening the suffix set affects every keyword in the table. On the 2026-08-17 corpus, **11 of 24**
+  proposed keywords fired on nothing until they were checked against the real article text.
+- **A test that omits an input silently exempts a whole tier.** The 2026-08-17 replay initially called
+  `classify_text` without the URL, so the publisher-section tier was untested across all 251 articles
+  while the suite passed. Give the oracle every input the running service has.
+
+---
+
+## 13. Failure Handling
 
 | Failure scenario | Behaviour |
 |---|---|
@@ -817,9 +948,9 @@ When using `bge-m3`, the `ml` Python extra must be installed (`pip install .[ml]
 
 ---
 
-## 13. Assumptions and Limitations
+## 14. Assumptions and Limitations
 
-### 13.1 Accepted design decisions
+### 14.1 Accepted design decisions
 
 | Decision | Rationale |
 |---|---|
@@ -831,20 +962,23 @@ When using `bge-m3`, the `ml` Python extra must be installed (`pip install .[ml]
 | Conditional context tags inferred locally | Transport and geopolitical condition codes are derivable from the text deterministically; no LLM is needed for this step |
 | RISK_PREMIUM_ELEVATED not set here | This tag is price-derived; it requires VIX data that the Prediction Service has access to, not the Cleansing Service |
 
-### 13.2 Known limitations
+### 14.2 Known limitations
 
 - **Industry fan-out can inflate confidence** — if an industry-wide event assigns 10 asset IDs, each asset gets an event that looks like direct company news. The Prediction Service aggregates these correctly, but credibility scoring sees each as an independent prediction.
 - **Cluster state is not restored on restart** — in-progress MERGING clusters survive in the database; the close job will attempt to retry them as `ERROR_RETRYABLE`. The article-level idempotency guard prevents double processing.
 - **No cross-language deduplication** — a Swedish article and its English translation about the same event will both pass SimHash dedup (different token distributions) and could produce two separate clusters. The clusters will not merge because Gate 2 requires the same event type, which can be the same, but they come from different embeddings and may not cross Gate 1.
 - **Keyword taxonomy coverage** — unmapped lemmas produce `OTHER` event type and a singleton cluster. Adding coverage requires updating `ACTION_TAXONOMY` in `taxonomy.py`.
+- **Publisher-section coverage is partial** — only one source exposes a reliable section. Two expose none at all (`svd` uses `/a/<id>/<slug>`, `aftonbladet` files nearly everything under `/nyheter/`) and one is a financial wire whose paths are formats rather than subjects. Roughly three quarters of a typical day still depends on keyword classification. See §12.4.
+- **Non-financial features have no lexical marker** — concert reviews, book reviews and columns from a source without a section still fall to `OTHER`. Closing this needs a feed-supplied category or a model, not more keywords. See §12.4.
+- **Three articles are misclassified and still reach an asset**, so they produce a prediction. This is a more serious failure mode than a wrong type, which usually resolves to nothing, and it is not addressed by the round-2 changes. Tracked by `_KNOWN_ASSET_LEAKS` in `tests/test_audit_replay_2026_08_17.py`; see §12.4.
 - **BGE-m3 model download** — first startup with `embedding_backend=bge-m3` downloads ~1.2 GB; no caching is pre-arranged in the Docker/docker-compose setup.
 - **SpaCy models** — `en_core_web_sm` and `sv_core_news_sm` must be installed separately (`python -m spacy download …`).
 
 ---
 
-## 14. How to Update This Document
+## 15. How to Update This Document
 
-### 14.1 When to update
+### 15.1 When to update
 
 Update this document whenever any of the following changes:
 
@@ -861,7 +995,7 @@ Update this document whenever any of the following changes:
 - A new test file is added (add it to section 11)
 - An accepted design decision is revisited
 
-### 14.2 Steps to update
+### 15.2 Steps to update
 
 1. **Read the current source first** — verify what the code actually does before writing requirements; this document describes as-built behaviour
 2. **Assign the next CLN-N ID** — check the highest existing ID in this file and continue the sequence
@@ -872,7 +1006,7 @@ Update this document whenever any of the following changes:
 
 ---
 
-## 15. Change History
+## 16. Change History
 
 | Date | Description |
 |---|---|
@@ -880,3 +1014,4 @@ Update this document whenever any of the following changes:
 | 2026-08-07 | **Defect fix.** Two taxonomy keywords were unreachable: `"spin-off"` could never match because normalisation turns punctuation into spaces, and `"appoints new cfo"` always lost to the generic `"appoint"` because single-token positions were compared one character early. Both event types are in REF-01 (`RESTRUCTURING`: spin-off; `EXECUTIVE_CHANGE`: appointed), so the code was the defect. CLN-61 and CLN-62 added; §7 step 4 updated |
 | 2026-08-14 | **Defect fix (E12 S01).** An audit of 2026-08-12 found 93 of 113 predictions were not justified by their news, and cleansing was the root cause. Four independent defects: (1) the non-financial reject tier ran *after* the specific-keyword tier, so a WWE headline containing "The **War** Raiders" was typed `MILITARY_CONFLICT` before `"wwe"` could reject it; (2) generic keywords were trusted in any headline, so "Forcing Early **Closure** Of Garden Display" became `STRAIT_CLOSURE` and "lower overuse injury **rates**" became `RATE_DECISION`; (3) `resolve_scope` skipped the punctuation normalisation that `_keyword_present` documents as a precondition, so `"Exxon, Inc."` missed its company and `"Lockheed-Martin wins missile contract"` fell through to an industry fan-out that predicted its competitors; (4) the event-type fallback fired on event type alone, so any article typed as a macro event reached the gold and oil proxies — three assets carried 76 of 113 predictions. CLN-63 through CLN-67 added. Also: `"default"` removed from the taxonomy (a settings default is not a credit event, and `DEBT_CRISIS` seeds an edge to every asset group), and `COMMODITY_PRICE_SHOCK` given a cue-gated fallback so a gold forecast reaches gold miners again — it had been producing nothing at all. §7.5 rewritten |
 | 2026-08-14 | **Defect fix (E12 follow-up).** `REGULATORY_ACTION` conflates two opposite events: its keywords cover approvals (`approved`, `cleared`, `godkänd`) and enforcement (`fined`, `penalty`, `böter`) alike, and the factor carries a single DOWN prior to every asset group because enforcement is the more common case. So "FDA approves AstraZeneca's new drug" predicted AZN_STO DOWN 0.35 — the same call as a fine, and systematically wrong on drug approvals. An approval is now reported as `RESOLUTION`, which negates the factor's stored sign at decision time (verified end to end: approval → UP, fine → DOWN). Scoped to this one event type: the cues cannot join the global `RESOLUTION_CUES`, because "Merger approved" would then flip `CORPORATE_ACQUISITION`'s UP prior to DOWN. Swedish `godkänner` added to the taxonomy — `godkänd` does not suffix-match it. CLN-68 added |
+| 2026-08-18 | **Defect fix.** An audit of all 251 clusters produced on 2026-08-17 found 110 correctly classified (43.8%). 222 were typed `OTHER`, including roughly 85 sport, culture and lifestyle articles that REF-01 §2.1 requires be *explicitly* rejected — the reject tier fired **twice in 251 articles**, because its vocabulary was 40 English-first keywords (three for `LIFESTYLE`, all English) applied to five Swedish-language feeds. Because `OTHER` is excluded from Gate 2, each type error was also a clustering error: six duplicate story pairs never merged. Three defects fixed: multi-word keywords matched without a leading word boundary, so `"bud på"` matched `återbud på` and typed a long-jumper leaving a final as `CORPORATE_ACQUISITION` (CLN-69); 24 macro events had no keyword at all (CLN-70); and the publisher section already carried on `ArticleIngested.canonical_url` was discarded rather than used, though it is the most reliable non-financial signal available — the DN sport section was correct 26 of 26 times (CLN-71, CLN-72). Scored accuracy rose **46.6% → 72.4%** with no material regression, verified against both the 2026-08-12 and the new 2026-08-17 fixture corpus. A Swedish reject vocabulary was measured (+5–8 fixes) and **not** adopted: Swedish political prose reuses sport vocabulary (`lag` means both "team" and "law"), and the false-positive rate cannot be bounded from one audit day. CLN-69 through CLN-72 added; §7 step 4 renumbered to five tiers; §12 added to record the method and the rejected approaches |

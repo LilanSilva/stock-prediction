@@ -1,0 +1,84 @@
+Messure Cleanssing accuracy
+
+# Task: audit and improve cleansing classification for 2026-08-18
+
+Repo: `c:\Lilan\GitHub\feed-analyzer`. Only the **Cleansing** service is in scope.
+Python: `.venv/Scripts/python.exe`. Tests: run from `src/services/cleansing` with
+`../../../.venv/Scripts/python.exe -m pytest tests -q`.
+
+Read `requirements/SRS-03-cleansing.md` §12 FIRST. It records the method, and the approaches
+already measured and **rejected** — do not re-attempt those.
+
+## Rules
+
+- **Ground truth is `requirements/REF-01-event-taxonomy.md`**, not the audit file's own
+  `llm_instructions`. Note `SPORT`/`ENTERTAINMENT`/`LIFESTYLE` (types 33–35) are the *explicit reject
+  bucket*; `OTHER` means "valid event not yet represented". A sport article in `OTHER` is an error.
+- **Measure, never assert.** Every claim about a fix must come from running the real code over the
+  labelled corpus. My first keyword attempt last round introduced 4 regressions I had not predicted.
+- **DB access: read-only `SELECT` only.** No insert/update/delete/DDL.
+- **Never edit a label to make a test pass.** See `tests/fixtures/README.md`.
+
+## Steps
+
+**1. Reproduce.** Run the real `classify_text` over every cluster in
+`scripts/cleansing-audit-2026-08-18.json` and confirm it reproduces the stored `event_type`. If not,
+find out why before analysing anything. Report the tier that produced each result (tier 0–4 in
+`taxonomy.classify_text`) — the tier histogram is the diagnosis.
+
+**2. Identify.** Label every cluster against REF-01. Report only the misclassified ones, grouped by
+the type they *should* be. Separately flag any article that is misclassified **and resolves to
+assets** via `resolve_scope` — those produce false predictions and are the most serious class.
+
+**3. Find fixes and measure each.** For every candidate, before proposing it:
+   - verify the keyword is actually reachable: `_keyword_present` **appends** suffixes and never
+     strips, so Swedish definite plurals (`-erna`, `-arna`) need the inflected form listed explicitly.
+     Last round **11 of 24** candidates fired on nothing.
+   - check it does not fire on an article labelled something else (homographs: `torka` = drought/wipe,
+     `låt` = song/let, `lag` = team/law, singular `brand` = any fire).
+   - measure accuracy before/after and count regressions.
+
+**4. Plan.** Create `backlog/E14-<name>/` using the epic/story/task convention in
+`backlog/README.md` (epic README + `S##-*/README.md` + `T##-*.md`). Cover: code changes, test
+updates, doc updates, deployment. State the measured gain and regression count per story. Order
+stories so tests land before or with the code they guard. Get sign-off on any judgement-call labels
+before freezing them.
+
+**5. Execute.**
+   - Freeze the corpus as a fixture in `src/services/cleansing/tests/fixtures/`, following
+     `audit-2026-08-17-*.json` and `tests/test_audit_replay_2026_08_17.py`. Use the **ratchet
+     pattern**: sets asserted to be *exactly* the currently-failing set, so no fix or regression can
+     land unrecorded. Verify the ratchet bites by simulating a change.
+   - Pass **every** input the running service has. Last round the replay omitted the URL and silently
+     exempted a whole tier while the suite passed.
+   - Both corpora (2026-08-12 and 2026-08-17) must stay green — precision **and** recall.
+   - Deploy: `docker compose -f infra/docker-compose.yml build feed-cleansing` then `up -d`.
+     Allow the 240s health grace period (BGE-m3 loads ~2 GB). No migration or contract bump is
+     expected — flag it if you think one is needed.
+
+**6. Docs, after deploy.** Add requirement IDs from **CLN-73** onward to SRS-03 §5, verification rows
+to §11, a new round subsection to §12 (approach, measured gain, **and what you rejected with the
+measurement**), limitations to §14.2, an entry to §16, and refresh §1. Update REF-01 §2.1/§6 only if
+the taxonomy lesson changed; **do not bump the taxonomy version** unless you add an event type.
+
+**7. Close out.** Delete `backlog/E14-*`, update the `backlog/README.md` live-work row, and verify
+`grep -rn "backlog/E14"` returns nothing. **No permanent file may cite the backlog** — cite CLN IDs,
+REF-01, or artefacts under `scripts/`.
+
+## Report at the end
+
+Accuracy before → after, articles fixed, regressions, any asset leaks still open, and what you tried
+that did not work.
+
+
+
+
+################# Prediction #############
+Messure Prediction accuracy
+prediction-audit-2026-08-17.json file has instruction to check how prediction happend and let me know does that prediction make sense with corresponding newss. if not show me them only nwws which not properly based to prediction
+
+once all development , test deployemnt complete then delete backlog item which you created and update document based on it. dont update document with backlog item because it should delete once develpment is completed 
+
+Add if requirement file dont have section called Prediction Accuracy Improvements. purpose of this section is maintain high level info of each refactor did for prediction improvemnet based on prediction results. functional changes not go to this section only improvemnt based on prediction history audit data
+
+

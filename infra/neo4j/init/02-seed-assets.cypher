@@ -21,10 +21,6 @@ MERGE (a:Asset {id: 'LMT_NYSE'})
 SET a.name = 'Lockheed Martin', a.asset_class = 'equity', a.currency = 'USD', a.market = 'NYSE', a.timezone = 'America/New_York';
 MATCH (a:Asset {id: 'LMT_NYSE'}), (g:AssetGroup {id: 'WEAPON_INDUSTRY'})
 MERGE (a)-[:MEMBER_OF]->(g);
-MERGE (a:Asset {id: 'LMT_NYSE_YH'})
-SET a.name = 'Lockheed Martin (Yahoo fallback)', a.asset_class = 'equity', a.currency = 'USD', a.market = 'NYSE', a.timezone = 'America/New_York';
-MATCH (a:Asset {id: 'LMT_NYSE_YH'}), (g:AssetGroup {id: 'WEAPON_INDUSTRY'})
-MERGE (a)-[:MEMBER_OF]->(g);
 MERGE (a:Asset {id: 'SAAB_B_STO'})
 SET a.name = 'Saab AB', a.asset_class = 'equity', a.currency = 'SEK', a.market = 'STO', a.timezone = 'Europe/Stockholm';
 MATCH (a:Asset {id: 'SAAB_B_STO'}), (g:AssetGroup {id: 'WEAPON_INDUSTRY'})
@@ -97,10 +93,6 @@ MERGE (a:Asset {id: 'GOOGL_NASDAQ'})
 SET a.name = 'Alphabet', a.asset_class = 'equity', a.currency = 'USD', a.market = 'NASDAQ', a.timezone = 'America/New_York';
 MATCH (a:Asset {id: 'GOOGL_NASDAQ'}), (g:AssetGroup {id: 'INTERNET_PLATFORMS'})
 MERGE (a)-[:MEMBER_OF]->(g);
-MERGE (a:Asset {id: 'GOOGL_NASDAQ_YH'})
-SET a.name = 'Alphabet (Yahoo fallback)', a.asset_class = 'equity', a.currency = 'USD', a.market = 'NASDAQ', a.timezone = 'America/New_York';
-MATCH (a:Asset {id: 'GOOGL_NASDAQ_YH'}), (g:AssetGroup {id: 'INTERNET_PLATFORMS'})
-MERGE (a)-[:MEMBER_OF]->(g);
 MERGE (a:Asset {id: 'AMZN_NASDAQ'})
 SET a.name = 'Amazon', a.asset_class = 'equity', a.currency = 'USD', a.market = 'NASDAQ', a.timezone = 'America/New_York';
 MATCH (a:Asset {id: 'AMZN_NASDAQ'}), (g:AssetGroup {id: 'INTERNET_PLATFORMS'})
@@ -124,10 +116,6 @@ SET g.name = 'Automotive industry';
 MERGE (a:Asset {id: 'TSLA_NASDAQ'})
 SET a.name = 'Tesla', a.asset_class = 'equity', a.currency = 'USD', a.market = 'NASDAQ', a.timezone = 'America/New_York';
 MATCH (a:Asset {id: 'TSLA_NASDAQ'}), (g:AssetGroup {id: 'AUTOMOTIVE_INDUSTRY'})
-MERGE (a)-[:MEMBER_OF]->(g);
-MERGE (a:Asset {id: 'TSLA_NASDAQ_YH'})
-SET a.name = 'Tesla (Yahoo fallback)', a.asset_class = 'equity', a.currency = 'USD', a.market = 'NASDAQ', a.timezone = 'America/New_York';
-MATCH (a:Asset {id: 'TSLA_NASDAQ_YH'}), (g:AssetGroup {id: 'AUTOMOTIVE_INDUSTRY'})
 MERGE (a)-[:MEMBER_OF]->(g);
 
 // --- Oil, gas & refining ---

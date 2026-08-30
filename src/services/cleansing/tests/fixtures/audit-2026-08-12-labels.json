@@ -48,7 +48,6 @@
       "expected_assets": [
         "NEM_NYSE",
         "LMT_NYSE",
-        "LMT_NYSE_YH",
         "SAAB_B_STO"
       ],
       "verdict": "justified",
@@ -107,7 +106,6 @@
       "expected_assets": [
         "NEM_NYSE",
         "LMT_NYSE",
-        "LMT_NYSE_YH",
         "SAAB_B_STO"
       ],
       "verdict": "justified",
@@ -295,7 +293,6 @@
       "expected_assets": [
         "NEM_NYSE",
         "LMT_NYSE",
-        "LMT_NYSE_YH",
         "SAAB_B_STO"
       ],
       "verdict": "justified",
@@ -371,7 +368,6 @@
       "expected_event_type": "MILITARY_CONFLICT",
       "expected_assets": [
         "LMT_NYSE",
-        "LMT_NYSE_YH",
         "SAAB_B_STO"
       ],
       "verdict": "justified",

@@ -1,7 +1,8 @@
 """Replay of the 2026-08-12 prediction audit through the real classifier.
 
 The audit found 93 of 113 predictions were not justified by their contributing news
-(backlog/E12-Prediction-Quality-Remediation). This module is the executable form of that finding: it
+(``scripts/prediction-audit-2026-08-12.json``; the resulting rules are CLN-63 - CLN-68 in
+``requirements/SRS-03-cleansing.md`` §5). This module is the executable form of that finding: it
 runs all 73 distinct articles through ``classify_text`` and ``resolve_scope`` and asserts the
 labelled outcome.
 

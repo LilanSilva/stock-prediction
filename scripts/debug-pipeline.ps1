@@ -218,6 +218,7 @@ FROM   prediction.predictions p
 LEFT   JOIN verification.scores      vs ON vs.prediction_id = p.prediction_id
 LEFT   JOIN verification.evaluations ve ON ve.prediction_id = p.prediction_id
 WHERE  p.decision_at::date = '$Date'::date
+  AND  (ve.status IS NULL OR ve.status <> 'WITHDRAWN')
 ORDER  BY p.decision_at;
 "@
 $predSummary = Invoke-PsqlCsv @"
@@ -228,7 +229,9 @@ SELECT count(*)                                         AS predictions_made,
        count(*) FILTER (WHERE vs.prediction_id IS NULL) AS not_yet_scored
 FROM   prediction.predictions p
 LEFT   JOIN verification.scores vs ON vs.prediction_id = p.prediction_id
-WHERE  p.decision_at::date = '$Date'::date;
+LEFT   JOIN verification.evaluations ve ON ve.prediction_id = p.prediction_id
+WHERE  p.decision_at::date = '$Date'::date
+  AND  (ve.status IS NULL OR ve.status <> 'WITHDRAWN');
 "@
 $predCols  = @("prediction_id","asset_id","predicted_dir","predicted_mag","confidence",
                "horizon","decision_at","actual_direction","actual_magnitude","is_correct",
@@ -260,6 +263,7 @@ FROM   verification.evaluations ve
 LEFT   JOIN verification.price_observations po ON po.prediction_id = ve.prediction_id
 WHERE  ve.created_at::date = '$Date'::date
   AND  ve.status <> 'SCORED'
+  AND  ve.status <> 'WITHDRAWN'
 ORDER  BY ve.created_at;
 "@
 $verifyCols  = @("prediction_id","asset_id","status","baseline_session","settlement_session",
@@ -290,7 +294,9 @@ LEFT   JOIN market_data.close_observations co_base
 LEFT   JOIN market_data.close_observations co_sett
          ON co_sett.asset_id = pr.asset_id
         AND co_sett.session  = pr.settlement_session
+LEFT   JOIN prediction.predictions p ON p.prediction_id = pr.prediction_id
 WHERE  pr.created_at::date = '$Date'::date
+  AND  (p.status IS NULL OR p.status <> 'WITHDRAWN')
   AND  (pr.state <> 'DONE'
         OR co_base.close IS NULL
         OR co_sett.close IS NULL)

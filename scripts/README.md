@@ -18,6 +18,55 @@ after the lockfile changes.
 [README](../README.md#first-time-setup)** — including the manual equivalent if you prefer not to run a
 script.
 
+## Build and deploy
+
+| Script | Purpose |
+|---|---|
+| [build-and-deploy.ps1](build-and-deploy.ps1) | Rebuild the seven service images and redeploy **only those containers**, onto data stores that are already running |
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\build-and-deploy.ps1
+powershell -ExecutionPolicy Bypass -File scripts\build-and-deploy.ps1 -Service feed-prediction,feed-notification
+powershell -ExecutionPolicy Bypass -File scripts\build-and-deploy.ps1 -NoBuild        # redeploy current images
+powershell -ExecutionPolicy Bypass -File scripts\build-and-deploy.ps1 -NoCache -Pull
+```
+
+This is the code-change loop, not stack bring-up. Postgres, Neo4j and RabbitMQ keep running
+throughout, with their volumes and every weight Credibility has learned intact. The script uses the
+same compose file, env file and Compose project ('infra') as the documented command, so it acts on
+the existing stack rather than a parallel one.
+
+**Why not `up -d --build`.** `feed-prediction` and `feed-credibility` declare
+`depends_on: feed-neo4j-seed`, so a plain `up` re-runs the graph seed container. Its `MERGE`
+statements are idempotent, but `05-seed-conditioned-edges.cypher` *deletes* the unconditional edges
+its conditioned edges supersede — a re-seed cannot restore anything an earlier version of those
+files removed ([infra/README.md](../infra/README.md#re-seeding-an-existing-volume)). This script
+deploys with `--no-deps`, so Compose starts nothing but the services named. Verified: the seed
+container's `FinishedAt` is unchanged after a full run, including after force-recreating
+`feed-prediction`.
+
+What it adds over the raw command:
+
+- **`docker compose config --quiet` before building.** A variable the compose file declares required
+  (`POSTGRES_PASSWORD`, `NEO4J_AUTH`, `RABBITMQ_DEFAULT_PASS`, …) otherwise surfaces only when a
+  container starts, after the build time has already been spent.
+- **A read-only infrastructure check.** Fails, with the command to fix it, if a data store is not
+  running and healthy — rather than deploying services that will crash-loop against it. It reports
+  how the graph seed last completed but never runs it; a bad or missing seed is a warning, repeated
+  in the final summary, since `feed-prediction` and `feed-credibility` read that graph.
+- **Waiting on each service healthcheck**, reporting each one as it settles, and tailing the logs of
+  anything that did not reach `healthy`. Exits non-zero in that case, so it is usable in a chain.
+
+Naming a data store in `-Service` is refused, and no volume is ever removed — `-RemoveFirst` removes
+the targeted *service* containers only. Bringing the infrastructure up in the first place stays a
+separate, deliberate step:
+
+```powershell
+docker compose --env-file infra\.env -f infra\docker-compose.yml up -d
+```
+
+Full parameter list: `Get-Help scripts\build-and-deploy.ps1 -Detailed`.
+
 ## Asset registry
 
 Run these after **any** edit to `assets.json`. Structural validation alone cannot catch a typo'd

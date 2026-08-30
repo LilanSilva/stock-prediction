@@ -26,9 +26,8 @@ def test_supported_assets_cover_every_canonical_asset() -> None:
 @pytest.mark.parametrize(
     ("asset_id", "provider_symbol", "expected_exchange", "provider"),
     [
-        # NEM routes to yahoo, XOM to biquote — provider is per asset, not per market.
         (AssetId.NEM_NYSE, "NEM", "NYSE", "yahoo"),
-        (AssetId.XOM_NYSE, "XOM", "NYSE", "biquote.io"),
+        (AssetId.XOM_NYSE, "XOM", "NYSE", "yahoo"),
     ],
 )
 def test_resolve_maps_canonical_id_to_frozen_policy(
@@ -53,19 +52,22 @@ def test_resolve_preserves_provider_daily_close_semantics() -> None:
         assert series.registry_version == REGISTRY_VERSION
 
 
-def test_us_assets_keep_their_biquote_mapping() -> None:
-    # The refactor must be additive: existing US assets resolve exactly as before.
+def test_us_assets_resolve_to_yahoo_with_us_market_policy() -> None:
     for asset_id in (AssetId.LMT_NYSE, AssetId.TSLA_NASDAQ, AssetId.AAPL_NASDAQ):
         series = resolve(asset_id)
-        assert series.provider == "biquote.io"
+        assert series.provider == "yahoo"
         assert series.currency == "USD"
         assert series.timezone == "America/New_York"
         assert (series.session_completion_hour, series.session_completion_minute) == (17, 0)
 
 
+def test_no_asset_declares_a_fallback() -> None:
+    # Fallbacks existed only to paper over biquote's missing sessions; a single provider needs none.
+    assert [a for a in supported_assets() if resolve(a).fallback is not None] == []
+
+
 def test_non_us_assets_route_to_a_local_provider_and_calendar() -> None:
-    # biquote serves no European listing, so EU/Nordic assets must resolve elsewhere with their own
-    # currency and session calendar.
+    # EU/Nordic assets must resolve with their own currency and session calendar.
     series = resolve("SAAB_B_STO")
     assert series.provider == "yahoo"
     assert series.currency == "SEK"

@@ -140,6 +140,14 @@ cp infra/.env.example infra/.env   # then edit infra/.env with local values
 docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build
 ```
 
+Once that stack is up, redeploying after a code change is
+[scripts/build-and-deploy.ps1](scripts/build-and-deploy.ps1) — it rebuilds the service images and
+recreates only the service containers, leaving Postgres, Neo4j, RabbitMQ and the graph seed alone:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\build-and-deploy.ps1
+```
+
 **Every secret lives in `infra/.env` only** (git-ignored) — never in a tracked file, not even a
 password hash. That rule, the environment-specific image and broker notes, and how to validate an
 infrastructure change are all in [infra/README.md](infra/README.md).

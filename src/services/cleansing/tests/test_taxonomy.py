@@ -87,6 +87,63 @@ def test_classify_polarity_defaults_to_occurrence() -> None:
     assert classify_polarity("An ordinary market update") == EventPolarity.OCCURRENCE
 
 
+def test_a_ceasefire_that_ends_is_not_a_resolution() -> None:
+    # The 2026-08-18 regression: "ceasefire" matched RESOLUTION_CUES regardless of whether the
+    # ceasefire was holding or collapsing, so this headline inverted COMMODITY_PRICE_SHOCK's UP edge
+    # to DOWN and the Scope-B gate then dropped it — an explicit oil rise predicted nothing.
+    title = (
+        "Oil prices rise as US-Iran ceasefire ends; UK wage growth slows amid cost of living "
+        "squeeze – business live"
+    )
+    event_type, _ = classify_text(title, "")
+    assert event_type is EventType.COMMODITY_PRICE_SHOCK
+    assert classify_polarity(title, event_type) is EventPolarity.OCCURRENCE
+
+
+def test_resolution_negation_covers_the_common_phrasings() -> None:
+    for title in (
+        "Gaza ceasefire collapses after strikes",
+        "Ceasefire expired overnight",
+        "Truce breaks down as talks stall",
+        "End of the ceasefire leaves oil exposed",
+        "No deal reached between the two sides",
+        "Vapenvilan upphör vid midnatt",
+        "Vapenvilan löper ut i morgon",
+    ):
+        assert classify_polarity(title) is EventPolarity.OCCURRENCE, title
+
+
+def test_resolution_negation_does_not_swallow_a_holding_ceasefire() -> None:
+    # The reason the cues are enumerated instead of stemmed to "ceasefire end"/"ceasefire break":
+    # both of these carry a de-escalation meaning and must stay RESOLUTION.
+    assert classify_polarity("Ceasefire endures despite protests") is EventPolarity.RESOLUTION
+    assert classify_polarity("Ceasefire breakthrough after talks") is EventPolarity.RESOLUTION
+
+
+def test_swedish_attack_participle_is_classified_when_corroborated() -> None:
+    # aftonbladet + di, 2026-08-18. "attackera" only ever matched the bare infinitive, so both
+    # copies of this story classified OTHER and moved no asset.
+    title = "Saudiskt raffinaderi attackerat av Huthirörelsen"
+    event_type, keyword = classify_text(title, "")
+    assert event_type is EventType.MILITARY_CONFLICT
+    assert keyword == "attackerat"
+    # "raffinaderi" must also select the TRANSPORT_AFFECTED edge: MILITARY_CONFLICT -> OIL_GAS
+    # exists only in its conditioned form, so SAFE_HAVEN_ONLY would move gold and not oil.
+    assert infer_conditions(title, event_type) == [ConditionCode.TRANSPORT_AFFECTED]
+
+
+def test_attack_participles_stay_generic_and_need_corroboration() -> None:
+    # Listed in GENERIC_KEYWORDS alongside bare "attack", so an uncorroborated headline with no
+    # company, industry, figure or domain cue must not become a military conflict.
+    for title in (
+        "Spelaren attackerade domaren efter matchen",
+        "Zlatan attackerat av kritiker",
+        "Fan attacked a player at the stadium",
+    ):
+        event_type, _ = classify_text(title, "")
+        assert event_type is not EventType.MILITARY_CONFLICT, title
+
+
 def test_infer_conditions_transport_cue() -> None:
     tags = infer_conditions("Tanker blocked in the Strait of Hormuz", EventType.MILITARY_CONFLICT)
     assert tags == [ConditionCode.TRANSPORT_AFFECTED]
@@ -426,3 +483,176 @@ def test_bare_swedish_vinst_is_not_earnings() -> None:
     # Guarding this stops the fix from recreating the bug class it was written to remove.
     event_type, _ = classify_text("Djurgårdens vinst mot AIK i matchen igår")
     assert event_type != EventType.CORPORATE_EARNINGS
+
+
+# --- CLN-69: multi-word keys are anchored on their leading side only ----------------------------
+
+
+def test_multiword_key_needs_a_leading_word_boundary() -> None:
+    # "återbud" (a withdrawal) contains "bud" (a bid). Without a leading boundary the
+    # CORPORATE_ACQUISITION key "bud på" matched inside it, and a long-jumper pulling out of a
+    # European final was typed as a takeover on 2026-08-17.
+    event_type, _ = classify_text(
+        "Talangen missar final efter skada – fick vård sent",
+        "Längdhoppslöftet tog sig vidare till EM-final men tvingas lämna återbud på grund av en "
+        "lårskada.",
+    )
+    assert event_type is not EventType.CORPORATE_ACQUISITION
+
+
+def test_multiword_key_still_matches_a_real_bid() -> None:
+    # The other half of CLN-69: anchoring must not cost the genuine match the key exists for.
+    event_type, keyword = classify_text("Teknikbolag lägger bud på Spotlight")
+    assert event_type is EventType.CORPORATE_ACQUISITION
+    assert keyword == "bud på"
+
+
+def test_multiword_key_tolerates_a_trailing_suffix() -> None:
+    # Anchoring is deliberately one-sided. The trailing side stays open so an inflected or compounded
+    # final word still matches: "interest rates" must fire the "interest rate" key. Anchoring both
+    # sides would break this, and in Swedish would break compounds such as "EM-guldet".
+    assert classify_text("Central bank holds interest rates steady")[0] is EventType.RATE_DECISION
+
+
+def test_macro_vocabulary_swedish_quake_and_wildfires() -> None:
+    # Clusters 0632d2f8 / 578e5b05: "skalv" is what Swedish wires use; "jordbävning" missed them.
+    assert classify_text("Ovanligt många skalv i befolkade områden")[0] is EventType.NATURAL_DISASTER
+    # Cluster 2cec254b: wildfire coverage uses the PLURAL "bränder", and the headline form is the
+    # definite plural "Bränderna" — which the generic suffix set does not reach, so both are keywords.
+    assert classify_text("Bränderna i Europa: Två döda i Grekland")[0] is EventType.NATURAL_DISASTER
+    assert classify_text("Minst två personer har omkommit i bränder utanför Aten")[0] is (
+        EventType.NATURAL_DISASTER
+    )
+
+
+def test_singular_brand_is_not_a_natural_disaster() -> None:
+    # The counterpart to the plural keyword. "brand" is the ordinary Swedish word for any fire, and
+    # cluster 0673e0e2 was twelve burnt cars and an arrest — not a natural disaster. Guarding this
+    # stops a future widening from recreating the bug the plural was chosen to avoid.
+    event_type, _ = classify_text(
+        "Storbrand i Nykvarn – flera fordon förstörda",
+        "Minst tolv bilar och en bostad har förstörts i samband med en större brand i Nykvarn.",
+    )
+    assert event_type is not EventType.NATURAL_DISASTER
+
+
+def test_macro_vocabulary_economic_data_swedish() -> None:
+    # Clusters 51ddb820 / 685f445f / d0babdda / d526b2bf.
+    assert classify_text("Kinas industriproduktion steg i juli")[0] is EventType.ECONOMIC_DATA_RELEASE
+    assert classify_text("Svagare lyft i kinesisk detaljhandel")[0] is EventType.ECONOMIC_DATA_RELEASE
+    assert classify_text("Bopriserna sjunker i Kina")[0] is EventType.ECONOMIC_DATA_RELEASE
+    assert classify_text("Brittiska huspriser sjönk 2,0 procent")[0] is EventType.ECONOMIC_DATA_RELEASE
+
+
+def test_macro_vocabulary_earnings_swedish() -> None:
+    # Clusters 910cd50c / bb9bde67: results reported as EBITA/EBITDA and revenues.
+    assert classify_text("Bolaget redovisar ett ebita-resultat om 16,0 miljoner kronor")[0] is (
+        EventType.CORPORATE_EARNINGS
+    )
+    assert classify_text("Nitro Games redovisar intäkter om 1,0 miljoner euro")[0] is (
+        EventType.CORPORATE_EARNINGS
+    )
+
+
+def test_macro_vocabulary_health_and_conflict_swedish() -> None:
+    # Clusters ab031602 / ca41cb47 / dbaa95b7 / fcc926eb.
+    assert classify_text("Kongo på väg mot värsta ebolautbrottet hittills")[0] is (
+        EventType.PANDEMIC_OUTBREAK
+    )
+    assert classify_text("Varnar Urkultbesökare efter mässlingfall")[0] is EventType.PANDEMIC_OUTBREAK
+    assert classify_text("Ryssland: Sex döda i ukrainsk robotattack")[0] is (
+        EventType.MILITARY_CONFLICT
+    )
+    assert classify_text("Ryssland har 59 nya avfyrningsramper nära Nato")[0] is (
+        EventType.GEOPOLITICAL_TENSION
+    )
+
+
+def test_macro_vocabulary_swedish_definite_plural_forms() -> None:
+    # `_keyword_present` APPENDS suffixes and never strips, and -erna/-arna are outside its suffix
+    # set. So these two are listed in their inflected form on purpose; a stem would never match.
+    assert classify_text("Inflationsförväntningarna skruvas upp något")[0] is (
+        EventType.INFLATION_CHANGE
+    )
+    assert classify_text("Sagax har förvärvat nio fastigheter i Europa")[0] is (
+        EventType.CORPORATE_ACQUISITION
+    )
+
+
+# --- CLN-71 / CLN-72: the publisher-section tier ------------------------------------------------
+
+
+def test_section_types_an_article_a_keyword_would_miss() -> None:
+    # Cluster 82e1cc0d: a Swedish celebration report with no rejectable keyword anywhere. The section
+    # is the only signal that says it is sport.
+    event_type, keyword = classify_text(
+        "Vilt firande med löparkompisarna: ”Vi är det genuina gänget”",
+        "Andreas Almgren firade vilt med svenska fanan inne på löparbanan.",
+        "https://www.dn.se/sport/vilt-firande-med-loparkompisarna",
+    )
+    assert event_type is EventType.SPORT
+    assert keyword == "section:sport"
+
+
+def test_section_outranks_a_market_keyword_in_the_body() -> None:
+    # Cluster ae384bd0: a Gorillaz festival review whose body says the band will "stänga" the festival.
+    # That keyword typed it STRAIT_CLOSURE, which moved oil. The culture section settles it.
+    event_type, _ = classify_text(
+        "Både party och politiskt allvar när Gorillaz avslutar allt",
+        "Damon Albarns stora orkester har bestämt sig för att stänga årets Way out west med fest.",
+        "https://www.dn.se/kultur/bade-party-och-politiskt-allvar-nar-gorillaz-avslutar-allt",
+    )
+    assert event_type is EventType.ENTERTAINMENT
+
+
+def test_section_is_skipped_when_the_title_names_a_company() -> None:
+    """CLN-72. A listed company in the headline means market news whatever section it is filed under.
+
+    Without this guard a culture-desk profile of a listed studio, or a sport-desk story about a
+    sportswear maker's results, would be discarded as non-financial.
+    """
+    event_type, _ = classify_text(
+        "Tesla rörelseresultat överraskar marknaden",
+        "",
+        "https://www.dn.se/kultur/nagot-om-tesla",
+    )
+    assert event_type is EventType.CORPORATE_EARNINGS
+
+
+def test_unmapped_or_missing_url_classifies_exactly_as_before() -> None:
+    """CLN-72: the tier fails open, so adding a URL must never change an unrelated verdict."""
+    title = "Kinas industriproduktion steg i juli"
+    without = classify_text(title)
+    for url in ("", "https://www.dn.se/ekonomi/kinas-industriproduktion", "not-a-url"):
+        assert classify_text(title, "", url) == without
+
+
+def test_a_section_can_never_produce_a_market_type() -> None:
+    # The invariant is enforced at import by _validate_section_types_are_non_financial; this asserts
+    # the observable consequence, so the guard cannot be removed without a test failing.
+    for url in (
+        "https://www.dn.se/sport/nagot",
+        "https://www.dn.se/kultur/nagot",
+        "https://www.theguardian.com/film/nagot",
+    ):
+        event_type, _ = classify_text("Rubrik utan nyckelord", "", url)
+        assert event_type in {EventType.SPORT, EventType.ENTERTAINMENT, EventType.LIFESTYLE}
+
+
+def test_section_rejected_article_resolves_to_no_assets() -> None:
+    # The point of rejecting: a sport article naming a listed club must not reach that club's stock.
+    event_type, _ = classify_text(
+        "AIK starkast i derbyt mot Djurgården",
+        "",
+        "https://www.dn.se/sport/aik-starkast-i-derbyt",
+    )
+    assert resolve_scope("AIK starkast i derbyt mot Djurgården", event_type).assets == ()
+
+
+def test_leading_anchor_does_not_disturb_the_longest_match_tiebreak() -> None:
+    # CLN-61: phrase and single-token positions must stay comparable, so the specific phrase still
+    # beats the generic token that starts at the same word. The +1 correction in the phrase branch is
+    # what preserves this.
+    event_type, keyword = classify_text("Board appoints new CFO after departure")
+    assert event_type is EventType.EXECUTIVE_CHANGE
+    assert keyword == "appoints new cfo"

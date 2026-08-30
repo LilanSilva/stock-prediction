@@ -65,6 +65,7 @@ class FakeRepository:
         self.completed: list[PriceObserved] = []
         self.baseline_marks: list[uuid.UUID] = []
         self.failures: list[tuple[uuid.UUID, str]] = []
+        self.abandoned: list[tuple[uuid.UUID, str]] = []
 
     async def mark_baseline_observed(
         self, request_id: uuid.UUID, asset_id: AssetId, baseline: CloseObservation
@@ -79,6 +80,9 @@ class FakeRepository:
         self, request_id: uuid.UUID, error: str, *, next_attempt_at: datetime | None
     ) -> None:
         self.failures.append((request_id, error))
+
+    async def abandon_request(self, request_id: uuid.UUID, reason: str) -> None:
+        self.abandoned.append((request_id, reason))
 
 
 def _processor(repo: FakeRepository, adapter: FakeAdapter) -> PriceRequestProcessor:
@@ -117,6 +121,56 @@ async def test_pending_when_settlement_bar_not_yet_published() -> None:
     assert outcome.completed is False
     assert outcome.pending_reason == "settlement_lag"
     assert repo.completed == []
+
+
+async def test_abandons_when_bar_still_missing_long_after_settlement() -> None:
+    # A bar the provider never published must terminate, not retry for the life of the deployment.
+    repo = FakeRepository()
+    adapter = FakeAdapter({_BASELINE: "3315.0"})
+    long_after = datetime(2026, 7, 25, 21, 0, tzinfo=UTC)  # settlement + 12 days
+
+    outcome = await _processor(repo, adapter).process(_request(), now=long_after)
+
+    assert outcome.completed is False
+    assert outcome.pending_reason == "abandoned"
+    assert len(repo.abandoned) == 1
+    assert repo.completed == []
+    assert repo.failures == []
+
+
+async def test_does_not_abandon_inside_the_grace_window() -> None:
+    repo = FakeRepository()
+    adapter = FakeAdapter({_BASELINE: "3315.0"})
+    within_window = datetime(2026, 7, 18, 21, 0, tzinfo=UTC)  # settlement + 5 days
+
+    outcome = await _processor(repo, adapter).process(_request(), now=within_window)
+
+    assert repo.abandoned == []
+    assert outcome.pending_reason == "settlement_lag"
+
+
+async def test_a_late_bar_still_completes_inside_the_grace_window() -> None:
+    repo = FakeRepository()
+    adapter = FakeAdapter({_BASELINE: "3315.0", _SETTLEMENT: "3290.25"})
+    within_window = datetime(2026, 7, 19, 21, 0, tzinfo=UTC)  # settlement + 6 days
+
+    outcome = await _processor(repo, adapter).process(_request(), now=within_window)
+
+    assert outcome.completed is True
+    assert repo.abandoned == []
+
+
+async def test_recoverable_request_completes_even_long_past_the_grace_window() -> None:
+    # The fetch is always attempted before abandoning, so a provider switch or backfill can still
+    # rescue an old request instead of it being retired unread.
+    repo = FakeRepository()
+    adapter = FakeAdapter({_BASELINE: "3315.0", _SETTLEMENT: "3290.25"})
+    long_after = datetime(2026, 8, 20, 21, 0, tzinfo=UTC)  # settlement + 38 days
+
+    outcome = await _processor(repo, adapter).process(_request(), now=long_after)
+
+    assert outcome.completed is True
+    assert repo.abandoned == []
 
 
 async def test_pending_when_baseline_not_available() -> None:

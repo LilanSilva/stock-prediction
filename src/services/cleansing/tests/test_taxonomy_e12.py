@@ -6,8 +6,8 @@ article
 that noticed. Every test cites the article it was written from.
 
 Kept separate from ``test_taxonomy.py`` because these tests share one subject — the precision fixes
-in
-backlog/E12-Prediction-Quality-Remediation — and reading them together is how the rules make sense.
+CLN-63 - CLN-68 in ``requirements/SRS-03-cleansing.md`` §5 — and reading them together is how the
+rules make sense.
 """
 
 from __future__ import annotations

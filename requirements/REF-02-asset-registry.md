@@ -20,7 +20,7 @@ statements. The requirements that constrain it are
 
 `assets.json` is the executable source of truth. Every count and field rule below must match it.
 
-**Current registry:** 16 groups, 37 assets (34 primary + 3 fallback entries), 4 currencies
+**Current registry:** 14 groups, 29 assets, 4 currencies
 (USD, SEK, EUR, DKK), 6 market timezones, 9 exchanges.
 
 ## 2. The registry is data, not code
@@ -208,15 +208,23 @@ through `AdapterRouter` ([SRS-05 §7.2](SRS-05-market-data.md#7-how-it-works)).
 
 | Provider | Serves | Assets |
 |---|---|---|
-| `biquote.io` | a curated list of US mega-caps | 12 |
-| `yahoo` | Stockholm, Copenhagen, Amsterdam, Paris, Xetra, **and US names biquote lacks** | 25 (incl. 3 fallback entries) |
+| `yahoo` | every market in the registry: NYSE, NASDAQ, Stockholm, Copenhagen, Amsterdam, Paris, Xetra | 29 |
 
-### 5.1 biquote is limited by its symbol list, not by exchange
+### 5.1 biquote.io was retired on 2026-08-29
 
-Probed 2026-08-03: every European listing returns 0 bars, *including* EU giants that trade on US
-exchanges (`ASML`, `SAP`, `NVO`, `SHEL`), and 8 requested US names (`BNTX`, `UAL`, `FANG`, `SPG`,
-`VLO`, `ZM`, `MRNA`, `PTON`) also return 0. Those 8 route to Yahoo. `EXCHANGE:TICKER` prefixes are
-rejected outright.
+biquote served US mega-caps until 2026-08-29. It is a quote/CFD feed, not consolidated exchange
+trades: bars carry `volume: 0` with only a `tickVolume`, and prices sit on half-cents (`598.955`),
+the signature of a bid/ask midpoint.
+
+Measured 2026-08-29 over one 20-day window, biquote returned 8–9 bars where Yahoo returned 15 — for
+`XOM` it had no bar for 17, 18, 19, 21, 24, 25 or 28 August, all ordinary weekday sessions. Where both
+vendors covered the same session their closes differed by up to `0.702%`. Missing sessions stalled 12
+price requests indefinitely, so every asset was moved to Yahoo. See
+[ADR](ADR-decisions.md) for the full decision.
+
+The earlier 2026-08-03 probe already showed biquote returning 0 bars for every European listing,
+*including* EU giants trading on US exchanges (`ASML`, `SAP`, `NVO`, `SHEL`), and for 8 requested US
+names (`BNTX`, `UAL`, `FANG`, `SPG`, `VLO`, `ZM`, `MRNA`, `PTON`).
 
 ### 5.2 Yahoo requires a browser User-Agent
 
@@ -226,9 +234,9 @@ browser agent all returned 200, while 8 with curl's default agent all returned 4
 
 The adapter sends a browser UA and a test asserts the string does not identify this service.
 
-Accept the caveats: the endpoint is undocumented and UA-sniffing may change without notice. That is
-precisely why US assets stay on biquote — Yahoo flakiness cannot be allowed to regress existing
-scoring, and switching to a paid vendor is one field in the JSON.
+Accept the caveats: the endpoint is undocumented and UA-sniffing may change without notice. Since
+2026-08-29 Yahoo is the only provider, so this is a single point of failure for price data; the
+per-asset `provider` field means adding a second vendor is one field in the JSON.
 
 ### 5.3 Finnhub was evaluated and rejected
 
@@ -243,21 +251,19 @@ Viable on a paid plan; confirm `.ST` coverage before subscribing.
 
 ### 5.4 Fallback assets
 
-Three primary assets declare a Yahoo fallback, resolving the biquote selective-data gap observed
-2026-08-04:
+**No asset declares a fallback.** The `fallback` field remains part of the schema and
+`AdapterRouter.get_close` still honours it, but every entry is `null` since the move to a single
+provider on 2026-08-29.
 
-| Primary | Fallback |
-|---|---|
-| `LMT_NYSE` | `LMT_NYSE_YH` |
-| `TSLA_NASDAQ` | `TSLA_NASDAQ_YH` |
-| `GOOGL_NASDAQ` | `GOOGL_NASDAQ_YH` |
+Three `{PRIMARY_ID}_YH` mirror entries (`LMT_NYSE_YH`, `TSLA_NASDAQ_YH`, `GOOGL_NASDAQ_YH`) previously
+covered biquote's missing sessions. They were removed because a mirror is a **second registry asset**,
+and the pipeline treated it as an independent instrument rather than an internal routing detail: by
+2026-08-29 `LMT_NYSE` had 25 predictions and `LMT_NYSE_YH` had 23 for the same company, double-counting
+into accuracy and credibility. Empty `keywords` did not prevent this, because group-level causal edges
+reach every member of an `AssetGroup` regardless of keywords.
 
-`AdapterRouter.get_close` retries against the fallback asset's provider when the primary raises
-`PriceNotYetAvailableError`.
-
-Fallback entries are named `{PRIMARY_ID}_YH` by convention and carry **empty `keywords`** so they never
-participate in article matching — they are invisible to Cleansing and Prediction; only the Market Data
-adapter router uses them.
+**A future fallback must not be a separate registry asset.** Encode it inside the asset's own entry
+(alternate provider plus symbol) so it can never be selected as a prediction target.
 
 ## 6. Session calendars
 
@@ -338,6 +344,10 @@ currency, calendars, and fallback quality.
 
 ## 11. Registry version history
 
+- **`multi-market-v2`** (2026-08-29) — 29 assets, all routed to `yahoo`. biquote.io retired after it
+  was measured omitting ~40% of trading sessions and disagreeing with exchange closes by up to
+  `0.702%`; the three `_YH` mirror entries were deleted because the pipeline predicted on them as
+  separate instruments. No asset declares a fallback.
 - **`multi-market-v2`** (2026-08-06) — 37 assets (34 primary + 3 Yahoo fallback entries for
   `LMT_NYSE`, `TSLA_NASDAQ`, `GOOGL_NASDAQ`). `AdapterRouter.get_close` now retries against the
   fallback asset's provider when the primary raises `PriceNotYetAvailableError`, resolving the
@@ -356,4 +366,5 @@ currency, calendars, and fallback quality.
 
 | Date | Version | Change | Driver |
 |---|---|---|---|
+| `2026-08-29` | `1.1.0` | All assets routed to `yahoo`; biquote.io retired; the three `_YH` mirror assets removed; counts corrected to 14 groups / 29 assets | biquote session gaps stalling price requests |
 | `2026-08-06` | `1.0.0` | Moved into `requirements/` from `docs/reference/asset-registry.md`. Corrected group count to 16 (both the old document and SRS-01 §9.3 were wrong); added the group list, the full session-calendar table, the fallback-asset table, and update rules | Requirements consolidation |

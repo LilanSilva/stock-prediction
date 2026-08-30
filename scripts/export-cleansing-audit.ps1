@@ -10,7 +10,13 @@
 
       - cluster_id             : key to reference a cluster in your LLM reply
       - classified_event_type  : the event group the Cleansing service assigned
-      - articles[]             : article_id (key), title, and body excerpt (500 chars)
+      - articles[]             : article_id (key), title, canonical_url, and the full body
+
+    The body is exported in full and the canonical URL alongside it, because both are inputs to
+    classification and an export that omits either cannot reproduce it. Truncating the body to an
+    excerpt made two of 251 clusters irreproducible on 2026-08-17: their event type was derived from
+    body text past the cut, so a reader could not tell a correct classification from a defect. The
+    URL carries the publisher's section, which the classifier consults ahead of every keyword tier.
 
 .PARAMETER Date
     The day to export, formatted yyyy-MM-dd (filtered on ingestion.articles.ingested_at UTC).
@@ -103,10 +109,11 @@ Write-Host "Feed Analyzer - building cleansing audit for $Date ..." -ForegroundC
 $rows = Invoke-PsqlCsv @"
 SELECT
     ec.cluster_id,
-    ec.event_type                                              AS classified_event_type,
+    ec.event_type                                       AS classified_event_type,
     ia.article_id,
-    left(ia.title, 200)                                        AS title,
-    left(regexp_replace(ia.body, E'[\\n\\r]+', ' ', 'g'), 500) AS body
+    ia.canonical_url,
+    left(ia.title, 200)                                 AS title,
+    regexp_replace(ia.body, E'[\\n\\r]+', ' ', 'g')     AS body
 FROM ingestion.articles ia
 JOIN cleansing.cluster_articles ca ON ca.article_id = ia.article_id
 JOIN cleansing.event_clusters   ec ON ec.cluster_id = ca.cluster_id
@@ -138,9 +145,10 @@ foreach ($row in $rows) {
         }
     }
     $clusterMap[$cid].articles.Add([ordered]@{
-        article_id = $row.article_id
-        title      = $row.title
-        body       = $row.body
+        article_id    = $row.article_id
+        canonical_url = $row.canonical_url
+        title         = $row.title
+        body          = $row.body
     })
 }
 

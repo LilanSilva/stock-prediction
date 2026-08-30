@@ -1,7 +1,7 @@
 """Tests for per-asset provider routing.
 
-The registry decides which vendor prices each asset, because no single provider covers every market:
-biquote serves a curated set of US mega-caps, Yahoo serves Stockholm/Euronext/Xetra.
+The registry decides which vendor prices each asset via the ``provider`` field. Routing follows that
+field, never the exchange, so a market can be re-pointed at another vendor by a registry edit alone.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ import pytest
 from shared.reference import provider_of, resolve, supported_assets
 from shared.schemas.messages import AssetId, CloseObservation, PriceKind
 
+from market_data.adapters import router as router_module
 from market_data.adapters.router import AdapterRouter
 from market_data.exceptions import InvalidObservationError
 
@@ -51,33 +52,29 @@ def _router() -> tuple[AdapterRouter, _StubAdapter, _StubAdapter]:
     return AdapterRouter({"biquote.io": biquote, "yahoo": yahoo}), biquote, yahoo
 
 
-def test_us_assets_route_to_biquote() -> None:
-    router, biquote, _ = _router()
-    assert router.adapter_for(AssetId.XOM_NYSE) is biquote
-    assert router.adapter_for(AssetId.LMT_NYSE) is biquote
+def test_us_assets_route_to_yahoo() -> None:
+    router, _, yahoo = _router()
+    assert router.adapter_for(AssetId.XOM_NYSE) is yahoo
+    assert router.adapter_for(AssetId.LMT_NYSE) is yahoo
 
 
 def test_non_us_assets_route_to_yahoo() -> None:
-    # biquote returns 0 bars for every European listing, so these must not reach it.
     router, _, yahoo = _router()
     for asset_id in (AssetId.SAAB_B_STO, AssetId.NOVO_B_CPH, AssetId.ASML_AMS, AssetId.SAP_ETR):
         assert router.adapter_for(asset_id) is yahoo
 
 
-def test_us_listings_biquote_cannot_serve_route_to_yahoo() -> None:
-    # Probed 2026-08-03: biquote returns 0 bars for these despite them being US-listed, so the
-    # registry routes them to Yahoo. Routing follows the provider field, not the exchange.
+def test_routing_follows_the_provider_field_not_the_exchange() -> None:
     router, _, yahoo = _router()
     for asset_id in (AssetId.UAL_NASDAQ, AssetId.MRNA_NASDAQ, AssetId.ZM_NASDAQ):
         assert router.adapter_for(asset_id) is yahoo
 
 
 async def test_get_close_delegates_to_the_routed_adapter() -> None:
-    router, biquote, yahoo = _router()
+    router, _, yahoo = _router()
     await router.get_close(AssetId.SAAB_B_STO, date(2026, 7, 29))
     await router.get_close(AssetId.XOM_NYSE, date(2026, 7, 29))
-    assert yahoo.calls == [AssetId.SAAB_B_STO]
-    assert biquote.calls == [AssetId.XOM_NYSE]
+    assert yahoo.calls == [AssetId.SAAB_B_STO, AssetId.XOM_NYSE]
 
 
 async def test_fetch_observations_delegates_to_the_routed_adapter() -> None:
@@ -128,44 +125,40 @@ class _FailingAdapter:
         return []
 
 
-async def test_fallback_used_when_primary_missing_bar() -> None:
-    # When biquote raises PriceNotYetAvailableError and the asset has a fallback, the router
-    # retries against the fallback asset's adapter and returns its observation.
-    failing_biquote = _FailingAdapter("biquote.io")
-    yahoo = _StubAdapter("yahoo")
-    router = AdapterRouter({"biquote.io": failing_biquote, "yahoo": yahoo})
+class _FakeSeries:
+    """Minimal stand-in for the registry entry the router reads (provider + fallback only)."""
+
+    def __init__(self, provider: str, fallback: AssetId | None) -> None:
+        self.provider = provider
+        self.fallback = fallback
+
+
+async def test_fallback_used_when_primary_missing_bar(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A registry entry may name a fallback asset; the router retries there when the primary
+    # provider has no bar for the session.
+    primary = _FailingAdapter("primary")
+    backup = _StubAdapter("backup")
+    router = AdapterRouter({"primary": primary, "backup": backup})
+
+    series = {
+        AssetId.LMT_NYSE: _FakeSeries("primary", AssetId.NEM_NYSE),
+        AssetId.NEM_NYSE: _FakeSeries("backup", None),
+    }
+    monkeypatch.setattr(router_module, "resolve", lambda asset_id: series[asset_id])
 
     obs = await router.get_close(AssetId.LMT_NYSE, date(2026, 8, 4))
 
-    assert obs.source == "yahoo"
-    assert failing_biquote.calls == [AssetId.LMT_NYSE]
-    assert yahoo.calls == [AssetId.LMT_NYSE_YH]
-
-
-async def test_fallback_used_for_all_three_affected_assets() -> None:
-    failing_biquote = _FailingAdapter("biquote.io")
-    yahoo = _StubAdapter("yahoo")
-    router = AdapterRouter({"biquote.io": failing_biquote, "yahoo": yahoo})
-
-    for asset_id, fallback_id in (
-        (AssetId.LMT_NYSE, AssetId.LMT_NYSE_YH),
-        (AssetId.TSLA_NASDAQ, AssetId.TSLA_NASDAQ_YH),
-        (AssetId.GOOGL_NASDAQ, AssetId.GOOGL_NASDAQ_YH),
-    ):
-        yahoo.calls.clear()
-        obs = await router.get_close(asset_id, date(2026, 8, 4))
-        assert obs.source == "yahoo"
-        assert yahoo.calls == [fallback_id]
+    assert obs.source == "backup"
+    assert primary.calls == [AssetId.LMT_NYSE]
+    assert backup.calls == [AssetId.NEM_NYSE]
 
 
 async def test_no_fallback_re_raises() -> None:
     # Assets without a fallback declared still propagate PriceNotYetAvailableError normally.
     from market_data.exceptions import PriceNotYetAvailableError
 
-    failing_biquote = _FailingAdapter("biquote.io")
-    yahoo = _StubAdapter("yahoo")
-    router = AdapterRouter({"biquote.io": failing_biquote, "yahoo": yahoo})
+    failing_yahoo = _FailingAdapter("yahoo")
+    router = AdapterRouter({"yahoo": failing_yahoo})
 
-    # XOM_NYSE is biquote-served (so it reaches the failing adapter) and declares no fallback.
     with pytest.raises(PriceNotYetAvailableError):
         await router.get_close(AssetId.XOM_NYSE, date(2026, 8, 4))

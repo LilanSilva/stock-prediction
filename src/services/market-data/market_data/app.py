@@ -69,7 +69,8 @@ class RecentClosesResponse(BaseModel):
 @dataclass
 class ServiceState:
     last_poll_at: datetime | None = None
-    open_requests: int = 0
+    # Requests due on the last tick, not the total still open: deferred ones are excluded.
+    due_requests: int = 0
     last_published: int = 0
     consumed_total: int = 0
 
@@ -126,7 +127,7 @@ async def _run_scheduler_tick(app: FastAPI) -> None:
                 logger.exception("scheduled_process_terminal", request_id=str(request.request_id))
         published = await ctx.outbox.publish_pending()
         ctx.state.last_poll_at = now
-        ctx.state.open_requests = len(open_requests)
+        ctx.state.due_requests = len(open_requests)
         ctx.state.last_published = published
     except Exception:  # noqa: BLE001 - a scheduled tick must never crash the scheduler
         logger.exception("scheduled_tick_failed")
@@ -178,6 +179,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         adapter,
         retry_backoff_base_seconds=settings.retry_backoff_base_seconds,
         retry_backoff_max_seconds=settings.retry_backoff_max_seconds,
+        abandon_after_settlement_days=settings.abandon_after_settlement_days,
     )
     outbox = OutboxPublisher(pool, rabbit)
 
@@ -238,7 +240,7 @@ async def health() -> dict[str, object]:
     return {
         "status": "ok",
         "last_poll_at": state.last_poll_at.isoformat() if state.last_poll_at else None,
-        "open_requests": state.open_requests,
+        "due_requests": state.due_requests,
         "last_published": state.last_published,
         "consumed_total": state.consumed_total,
     }

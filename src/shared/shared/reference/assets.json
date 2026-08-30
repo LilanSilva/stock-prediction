@@ -20,25 +20,6 @@
           "asset_id": "LMT_NYSE",
           "name": "Lockheed Martin",
           "code": "NYSE:LMT",
-          "provider": "biquote.io",
-          "provider_symbol": "LMT",
-          "economic_identity": "Lockheed Martin ordinary shares (NYSE)",
-          "expected_exchange": "NYSE",
-          "currency": "USD",
-          "timezone": "America/New_York",
-          "session_complete_at": "17:00",
-          "price_kind": "PROVIDER_DAILY_CLOSE",
-          "is_adjusted": false,
-          "fallback": "LMT_NYSE_YH",
-          "keywords": [
-            "lockheed",
-            "lmt"
-          ]
-        },
-        {
-          "asset_id": "LMT_NYSE_YH",
-          "name": "Lockheed Martin (Yahoo fallback)",
-          "code": "NYSE:LMT",
           "provider": "yahoo",
           "provider_symbol": "LMT",
           "economic_identity": "Lockheed Martin ordinary shares (NYSE)",
@@ -49,7 +30,10 @@
           "price_kind": "PROVIDER_DAILY_CLOSE",
           "is_adjusted": false,
           "fallback": null,
-          "keywords": []
+          "keywords": [
+            "lockheed",
+            "lmt"
+          ]
         },
         {
           "asset_id": "SAAB_B_STO",
@@ -87,7 +71,7 @@
           "asset_id": "BA_NYSE",
           "name": "Boeing",
           "code": "NYSE:BA",
-          "provider": "biquote.io",
+          "provider": "yahoo",
           "provider_symbol": "BA",
           "economic_identity": "Boeing ordinary shares (NYSE)",
           "expected_exchange": "NYSE",
@@ -210,7 +194,7 @@
           "asset_id": "NVDA_NASDAQ",
           "name": "Nvidia",
           "code": "NASDAQ:NVDA",
-          "provider": "biquote.io",
+          "provider": "yahoo",
           "provider_symbol": "NVDA",
           "economic_identity": "Nvidia ordinary shares (NASDAQ)",
           "expected_exchange": "NASDAQ",
@@ -282,7 +266,7 @@
           "asset_id": "MSFT_NASDAQ",
           "name": "Microsoft",
           "code": "NASDAQ:MSFT",
-          "provider": "biquote.io",
+          "provider": "yahoo",
           "provider_symbol": "MSFT",
           "economic_identity": "Microsoft ordinary shares (NASDAQ)",
           "expected_exchange": "NASDAQ",
@@ -354,26 +338,6 @@
           "asset_id": "GOOGL_NASDAQ",
           "name": "Alphabet",
           "code": "NASDAQ:GOOGL",
-          "provider": "biquote.io",
-          "provider_symbol": "GOOGL",
-          "economic_identity": "Alphabet ordinary shares (NASDAQ)",
-          "expected_exchange": "NASDAQ",
-          "currency": "USD",
-          "timezone": "America/New_York",
-          "session_complete_at": "17:00",
-          "price_kind": "PROVIDER_DAILY_CLOSE",
-          "is_adjusted": false,
-          "fallback": "GOOGL_NASDAQ_YH",
-          "keywords": [
-            "alphabet",
-            "android",
-            "googl"
-          ]
-        },
-        {
-          "asset_id": "GOOGL_NASDAQ_YH",
-          "name": "Alphabet (Yahoo fallback)",
-          "code": "NASDAQ:GOOGL",
           "provider": "yahoo",
           "provider_symbol": "GOOGL",
           "economic_identity": "Alphabet ordinary shares (NASDAQ)",
@@ -384,13 +348,17 @@
           "price_kind": "PROVIDER_DAILY_CLOSE",
           "is_adjusted": false,
           "fallback": null,
-          "keywords": []
+          "keywords": [
+            "alphabet",
+            "android",
+            "googl"
+          ]
         },
         {
           "asset_id": "AMZN_NASDAQ",
           "name": "Amazon",
           "code": "NASDAQ:AMZN",
-          "provider": "biquote.io",
+          "provider": "yahoo",
           "provider_symbol": "AMZN",
           "economic_identity": "Amazon ordinary shares (NASDAQ)",
           "expected_exchange": "NASDAQ",
@@ -409,7 +377,7 @@
           "asset_id": "NFLX_NASDAQ",
           "name": "Netflix",
           "code": "NASDAQ:NFLX",
-          "provider": "biquote.io",
+          "provider": "yahoo",
           "provider_symbol": "NFLX",
           "economic_identity": "Netflix ordinary shares (NASDAQ)",
           "expected_exchange": "NASDAQ",
@@ -438,7 +406,7 @@
           "asset_id": "AAPL_NASDAQ",
           "name": "Apple",
           "code": "NASDAQ:AAPL",
-          "provider": "biquote.io",
+          "provider": "yahoo",
           "provider_symbol": "AAPL",
           "economic_identity": "Apple ordinary shares (NASDAQ)",
           "expected_exchange": "NASDAQ",
@@ -472,26 +440,6 @@
           "asset_id": "TSLA_NASDAQ",
           "name": "Tesla",
           "code": "NASDAQ:TSLA",
-          "provider": "biquote.io",
-          "provider_symbol": "TSLA",
-          "economic_identity": "Tesla ordinary shares (NASDAQ)",
-          "expected_exchange": "NASDAQ",
-          "currency": "USD",
-          "timezone": "America/New_York",
-          "session_complete_at": "17:00",
-          "price_kind": "PROVIDER_DAILY_CLOSE",
-          "is_adjusted": false,
-          "fallback": "TSLA_NASDAQ_YH",
-          "keywords": [
-            "tesla",
-            "tsla",
-            "elon musk"
-          ]
-        },
-        {
-          "asset_id": "TSLA_NASDAQ_YH",
-          "name": "Tesla (Yahoo fallback)",
-          "code": "NASDAQ:TSLA",
           "provider": "yahoo",
           "provider_symbol": "TSLA",
           "economic_identity": "Tesla ordinary shares (NASDAQ)",
@@ -502,7 +450,11 @@
           "price_kind": "PROVIDER_DAILY_CLOSE",
           "is_adjusted": false,
           "fallback": null,
-          "keywords": []
+          "keywords": [
+            "tesla",
+            "tsla",
+            "elon musk"
+          ]
         }
       ]
     },
@@ -522,7 +474,7 @@
           "asset_id": "XOM_NYSE",
           "name": "Exxon Mobil",
           "code": "NYSE:XOM",
-          "provider": "biquote.io",
+          "provider": "yahoo",
           "provider_symbol": "XOM",
           "economic_identity": "Exxon Mobil ordinary shares (NYSE)",
           "expected_exchange": "NYSE",

@@ -34,7 +34,8 @@ the one remediation epic `P06`, which does use the epic/story/task nesting.
 | [E08](E08-API-Gateway-BFF/README.md) | API Gateway / read-only BFF | M3 | Not started — design in [functional-document.md](E08-API-Gateway-BFF/functional-document.md) |
 | [E09](E09-Dashboard-Web-UI/README.md) | Dashboard web UI | M3 | Not started — design in [functional-document.md](E09-Dashboard-Web-UI/functional-document.md) |
 | E10 | Cross-asset `CORRELATES_WITH` propagation | M4 | **Complete** — implemented and verified against the local stack; specified in [ADR-008](../requirements/ADR-decisions.md), [SRS-04](../requirements/SRS-04-prediction.md), [SRS-07](../requirements/SRS-07-credibility.md). **Gated by E12 S03** after an audit found propagated predictions were 35% of output at a 32% hit rate |
-| E12 | Prediction quality remediation | M4 | **S01–S03 complete**, S04 in progress — 93 of 113 predictions on 2026-08-12 were not justified by their news |
+| E12 | Prediction quality remediation | M4 | **Complete** — 93 of 113 predictions on 2026-08-12 were not justified by their news; specified as CLN-63 – CLN-68 in [SRS-03](../requirements/SRS-03-cleansing.md) and PRD-60 – PRD-62 in [SRS-04](../requirements/SRS-04-prediction.md) |
+| E13 | Cleansing classification accuracy | M4 | **Complete** — an audit of 2026-08-17 found 110 of 251 clusters correctly classified; raised to 72.4%. Specified as CLN-69 – CLN-72 in [SRS-03](../requirements/SRS-03-cleansing.md), with the method and the rejected approaches in [SRS-03 §12](../requirements/SRS-03-cleansing.md#12-classification-accuracy-improvements) |
 | [E11](E11-Data-Retention/README.md) | Bounded growth/retention for unbounded tables | Unscheduled | Proposed; only Ingestion has a retention cleaner today |
 
 E08 and E09 have no SRS by design: [requirements/](../requirements/README.md) specifies implemented

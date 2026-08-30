@@ -18,6 +18,8 @@ from enum import StrEnum
 from shared.reference import members_of, registry
 from shared.schemas.messages import AssetId, ConditionCode, EventPolarity, EventType
 
+from cleansing.sections import mapped_section_types, section_event_type
+
 # Keyword/lemma (lowercase) -> canonical event type. Swedish and English forms map to the same type.
 ACTION_TAXONOMY: dict[str, EventType] = {
     # MILITARY_CONFLICT
@@ -31,11 +33,23 @@ ACTION_TAXONOMY: dict[str, EventType] = {
     "conflict": EventType.MILITARY_CONFLICT,
     "anfall": EventType.MILITARY_CONFLICT,  # sv
     "attackera": EventType.MILITARY_CONFLICT,  # sv
+    # Inflected attack forms. ``_keyword_present`` tolerates only ("", s, es, er, ar, et, en, ing),
+    # so "attacked" never matched "attack", and "attackera" matched the bare infinitive alone — a
+    # form that essentially never appears in a headline. "Saudiskt raffinaderi attackerat av
+    # Huthirörelsen" (2026-08-18, aftonbladet + di) therefore classified OTHER and moved nothing.
+    # All of these are listed in GENERIC_KEYWORDS alongside bare "attack", so they only fire on a
+    # corroborated title and a sports "attackerade domaren" still falls through.
+    "attacked": EventType.MILITARY_CONFLICT,
+    "attackerat": EventType.MILITARY_CONFLICT,   # sv: past participle
+    "attackerade": EventType.MILITARY_CONFLICT,  # sv: past tense
+    "attackerats": EventType.MILITARY_CONFLICT,  # sv: passive perfect
+    "attackerar": EventType.MILITARY_CONFLICT,   # sv: present tense
     "invadera": EventType.MILITARY_CONFLICT,  # sv
     "krig": EventType.MILITARY_CONFLICT,       # sv: also matches kriget/krigens (suffix)
     "krigsplan": EventType.MILITARY_CONFLICT,  # sv: war plan
     "iranattack": EventType.MILITARY_CONFLICT, # sv: compound "Iran attack"
     "stridighet": EventType.MILITARY_CONFLICT, # sv: conflict/fighting
+    "robotattack": EventType.MILITARY_CONFLICT,  # sv: missile strike ("attack" alone is generic)
     # STRAIT_CLOSURE
     "close": EventType.STRAIT_CLOSURE,
     "closure": EventType.STRAIT_CLOSURE,
@@ -78,6 +92,9 @@ ACTION_TAXONOMY: dict[str, EventType] = {
     "inflation": EventType.INFLATION_CHANGE,
     "cpi": EventType.INFLATION_CHANGE,
     "deflation": EventType.INFLATION_CHANGE,
+    # sv: "the inflation expectations". Listed in the definite plural because -arna is outside the
+    # suffix set, so neither "inflationsförväntning" nor "inflation" reaches the headline form.
+    "inflationsförväntningarna": EventType.INFLATION_CHANGE,
     # RECESSION_SIGNAL
     "recession": EventType.RECESSION_SIGNAL,
     "contraction": EventType.RECESSION_SIGNAL,
@@ -90,6 +107,10 @@ ACTION_TAXONOMY: dict[str, EventType] = {
     "revenue": EventType.CORPORATE_EARNINGS,
     "kvartalsresultat": EventType.CORPORATE_EARNINGS,  # sv: quarterly result (not generic "resultat")
     "rörelseresultat": EventType.CORPORATE_EARNINGS,   # sv: operating result
+    "ebita": EventType.CORPORATE_EARNINGS,
+    "ebitda": EventType.CORPORATE_EARNINGS,
+    "intäkter": EventType.CORPORATE_EARNINGS,  # sv: revenues. PLURAL only — bare "intäkt" is broader
+    "kvartalet": EventType.CORPORATE_EARNINGS,  # sv: "the quarter", as in "för det andra kvartalet"
     # POLITICAL_TRANSITION
     "election": EventType.POLITICAL_TRANSITION,
     "resign": EventType.POLITICAL_TRANSITION,
@@ -102,8 +123,19 @@ ACTION_TAXONOMY: dict[str, EventType] = {
     "flood": EventType.NATURAL_DISASTER,
     "wildfire": EventType.NATURAL_DISASTER,
     "hurricane": EventType.NATURAL_DISASTER,
+    "drought": EventType.NATURAL_DISASTER,
+    "heatwave": EventType.NATURAL_DISASTER,
     "jordbävning": EventType.NATURAL_DISASTER,  # sv
     "översvämning": EventType.NATURAL_DISASTER,  # sv
+    "skalv": EventType.NATURAL_DISASTER,  # sv: (earth)quake; Swedish wires prefer this to "jordbävning"
+    # sv: PLURAL "fires" only. Bare "brand" is deliberately absent: it is the ordinary word for any
+    # fire, and on 2026-08-17 it matched "en större brand i Nykvarn" — twelve burnt cars and an
+    # arrest, not a natural disaster. The plural is what wildfire coverage uses ("Bränderna i
+    # Europa", "bekämpar bränder i Belgien"), and it leaves the urban "storbrand" headlines alone.
+    "bränder": EventType.NATURAL_DISASTER,
+    "bränderna": EventType.NATURAL_DISASTER,  # sv: definite plural (-na is outside the suffix set)
+    # "torka" (drought) is deliberately absent: it is also the verb "to wipe/dry", and in this corpus
+    # it fired on an election-campaign article as readily as on the English heatwave coverage.
     # CORPORATE_ACQUISITION
     "merger": EventType.CORPORATE_ACQUISITION,
     "mergers": EventType.CORPORATE_ACQUISITION,
@@ -115,6 +147,8 @@ ACTION_TAXONOMY: dict[str, EventType] = {
     "fusion": EventType.CORPORATE_ACQUISITION,         # sv
     "jättefusion": EventType.CORPORATE_ACQUISITION, # sv: mega-merger compound
     "förvärv": EventType.CORPORATE_ACQUISITION,     # sv
+    # sv: past participle "acquired". "förvärv" does not suffix-match "förvärvat", so it is listed.
+    "förvärvat": EventType.CORPORATE_ACQUISITION,
     "uppköp": EventType.CORPORATE_ACQUISITION,      # sv
     "samgående": EventType.CORPORATE_ACQUISITION,   # sv
     "bud på": EventType.CORPORATE_ACQUISITION,      # sv
@@ -286,6 +320,11 @@ ACTION_TAXONOMY: dict[str, EventType] = {
     "militärövning": EventType.GEOPOLITICAL_TENSION,  # sv
     "kärnvapenhot": EventType.GEOPOLITICAL_TENSION,   # sv: nuclear threat
     "spänningar": EventType.GEOPOLITICAL_TENSION,     # sv: tensions
+    "avfyrningsramp": EventType.GEOPOLITICAL_TENSION,  # sv: launch ramp; suffix → -ramper
+    # sv: drone. Also appears in bodies describing an actual strike, but a strike headline is typed
+    # MILITARY_CONFLICT from the title before the body tier is ever consulted, so this does not
+    # downgrade one.
+    "drönare": EventType.GEOPOLITICAL_TENSION,
     # COMMODITY_PRICE_SHOCK
     "opec": EventType.COMMODITY_PRICE_SHOCK,
     "oil production cut": EventType.COMMODITY_PRICE_SHOCK,
@@ -303,9 +342,17 @@ ACTION_TAXONOMY: dict[str, EventType] = {
     "unemployment": EventType.ECONOMIC_DATA_RELEASE,
     "pmi": EventType.ECONOMIC_DATA_RELEASE,
     "retail sales": EventType.ECONOMIC_DATA_RELEASE,
+    "industrial production": EventType.ECONOMIC_DATA_RELEASE,
+    "house prices": EventType.ECONOMIC_DATA_RELEASE,
     "bnp": EventType.ECONOMIC_DATA_RELEASE,         # sv: GDP
     "arbetslöshet": EventType.ECONOMIC_DATA_RELEASE,  # sv: unemployment
     "inköpschefsindex": EventType.ECONOMIC_DATA_RELEASE,  # sv: PMI
+    "industriproduktion": EventType.ECONOMIC_DATA_RELEASE,  # sv: industrial production
+    "detaljhandel": EventType.ECONOMIC_DATA_RELEASE,        # sv: retail (trade)
+    "huspris": EventType.ECONOMIC_DATA_RELEASE,             # sv: house price; suffix → huspriser
+    # Swedish definite plural (-erna) is outside the suffix set in ``_keyword_present``, so the
+    # inflected form is listed explicitly — same approach as "vinstutsikterna" below.
+    "bopriserna": EventType.ECONOMIC_DATA_RELEASE,  # sv: the housing prices
     # PANDEMIC_OUTBREAK
     "pandemic": EventType.PANDEMIC_OUTBREAK,
     "epidemic": EventType.PANDEMIC_OUTBREAK,
@@ -314,6 +361,10 @@ ACTION_TAXONOMY: dict[str, EventType] = {
     "pandemi": EventType.PANDEMIC_OUTBREAK,         # sv
     "utbrott": EventType.PANDEMIC_OUTBREAK,         # sv: outbreak
     "nedstängning": EventType.PANDEMIC_OUTBREAK,    # sv: lockdown
+    "ebolautbrott": EventType.PANDEMIC_OUTBREAK,    # sv compound; "utbrott" alone misses it
+    # sv: a measles CASE. Bare "mässling" does not match the compound "mässlingfall", and the
+    # compound is what the reporting uses.
+    "mässlingfall": EventType.PANDEMIC_OUTBREAK,
     # ENERGY_POLICY
     "carbon tax": EventType.ENERGY_POLICY,
     "green deal": EventType.ENERGY_POLICY,
@@ -367,6 +418,13 @@ GENERIC_KEYWORDS: frozenset[str] = frozenset(
         "partnership",
         "investigation",
         "attack",
+        # The inflected forms share bare "attack"'s failure mode ("Kane attacked the defence"), so
+        # they are gated the same way: honoured in a corroborated title, never in body prose.
+        "attacked",
+        "attackerat",
+        "attackerade",
+        "attackerats",
+        "attackerar",
         "approved",
         "cleared",
         "fired",
@@ -500,6 +558,13 @@ def _scan(
 
     The haystack is punctuation-normalised before matching so symbols attached to words
     (e.g. "opec+" or "anfall:") do not defeat word-boundary detection.
+
+    A multi-word key is anchored on its **leading** side only, and that asymmetry is deliberate
+    (CLN-69). Without a leading boundary the key matched inside a longer word: ``"bud på"`` matched
+    ``"återbud på"`` (*a withdrawal*), which typed an athlete pulling out of a final as
+    ``CORPORATE_ACQUISITION``. Anchoring the trailing side too would fix that and break Swedish
+    compounding, where the qualifier is glued to the noun: ``"em guld"`` would no longer match
+    ``EM-guldet``, which normalises to ``em guldet``. Do not "tidy" this into symmetry.
     """
     haystack = f" {_normalise(text.lower())} "
     best_type = EventType.OTHER
@@ -512,15 +577,20 @@ def _scan(
         if exclude is not None and keyword in exclude:
             continue
         if " " in keyword:
-            # Multi-word phrase: find position for earliest-match tie-breaking.
-            pos = haystack.find(keyword)
-            # On a tie the LONGER keyword wins: both "appoint" and "appoints new cfo" start at the
-            # same word, and the more specific phrase is the better classification.
-            if pos != -1 and (pos < best_pos or (pos == best_pos and len(keyword) > best_len)):
-                best_pos = pos
-                best_len = len(keyword)
-                best_type = event_type
-                best_keyword = keyword
+            # Multi-word phrase, anchored on its leading side so it cannot match inside a longer
+            # word (see the docstring: "bud på" must not match "återbud på"). `find(" keyword")`
+            # returns the index of the leading SPACE, so +1 gives the index of the word itself —
+            # the same basis the single-token branch uses.
+            pos = haystack.find(f" {keyword}")
+            if pos != -1:
+                pos += 1
+                # On a tie the LONGER keyword wins: both "appoint" and "appoints new cfo" start at
+                # the same word, and the more specific phrase is the better classification.
+                if pos < best_pos or (pos == best_pos and len(keyword) > best_len):
+                    best_pos = pos
+                    best_len = len(keyword)
+                    best_type = event_type
+                    best_keyword = keyword
         else:
             # Single token: use suffix-tolerant match; position is the bare-token index.
             # `find(" keyword")` returns the index of the leading SPACE, so +1 gives the index of
@@ -537,7 +607,7 @@ def _scan(
     return best_type, best_keyword
 
 
-def classify_text(title: str, body: str = "") -> tuple[EventType, str | None]:
+def classify_text(title: str, body: str = "", url: str = "") -> tuple[EventType, str | None]:
     """Deterministically classify an article, most trustworthy evidence first.
 
     Returns the mapped event type and the matched keyword (the "action" evidence), or (OTHER, None)
@@ -546,6 +616,12 @@ def classify_text(title: str, body: str = "") -> tuple[EventType, str | None]:
     Evidence is tiered rather than taken purely by position, because position within a long body is
     not a measure of relevance. Tiers, first hit wins:
 
+      0. **The publisher's section**, read from ``url`` (CLN-71). An editor's filing decision beats
+         any inference from text: on the 2026-08-17 corpus the DN sport section was correct 26 times
+         out of 26, while the keyword reject tier below fired twice in 251 articles. Skipped when the
+         title names a registered company, exactly as tier 1 is. This tier can only select a
+         non-financial type — a section must never manufacture a market classification — and it fails
+         open, so a missing or unmapped URL classifies as if none had been supplied (CLN-72).
       1. **Non-financial keyword in the title** — sport/entertainment/lifestyle, which makes the
          reject explicit instead of letting a market keyword mistype it. Skipped when the title
          names a registered company, so "Nike lifts full-year guidance" is never suppressed by a
@@ -570,14 +646,21 @@ def classify_text(title: str, body: str = "") -> tuple[EventType, str | None]:
     becoming a RATE_DECISION, while keeping "Gold expected to trade around $4,500/oz" — whose
     generic "gold" is corroborated by the SAFE_HAVEN cue in the same headline.
 
-    ``body`` is optional so a caller with only a headline (and the existing lemma-fallback path in
-    ``extraction``) can pass one argument.
+    ``body`` and ``url`` are optional so a caller with only a headline (and the existing
+    lemma-fallback path in ``extraction``) can pass one argument.
     """
     haystack = _haystack(title)
     names_company = bool(_company_matches(haystack)[0])
 
-    # A company-specific headline is financial news by definition; never reject it as sport.
+    # A company-specific headline is financial news by definition; never reject it as sport. This
+    # guard covers tier 0 and tier 1 alike.
     if not names_company:
+        from_section = section_event_type(url)
+        if from_section is not None:
+            # The keyword slot records WHY the article was rejected, so an audit export can show that
+            # the section decided it rather than a keyword. Downstream treats this as opaque text.
+            return from_section, f"section:{from_section.value.lower()}"
+
         non_financial, keyword = _scan(title, NON_FINANCIAL_KEYWORDS)
         if non_financial != EventType.OTHER:
             return non_financial, keyword
@@ -905,6 +988,68 @@ RESOLUTION_CUES: tuple[str, ...] = (
     "ger andrum",  # sv: gives respite / stands down
 )
 
+# Cues that the de-escalation named in the same headline is BREAKING DOWN rather than holding.
+# Checked before RESOLUTION_CUES and short-circuiting to OCCURRENCE, because a bare cue match cannot
+# tell the two readings apart. "Oil prices rise as US-Iran ceasefire ends" (2026-08-18) matched
+# "ceasefire" and was typed RESOLUTION, which inverted COMMODITY_PRICE_SHOCK's UP edge to DOWN; the
+# Scope-B price gate in ``decision._resolved_direction`` then dropped that DOWN as un-elevated,
+# leaving no material edge — so a headline explicitly reporting an oil rise produced no
+# prediction at all for either OIL_GAS member.
+#
+# Forms are enumerated rather than stemmed wherever the stem is ambiguous: substring matching on
+# "ceasefire end" would also swallow "ceasefire endures", and "ceasefire break" would swallow
+# "ceasefire breakthrough" — both the opposite meaning. Where the stem is unambiguous ("expire",
+# "collapse", "fail") the short form is used and covers every inflection.
+#
+# A headline carrying both readings ("ceasefire agreed after earlier truce breakdown") resolves to
+# OCCURRENCE. That is the conservative direction: OCCURRENCE keeps the factor's stored sign instead
+# of asserting an inversion, matching the tie-breaking default in ``merge._event_polarity``.
+RESOLUTION_NEGATION_CUES: tuple[str, ...] = (
+    "ceasefire ends",
+    "ceasefire ended",
+    "ceasefire ending",
+    "ceasefire expire",
+    "ceasefire collapse",
+    "ceasefire fail",
+    "ceasefire breaks down",
+    "ceasefire broke down",
+    "ceasefire breakdown",
+    "ceasefire is over",
+    "ceasefire violated",
+    "ceasefire violation",
+    "end of the ceasefire",
+    "end of ceasefire",
+    "no ceasefire",
+    "truce ends",
+    "truce ended",
+    "truce ending",
+    "truce expire",
+    "truce collapse",
+    "truce fail",
+    "truce breaks down",
+    "truce broke down",
+    "truce breakdown",
+    "truce is over",
+    "end of the truce",
+    "end of truce",
+    "no truce",
+    "no deal",
+    "no agreement",
+    "vapenvilan upphör",  # sv: the ceasefire ends (substring also covers "upphörde")
+    "vapenvila upphör",  # sv
+    "vapenvilan löper ut",  # sv: the ceasefire expires
+    "vapenvilan är över",  # sv: the ceasefire is over
+    "vapenvilan bryts",  # sv: the ceasefire is broken
+    "vapenvilan bröts",  # sv: the ceasefire was broken
+    "vapenvilan avslutas",  # sv: the ceasefire is concluded/terminated
+    "vapenvilan tar slut",  # sv: the ceasefire comes to an end
+    "vapenvilan tagit slut",  # sv: the ceasefire has come to an end
+    "slutet på vapenvilan",  # sv: the end of the ceasefire
+    "ingen vapenvila",  # sv: no ceasefire
+    "inget avtal",  # sv: no deal
+    "ingen överenskommelse",  # sv: no agreement
+)
+
 # REGULATORY_ACTION covers two opposite events under one factor with one DOWN prior. These cue sets
 # separate them so a favourable ruling is not predicted as a penalty. See
 # ``_is_favourable_regulatory``.
@@ -934,6 +1079,13 @@ TRANSPORT_CUES: tuple[str, ...] = (
     "export terminal",
     "oil route",
     "sjöfart",  # sv: shipping
+    # Swedish parity for "refinery"/"tanker" above. Without these a Swedish-language strike on oil
+    # infrastructure inferred SAFE_HAVEN_ONLY and moved only the gold proxies, because
+    # MILITARY_CONFLICT -> OIL_GAS exists solely as the TRANSPORT_AFFECTED conditioned edge
+    # (infra/neo4j/init/05) — the unconditional one is deleted there on purpose.
+    "raffinaderi",  # sv: refinery
+    "tankfartyg",   # sv: oil tanker
+    "oljehamn",     # sv: oil port/terminal
 )
 
 # --- Event-type fallback cue gate ---------------------------------------------------------------
@@ -1040,6 +1192,11 @@ def classify_polarity(text: str, event_type: EventType | None = None) -> EventPo
     haystack = f" {_normalise(text.lower())} "
     if event_type is not None and _is_favourable_regulatory(haystack, event_type):
         return EventPolarity.RESOLUTION
+    # Runs before the cue loop: a de-escalation that is ending is not a resolution, and several
+    # RESOLUTION_CUES ("ceasefire", "truce", "deal", "agreement") name the thing rather than the
+    # outcome, so they match either way. See RESOLUTION_NEGATION_CUES.
+    if any(_cue_present(haystack, cue) for cue in RESOLUTION_NEGATION_CUES):
+        return EventPolarity.OCCURRENCE
     for cue in RESOLUTION_CUES:
         if _cue_present(haystack, cue):
             return EventPolarity.RESOLUTION
@@ -1181,4 +1338,25 @@ def _validate_fallback_targets() -> None:
         )
 
 
+def _validate_section_types_are_non_financial() -> None:
+    """Fail at import if a publisher section could select a market event type (CLN-71).
+
+    Tier 0 runs ahead of every evidence tier, so an entry such as ``("www.di.se", "bors"):
+    RATE_DECISION`` would let a URL path manufacture a prediction with no evidence from the article at
+    all. A section may reject an article; it may never classify one. Refusing to load is better than
+    discovering this from a prediction.
+    """
+    offenders = sorted(
+        event_type.value
+        for event_type in mapped_section_types()
+        if event_type not in NON_FINANCIAL_EVENT_TYPES
+    )
+    if offenders:
+        raise RuntimeError(
+            "publisher sections may only map to non-financial event types; found: "
+            f"{', '.join(offenders)}"
+        )
+
+
 _validate_fallback_targets()
+_validate_section_types_are_non_financial()

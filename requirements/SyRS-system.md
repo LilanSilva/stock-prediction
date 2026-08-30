@@ -694,7 +694,7 @@ System-level behaviours and the tests that prove them.
 |---|---|
 | Industry news fans out to every group member | One headline over a 4-member group produces 4 predictions whose outcomes are correlated but scored as independent, inflating apparent confidence. Not yet bounded. |
 | Group edges accumulate evidence faster | Several listings in one group can credit the same inherited edge from one industry event |
-| Yahoo's endpoint is undocumented | It requires a browser User-Agent and its behaviour may change without notice; US assets stay on biquote so Yahoo flakiness cannot regress existing scoring |
+| Yahoo's endpoint is undocumented | It requires a browser User-Agent and its behaviour may change without notice. Since 2026-08-29 Yahoo prices every asset, so an endpoint change halts all scoring |
 | A market holiday consumes retry budget | The request waits rather than skipping to the next real session |
 | No Gateway or Dashboard | Results are read from the database or the Market Data read endpoint |
 | Calibration reports not yet produced | Confidence is recorded, but Brier score and reliability reports need more history |

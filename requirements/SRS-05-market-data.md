@@ -71,8 +71,8 @@ The Market Data Service is responsible for fetching and persisting real price da
 | Settlement session | The trading session whose close is used to score the prediction (next trading day) |
 | Session completion | A session is considered complete once the local market has closed: `session_date + local close time (configurable per asset)` |
 | Provider | The market data vendor for an asset; determined by the asset registry (`provider` field) |
-| biquote.io | Provider for US mega-cap stocks; OHLC JSON API with UTC-midnight bar times |
-| Yahoo Finance | Provider for European/remaining stocks; chart v8 API with intraday bars requiring timezone shift |
+| biquote.io | Retired 2026-08-29; OHLC JSON API previously used for US mega-caps (see [REF-02 §5.1](REF-02-asset-registry.md)) |
+| Yahoo Finance | Provider for every registry asset; chart v8 API with intraday bars requiring timezone shift |
 | PriceNotYetAvailableError | Provider returned no settled bar for the requested session (transient; retry scheduled) |
 | InvalidObservationError | Provider data failed validation (terminal; request dead-lettered) |
 | AdapterUnavailableError | Transport-level provider failure (transient; retry scheduled) |
@@ -105,8 +105,7 @@ The Market Data Service is responsible for fetching and persisting real price da
                           (Scope-B price elevation check)
 
 External providers:
-  [biquote.io]    ← US mega-cap stocks
-  [Yahoo Finance] ← European / remaining stocks
+  [Yahoo Finance] ← every registry asset (US and European)
 ```
 
 - Consumes from queue: `market-data.price-requests`
@@ -131,7 +130,7 @@ External providers:
 
 | ID | Requirement | Status |
 |---|---|---|
-| MKT-4 | The service shall manage each price request through the states: `PENDING → BASELINE_OBSERVED → COMPLETED` | Implemented |
+| MKT-4 | The service shall manage each price request through the states: `PENDING → BASELINE_OBSERVED → COMPLETED`, or to the terminal state `ABANDONED` | Implemented |
 | MKT-5 | The service shall fetch the baseline close first; on success, advance the state to `BASELINE_OBSERVED` and store the `CloseObservation` in `close_observations` | Implemented |
 | MKT-6 | Before fetching the settlement close, the service shall check whether the settlement session is complete using the asset's own timezone and configurable session-completion time | Implemented |
 | MKT-7 | If the settlement session is not yet complete, the service shall defer the request (record failure, schedule next attempt) and return without fetching | Implemented |
@@ -192,9 +191,10 @@ External providers:
 | ID | Requirement | Status |
 |---|---|---|
 | MKT-34 | The service shall run a scheduled job every `SETTLEMENT_POLL_INTERVAL_SECONDS` (default 3600 s = 1 hour) | Implemented |
-| MKT-35 | The job shall load all requests not in state `COMPLETED` from the database and attempt to advance each one | Implemented |
-| MKT-36 | Transient failures shall use exponential backoff: `min(backoff_base × 2^attempts, backoff_max)` seconds | Implemented |
-| MKT-37 | After `max_fetch_attempts` failures, the request shall be marked as dead-lettered (terminal error) | Implemented |
+| MKT-35 | The job shall load requests in state `PENDING` or `BASELINE_OBSERVED` **whose `next_attempt_at` has elapsed** and attempt to advance each one | Implemented |
+| MKT-36 | Transient failures shall use exponential backoff: `min(backoff_base × 2^attempts, backoff_max)` seconds, recorded in `next_attempt_at` and honoured by MKT-35 | Implemented |
+| MKT-37 | A request still unpriced more than `ABANDON_AFTER_SETTLEMENT_DAYS` after its settlement session shall move to the terminal state `ABANDONED` and never be re-driven | Implemented |
+| MKT-37b | A request whose `asset_id` is absent from the loaded registry shall be skipped with a warning rather than raising, so one retired asset cannot abort the tick for every other request | Implemented |
 
 ### 5.9 Outbox relay
 
@@ -266,16 +266,20 @@ The `AdapterRouter` resolves the provider name from the asset registry:
 
 ```python
 provider = registry.resolve(asset_id).provider
-adapter  = adapters_dict[provider]   # "biquote" or "yahoo"
+adapter  = adapters_dict[provider]   # "yahoo"
 ```
 
-The two adapters are instantiated at startup and keyed by name. The provider name in the registry (`"biquote"` or `"yahoo"`) must match an adapter key.
+Adapters are instantiated at startup and keyed by name. The provider name in the registry must match
+an adapter key; one that does not is a terminal deployment error, not a transient failure.
 
-**Current routing by asset:**
-- `biquote` — US mega-cap stocks: AAPL, MSFT, AMZN, GOOG, etc.
-- `yahoo` — European markets (Stockholm, Euronext, Xetra) and any US names not covered by biquote
+**Current routing by asset:** every asset routes to `yahoo`. Routing follows the registry `provider`
+field, never the exchange, so re-introducing a second vendor is a registry edit plus one adapter.
 
 ### 7.3 biquote.io adapter detail
+
+> **Retired 2026-08-29.** `BiquoteAdapter` remains in the codebase and is still registered by name,
+> but no registry asset routes to it. Retained for reference; see
+> [REF-02 §5.1](REF-02-asset-registry.md) for why.
 
 **API call:**
 ```
@@ -342,7 +346,10 @@ backoff_seconds = min(backoff_base × 2^attempts, backoff_max)
 # attempt 3+: 8.0 s (capped)
 ```
 
-After `max_fetch_attempts` (default 3) failed attempts, the request is dead-lettered.
+A request still unpriced more than `ABANDON_AFTER_SETTLEMENT_DAYS` (default 7) after its settlement
+session moves to the terminal `ABANDONED` state. The bound is calendar age rather than attempt count,
+because waiting for a settlement session to complete legitimately consumes many polling attempts,
+while a bar absent a week after settlement is missing rather than late.
 
 Note: in practice, the hourly polling interval dominates the retry cadence; the backoff only matters for rapid-fire failures within one poll cycle.
 
@@ -436,7 +443,7 @@ Key fields set by this service:
 | `settlement_session` | DATE NOT NULL | Session to fetch after completion |
 | `market_calendar` | TEXT NOT NULL | Calendar string from the message (informational) |
 | `correlation_id` | UUID NOT NULL | Propagated to `PriceObserved` |
-| `state` | TEXT DEFAULT 'PENDING' | `PENDING`, `BASELINE_OBSERVED`, or `COMPLETED` |
+| `state` | TEXT DEFAULT 'PENDING' | `PENDING`, `BASELINE_OBSERVED`, `COMPLETED`, or `ABANDONED` |
 | `attempts` | INTEGER DEFAULT 0 | Total fetch attempts (incremented on each deferred/completed) |
 | `next_attempt_at` | TIMESTAMPTZ | Earliest time for the next processing attempt |
 | `last_error` | TEXT | Most recent failure message |
@@ -504,7 +511,7 @@ No `MARKET_DATA_` prefix; this service uses unprefixed variables directly (`Mark
 | `SETTLEMENT_POLL_INTERVAL_SECONDS` | `3600` | How often the settlement polling job runs |
 | `RETRY_BACKOFF_BASE_SECONDS` | `2.0` | Exponential backoff base |
 | `RETRY_BACKOFF_MAX_SECONDS` | `8.0` | Exponential backoff cap |
-| `MAX_FETCH_ATTEMPTS` | `3` | Attempts before a request is dead-lettered |
+| `ABANDON_AFTER_SETTLEMENT_DAYS` | `7` | Days after the settlement session before an unpriced request is abandoned |
 | `DB_POOL_MIN_SIZE` | `1` | asyncpg minimum pool connections |
 | `DB_POOL_MAX_SIZE` | `5` | asyncpg maximum pool connections |
 
@@ -521,7 +528,7 @@ No `MARKET_DATA_` prefix; this service uses unprefixed variables directly (`Mark
 | MKT-18 – MKT-25 (biquote adapter) | `tests/test_biquote.py` | Valid bars; isOpen skip; null close skip; PriceNotYetAvailable; AdapterUnavailable; InvalidObservation |
 | MKT-26 – MKT-29 (Yahoo adapter) | `tests/test_yahoo.py` | Session timezone shift; User-Agent header; invalid JSON handling |
 | MKT-30 – MKT-33 (observation storage) | `tests/test_storage.py` | Idempotent upsert; content_hash computation; is_adjusted=False |
-| MKT-34 – MKT-37 (polling + backoff) | `tests/test_handler.py` | Backoff formula; max_attempts dead-letter |
+| MKT-34 – MKT-37b (polling, backoff, abandonment) | `tests/test_handler.py` | Backoff formula; abandonment past the grace window; no abandonment inside it; a late bar still completes |
 | MKT-42 – MKT-44 (recent-close API) | `tests/test_app.py` | Correct order; clamp to 1–250; empty list when no data |
 | End-to-end | `tests/test_integration.py` | Full PriceRequested → PriceObserved flow |
 
@@ -558,16 +565,16 @@ No `MARKET_DATA_` prefix; this service uses unprefixed variables directly (`Mark
 | Unadjusted closes only | The scoring formula uses a ratio (`return = (settlement - baseline) / baseline`); split-adjusted prices would change the ratio for older predictions; the POC avoids this complexity |
 | INCLUDE_ALL rollover for all assets | The POC does not handle futures rolls, dividend adjustments, or delisting; every positive finite close is kept as-is |
 | Yahoo User-Agent browser string | Yahoo's API returns HTTP 429 for known automated agents; the browser string is necessary for the service to function |
-| biquote replaces Yahoo for US mega-caps (POC-7) | biquote provides a stable, documented API with no anti-scraping measures; Yahoo requires a browser User-Agent workaround |
+| biquote replaces Yahoo for US mega-caps (POC-7) | **Reversed 2026-08-29.** biquote offered a stable, documented API with no anti-scraping measures, but proved to be a quote/CFD feed omitting ~40% of trading sessions; all assets moved back to Yahoo |
 
 ### 13.2 Known limitations
 
 - **No bar-time validation beyond the date** — the service checks only that a bar's session date matches the requested date; it does not validate that the bar is truly the official daily close (e.g. closing auction price vs. last trade).
-- **Settlement lag not bounded** — if a provider delays publishing a bar, the request will keep retrying up to `max_fetch_attempts` times. For end-of-month events where a provider is slow, this may result in the prediction never being scored.
+- **Settlement lag is bounded by calendar age, not attempt count** — a request unpriced more than `ABANDON_AFTER_SETTLEMENT_DAYS` (default 7) after its settlement session is abandoned and its prediction is never scored. A provider outage longer than the window therefore drops those predictions rather than retrying indefinitely.
 - **No holiday modelling** — the session completion check uses only the asset's daily close time; public holidays are not recognised. A holiday produces no provider bar, which is treated as `PriceNotYetAvailableError` and deferred.
 - **Recent-close API serves all stored closes** — the `/prices/recent/{asset_id}` endpoint returns the `N` most recent observations without any date-range filter. If registry_version changes frequently, older observations for a different version may appear alongside current ones.
-- **Browser User-Agent for Yahoo may need updating** — if Yahoo detects and blocks the current UA string, the Yahoo adapter will fail with `AdapterUnavailableError` for all European assets.
-- **biquote.io API key not required in POC** — the current biquote adapter makes unauthenticated requests; if biquote adds authentication requirements, an API key field must be added to the config.
+- **Browser User-Agent for Yahoo may need updating** — if Yahoo detects and blocks the current UA string, the Yahoo adapter will fail with `AdapterUnavailableError`. Since 2026-08-29 Yahoo serves every asset, so this halts all price observation, not just European assets.
+- **A missing session is indistinguishable from a late one** — both surface as `PriceNotYetAvailableError` and are retried. A session a provider will never publish therefore retries indefinitely.
 
 ---
 
