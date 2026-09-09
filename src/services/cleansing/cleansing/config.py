@@ -54,3 +54,11 @@ class CleansingSettings(BaseSettings):
     llm_prompt_version: str = "cleansing-merge-v1"
     llm_max_excerpts: int = Field(default=5, ge=1)
     llm_excerpt_chars: int = Field(default=600, gt=0)
+
+    # LLM-assisted classification. Consulted only for an article the deterministic taxonomy could not
+    # type at all (OTHER) — never for one it already resolved. Shares `llm_enabled`/the shared gateway
+    # with the merge step above; this flag exists to allow disabling just the classify fallback (e.g.
+    # to measure the deterministic-only accuracy floor) without also disabling merge.
+    llm_classify_other: bool = True
+    llm_classify_prompt_version: str = "cleansing-classify-v1"
+    llm_classify_body_chars: int = Field(default=600, gt=0)

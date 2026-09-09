@@ -174,6 +174,9 @@ Specific responsibilities:
 | CLN-70 | The action taxonomy shall carry Swedish and English forms for quakes, wildfires (plural `bränder` only), drought and heat, industrial production, retail trade, house prices, EBITA/EBITDA and revenues, Ebola and measles, missile strikes, drones and launch ramps, and inflation expectations | Implemented |
 | CLN-71 | Where an article's `canonical_url` names a publisher section measured to be unambiguously non-financial, that section shall determine the event type ahead of every keyword tier. A section shall never select a causal event type; this shall be enforced at import | Implemented |
 | CLN-72 | The section signal shall be skipped when the title names a registered company, and shall fail open: a missing, malformed or unmapped URL shall classify exactly as if no URL had been supplied | Implemented |
+| CLN-73 | A title matching `SECTION_OVERRIDE_CUES` (narrow vocabulary marking political commentary or crime-at-a-venue coverage) shall skip the section tier and the non-financial keyword tier even when it names no registered company, since one publisher section can carry more than one kind of content (2026-09-09 audit) | Implemented |
+| CLN-74 | When the deterministic tiers classify an article `OTHER` and an LLM classifier is configured, the service shall call the LLM gateway once to attempt reclassification into a canonical event type; an article already classified by the deterministic tiers shall never reach the LLM | Implemented |
+| CLN-75 | A classify-fallback failure of any kind (gateway error, malformed output, a returned value outside the `EventType` registry) shall resolve to `OTHER` rather than raise, so a failed call never blocks ingestion | Implemented |
 | CLN-16 | The service shall resolve the news scope and affected asset IDs using the precedence: COMPANY → INDUSTRY → EVENT_TYPE → NONE (see 7.5 for the full algorithm) | Implemented |
 | CLN-17 | The service shall assign a polarity (`OCCURRENCE` or `RESOLUTION`) by scanning for de-escalation cues (see 7.6) | Implemented |
 | CLN-18 | The service shall infer context tags (`TRANSPORT_AFFECTED`, `SAFE_HAVEN_ONLY`) by scanning for transport cues and checking the event type (see 7.7); `RISK_PREMIUM_ELEVATED` is added later by the Prediction Service, never here | Implemented |
@@ -770,6 +773,9 @@ All variables use the `CLEANSING_` prefix unless noted. Infrastructure variables
 | `CLEANSING_LLM_PROMPT_VERSION` | `cleansing-merge-v1` | Prompt version string recorded in LlmMetadata |
 | `CLEANSING_LLM_MAX_EXCERPTS` | `5` | Maximum number of article titles sent to the LLM per cluster |
 | `CLEANSING_LLM_EXCERPT_CHARS` | `600` | Maximum characters per title excerpt in LLM prompt |
+| `CLEANSING_LLM_CLASSIFY_OTHER` | `true` | Whether the OTHER-only classify fallback (CLN-74) is active |
+| `CLEANSING_LLM_CLASSIFY_PROMPT_VERSION` | `cleansing-classify-v1` | Prompt version string for the classify fallback |
+| `CLEANSING_LLM_CLASSIFY_BODY_CHARS` | `600` | Maximum body characters sent to the LLM per classify call |
 
 ### 10.1 Backend selection guidance
 
@@ -807,6 +813,7 @@ When using `bge-m3`, the `ml` Python extra must be installed (`pip install .[ml]
 | CLN-71, CLN-72 (section tier) | `tests/test_taxonomy.py` | Section outranks a body keyword; company gate; unmapped URL changes nothing; a rejected article resolves to no assets |
 | CLN-71 (wiring) | `tests/test_pipeline.py` | `canonical_url` reaches the classifier through the real pipeline. The tier fails open, so without this the URL could stop being passed and every other test would still pass |
 | CLN-69 – CLN-72 (end to end) | `tests/test_audit_replay_2026_08_17.py` | All 251 clusters of the 2026-08-17 audit replayed against labelled types, with an accuracy floor and two exact-match ratchets (outstanding misclassifications, and articles that wrongly reach an asset) |
+| CLN-73 – CLN-75 (classify fallback) | `tests/test_classify.py`, `tests/test_extraction.py` | LLM-chosen type used; classifier called only when local result is OTHER; never called when already classified; gateway failure/invalid output degrades to OTHER |
 | End-to-end | `tests/test_integration.py` | Full article → event path using in-memory fakes |
 
 ---

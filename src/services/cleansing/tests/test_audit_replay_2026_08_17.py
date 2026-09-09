@@ -64,7 +64,7 @@ _IDS = [label["ref"] for label in _LABELS]
 # fixtures/README.md the default assumption is that the classifier is wrong, not the label.
 _KNOWN_MISCLASSIFIED = frozenset({
     "B1", "B3", "B5", "B6", "B7", "B11", "B12", "B14", "B15", "B16",
-    "B27", "B28", "B37", "B39", "B42", "B43", "B45", "B47", "B48", "B52",
+    "B28", "B37", "B39", "B42", "B43", "B45", "B47", "B48", "B52",
     "B59", "B64", "B68", "B73", "B74", "B115", "B116", "B120", "B122", "B134",
     "B137", "B141", "B144", "B145", "B147", "B157", "B158", "B160", "B162", "B176",
     "B179", "B185", "B190", "B191", "B192", "B195", "B199", "B202", "B203", "B204",
@@ -96,7 +96,9 @@ _KNOWN_ASSET_LEAKS = frozenset({"B145", "B231", "B235"})
 #         prices, EBITA/EBITDA, Ebola and measles, missile strikes, drones and launch ramps
 #   0.72  CLN-71/CLN-72, the publisher-section tier — the single largest gain, and the only one that
 #         does not depend on guessing vocabulary
-_ACCURACY_FLOOR = 0.72
+#   0.728 2026-09-09 audit: "i rätten"/"rättegång" LEGAL_DISPUTE keywords (fixes B27, "i rätten" —
+#         trial coverage that had no court-specific vocabulary before)
+_ACCURACY_FLOOR = 0.728
 
 
 def _classify(ref: str) -> EventType:

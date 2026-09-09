@@ -28,6 +28,7 @@ from shared.messaging.client import ConsumerCallback, RabbitMQClient
 from shared.messaging.exceptions import MessagePoisonError
 from shared.schemas.messages import ArticleIngested
 
+from cleansing.classify import LlmClassifier
 from cleansing.config import CleansingSettings
 from cleansing.db import apply_schema, create_pool
 from cleansing.embedding import BgeM3Embedder, Embedder, build_embedder
@@ -62,12 +63,12 @@ class AppContext:
     state: ServiceState
 
 
-def _build_llm_merger(settings: CleansingSettings) -> LlmMerger | None:
-    """Construct the LLM merger only when both the service and the shared gateway are configured.
+def _build_llm_gateway(settings: CleansingSettings) -> LLMGateway | None:
+    """Construct the shared LLM gateway once, for both the merger and the classifier below.
 
     Any configuration problem (missing provider/key, or an unsupported provider) degrades the
-    service to local-only merging rather than failing startup: the LLM is optional and used only
-    for ambiguous clusters (functional document sec 6).
+    service to local-only processing rather than failing startup: the LLM is optional and used only
+    for ambiguous clusters and OTHER-typed articles (functional document sec 6).
     """
     if not settings.llm_enabled:
         return None
@@ -79,12 +80,34 @@ def _build_llm_merger(settings: CleansingSettings) -> LlmMerger | None:
     except Exception as exc:  # noqa: BLE001 - unconfigured/unsupported LLM => local-only mode
         logger.info("llm_disabled", reason=str(exc))
         return None
-    gateway = LLMGateway(llm_settings, {provider.name: provider})
+    return LLMGateway(llm_settings, {provider.name: provider})
+
+
+def _build_llm_merger(settings: CleansingSettings, gateway: LLMGateway | None) -> LlmMerger | None:
+    if gateway is None:
+        return None
     return LlmMerger(
         gateway,
         prompt_version=settings.llm_prompt_version,
         max_excerpts=settings.llm_max_excerpts,
         excerpt_chars=settings.llm_excerpt_chars,
+    )
+
+
+def _build_llm_classifier(
+    settings: CleansingSettings, gateway: LLMGateway | None
+) -> LlmClassifier | None:
+    """Construct the OTHER-only classification fallback (see `cleansing.classify`).
+
+    Gated on its own flag in addition to the shared gateway, so the classify fallback can be turned
+    off independently of the merge step (e.g. to measure the deterministic-only accuracy floor).
+    """
+    if gateway is None or not settings.llm_classify_other:
+        return None
+    return LlmClassifier(
+        gateway,
+        prompt_version=settings.llm_classify_prompt_version,
+        body_chars=settings.llm_classify_body_chars,
     )
 
 
@@ -138,7 +161,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if isinstance(embedder, BgeM3Embedder):
         embedder.load()  # load once at startup so /ready reflects real availability
 
-    extractor: ActionExtractor = build_extractor(settings.nlp_backend)
+    llm_gateway = _build_llm_gateway(settings)
+    extractor: ActionExtractor = build_extractor(
+        settings.nlp_backend, _build_llm_classifier(settings, llm_gateway)
+    )
     if isinstance(extractor, SpacyExtractor):
         extractor.load()
 
@@ -149,7 +175,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         embedder,
         extractor,
         settings,
-        llm_merger=_build_llm_merger(settings),
+        llm_merger=_build_llm_merger(settings, llm_gateway),
     )
 
     # Reconcile any outbox rows left pending by a previous crash before starting new work.

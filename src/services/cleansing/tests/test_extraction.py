@@ -1,10 +1,25 @@
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 from shared.reference import members_of
 from shared.schemas.messages import AssetId, ConditionCode, EventPolarity, EventType
 
+from cleansing.classify import LlmClassifier
 from cleansing.extraction import KeywordExtractor, SpacyExtractor, build_extractor
+
+
+class _StubClassifier:
+    """Records whether it was called and returns a fixed type — no gateway, no network."""
+
+    def __init__(self, event_type: EventType = EventType.LEGAL_DISPUTE) -> None:
+        self._event_type = event_type
+        self.calls = 0
+
+    async def classify(self, title: str, body: str = "", url: str = "") -> EventType:
+        self.calls += 1
+        return self._event_type
 
 
 async def test_keyword_extractor_has_no_actor_and_classifies() -> None:
@@ -45,6 +60,31 @@ async def test_keyword_extractor_detects_resolution() -> None:
     assert action.context_tags == (ConditionCode.SAFE_HAVEN_ONLY,)
 
 
+async def test_keyword_extractor_calls_llm_only_when_other() -> None:
+    stub = _StubClassifier(EventType.LEGAL_DISPUTE)
+    action = await KeywordExtractor(cast(LlmClassifier, stub)).extract(
+        "A quiet day with nothing notable", "en"
+    )
+    assert stub.calls == 1
+    assert action.event_type == EventType.LEGAL_DISPUTE
+
+
+async def test_keyword_extractor_does_not_call_llm_when_already_classified() -> None:
+    # The whole point of the fallback: an article the deterministic tiers already resolved must never
+    # reach the LLM, regardless of whether a classifier is configured.
+    stub = _StubClassifier(EventType.LEGAL_DISPUTE)
+    action = await KeywordExtractor(cast(LlmClassifier, stub)).extract(
+        "EU imposes sanctions on Russian oil exports", "en"
+    )
+    assert stub.calls == 0
+    assert action.event_type == EventType.SANCTIONS
+
+
+async def test_keyword_extractor_without_classifier_stays_other() -> None:
+    action = await KeywordExtractor(None).extract("A quiet day with nothing notable", "en")
+    assert action.event_type == EventType.OTHER
+
+
 async def test_spacy_extractor_falls_back_when_no_pipeline_loaded() -> None:
     # Exercises the no-model fallback branch without requiring the spaCy models to be installed.
     extractor = SpacyExtractor()
@@ -54,10 +94,26 @@ async def test_spacy_extractor_falls_back_when_no_pipeline_loaded() -> None:
     assert action.event_type == EventType.SANCTIONS
 
 
+async def test_spacy_extractor_without_pipeline_uses_llm_fallback_on_other() -> None:
+    stub = _StubClassifier(EventType.LEGAL_DISPUTE)
+    action = await SpacyExtractor(cast(LlmClassifier, stub)).extract(
+        "A quiet day with nothing notable", "en"
+    )
+    assert stub.calls == 1
+    assert action.event_type == EventType.LEGAL_DISPUTE
+
+
 def test_build_extractor_variants() -> None:
     assert isinstance(build_extractor("keyword"), KeywordExtractor)
     assert isinstance(build_extractor("KEYWORD"), KeywordExtractor)
     assert isinstance(build_extractor("spacy"), SpacyExtractor)
+
+
+def test_build_extractor_threads_the_llm_classifier_through() -> None:
+    stub = cast(LlmClassifier, _StubClassifier())
+    keyword_extractor = build_extractor("keyword", stub)
+    assert isinstance(keyword_extractor, KeywordExtractor)
+    assert keyword_extractor._llm_classifier is stub  # noqa: SLF001 - wiring check
 
 
 def test_build_extractor_rejects_unknown_backend() -> None:

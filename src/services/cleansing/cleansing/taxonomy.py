@@ -50,6 +50,16 @@ ACTION_TAXONOMY: dict[str, EventType] = {
     "iranattack": EventType.MILITARY_CONFLICT, # sv: compound "Iran attack"
     "stridighet": EventType.MILITARY_CONFLICT, # sv: conflict/fighting
     "robotattack": EventType.MILITARY_CONFLICT,  # sv: missile strike ("attack" alone is generic)
+    # sv: missile strike, "anfall" root instead of "attack" — a distinct compound, not reachable by
+    # suffix tolerance from bare "anfall" (line above) since the two are glued with no word boundary.
+    # "USA och Iran trappar upp attackerna" (2026-09-09) classified OTHER until this was added: the
+    # title's own "attackerna" is a GENERIC inflection needing corroboration that title lacked, but the
+    # body's "Iran har svarat med robotanfall" names the event outright.
+    "robotanfall": EventType.MILITARY_CONFLICT,
+    # sv: wedding attack. Compound with "attack", unreachable by suffix tolerance from bare "attack".
+    # "Sorg efter bröllopsattack" (2026-09-09, US strike on a wedding in Iran) classified OTHER without
+    # this: the title carries no other market/conflict word for corroboration.
+    "bröllopsattack": EventType.MILITARY_CONFLICT,
     # STRAIT_CLOSURE
     "close": EventType.STRAIT_CLOSURE,
     "closure": EventType.STRAIT_CLOSURE,
@@ -81,6 +91,10 @@ ACTION_TAXONOMY: dict[str, EventType] = {
     "embargo": EventType.SANCTIONS,
     "sanktion": EventType.SANCTIONS,  # sv
     "sanktioner": EventType.SANCTIONS,  # sv
+    # sv: definite plural "the sanctions". -erna is outside the suffix set in ``_keyword_present``
+    # (same gap as "vinstutsikterna"/"bopriserna" elsewhere in this module), so it is listed explicitly.
+    # "Roman Abramovitj får nej – sanktionerna kvar" (2026-09-09) classified OTHER without this.
+    "sanktionerna": EventType.SANCTIONS,  # sv
     # RATE_DECISION
     "rate": EventType.RATE_DECISION,
     "rates": EventType.RATE_DECISION,
@@ -232,10 +246,21 @@ ACTION_TAXONOMY: dict[str, EventType] = {
     "fraud": EventType.LEGAL_DISPUTE,
     "investigation": EventType.LEGAL_DISPUTE,
     "settlement": EventType.LEGAL_DISPUTE,
-    "stämning": EventType.LEGAL_DISPUTE,            # sv: lawsuit
+    "stämning": EventType.LEGAL_DISPUTE,            # sv: lawsuit (noun)
     "utredning": EventType.LEGAL_DISPUTE,           # sv: investigation
     "uppgörelse": EventType.LEGAL_DISPUTE,          # sv: settlement
     "bedrägeri": EventType.LEGAL_DISPUTE,           # sv: fraud
+    # sv: "threatens to sue". The bare verb "stämma" is deliberately absent — it also means "to tune"
+    # (a choir/instrument) and "to reconcile/check in" ("stämma av"), so it would repeat the "torka"
+    # false-positive class this module already guards against. The phrase is unambiguous.
+    "hotar stämma": EventType.LEGAL_DISPUTE,
+    # sv: trial. "Rättegången inledd" (2026-09-09, a contested inheritance case) classified OTHER
+    # without this.
+    "rättegång": EventType.LEGAL_DISPUTE,
+    # sv: "in court". Bare "rätten" is deliberately absent — it is also the ordinary word for "the
+    # right" ("har rätten att...") and would be as generic a false-positive source as bare "rätt". The
+    # phrase, in this word order, is specific to a courtroom.
+    "i rätten": EventType.LEGAL_DISPUTE,
     # PRODUCT_RECALL
     "recall": EventType.PRODUCT_RECALL,
     "recalls": EventType.PRODUCT_RECALL,
@@ -297,6 +322,9 @@ ACTION_TAXONOMY: dict[str, EventType] = {
     "infrastructure spending": EventType.FISCAL_POLICY,
     "statsbudget": EventType.FISCAL_POLICY,         # sv: state budget
     "skattesänkning": EventType.FISCAL_POLICY,      # sv: tax cut
+    # sv: tax relief/break — a distinct compound from "skattesänkning" above. "USA:s delstater bromsar
+    # skattelättnad för datacenter" (2026-09-09) classified OTHER without this.
+    "skattelättnad": EventType.FISCAL_POLICY,
     "stimulans": EventType.FISCAL_POLICY,           # sv
     # CURRENCY_CRISIS
     "devaluation": EventType.CURRENCY_CRISIS,
@@ -393,7 +421,12 @@ ACTION_TAXONOMY: dict[str, EventType] = {
     "styrräntan": EventType.RATE_DECISION,          # sv: the policy rate (definite form)
     # CORPORATE_ACQUISITION (sv compounds)
     "budpliktsbud": EventType.CORPORATE_ACQUISITION,  # sv: mandatory takeover bid
-    "storägare": EventType.CORPORATE_ACQUISITION,     # sv: major shareholder (stake building)
+    # sv: major shareholder BUYS/increases holding — stake building, i.e. acquisition-shaped. The bare
+    # noun "storägare" is deliberately absent (2026-09-09 audit): it named the shareholder but not the
+    # direction, so "Storägare säljer i danska jätten" (a major holder SELLING) was typed
+    # CORPORATE_ACQUISITION with no basis. These phrases keep the noun tied to a buying verb.
+    "storägare köper": EventType.CORPORATE_ACQUISITION,
+    "storägare ökar": EventType.CORPORATE_ACQUISITION,
 }
 
 # Keywords too generic to be trusted outside a headline. Each one measurably mistyped unrelated
@@ -494,7 +527,31 @@ NON_FINANCIAL_KEYWORDS: dict[str, EventType] = {
     "horoscope": EventType.LIFESTYLE,
     "recipe": EventType.LIFESTYLE,
     "star sign": EventType.LIFESTYLE,
+    "sexolog": EventType.LIFESTYLE,  # sv: sexologist (relationship/sex-advice column byline)
 }
+
+# Vocabulary that overrides a URL section's non-financial guess (CLN-71 residual, 2026-09-09 audit).
+# Tier 0 trusts the publisher's filing decision, but a desk can carry more than one kind of content:
+# DN's "kultur" desk mixes book/theatre reviews (correctly ENTERTAINMENT) with columnists writing
+# about politics, and its "sport" desk mixes match reports with crime coverage filed there because the
+# story happens to be about sports venues. A section cannot tell those apart; the headline's own
+# vocabulary can. Mirrors the company-name escape hatch in ``classify_text``: any match here skips
+# tier 0 (and tier 1) exactly like a registered company would, so the keyword tiers run and the
+# article lands on OTHER rather than being silently accepted as the section's default guess.
+#
+# Deliberately narrow: each entry is drawn from an actual 2026-09-09 misclassification and is a
+# specific compound or phrase, not a bare stem — bare "politik"/"politiker"/"politiskt" are absent
+# because a genuine culture review can legitimately use them ("Både party och politiskt allvar när
+# Gorillaz avslutar allt" is a Gorillaz festival review, correctly ENTERTAINMENT). Every term here is
+# several steps more specific than that.
+SECTION_OVERRIDE_CUES: frozenset[str] = frozenset(
+    {
+        "valrörelsen", "maktskifte", "systemskifte", "kulturpolitik", "mandatperioden",
+        "högernationalismen", "nazism", "migrationsdebatt", "ministerintervjun",
+        "pisaresultatet", "pisa katastrofen", "politiskt läger",
+        "gängkriminella", "gängkriminalitet", "gängrelaterad",
+    }
+)
 
 # Types that carry no causal edge and no asset mapping. Used to short-circuit asset resolution and
 # to keep these articles out of clustering (see ``gate2_compatible``). Mirrors the
@@ -619,9 +676,12 @@ def classify_text(title: str, body: str = "", url: str = "") -> tuple[EventType,
       0. **The publisher's section**, read from ``url`` (CLN-71). An editor's filing decision beats
          any inference from text: on the 2026-08-17 corpus the DN sport section was correct 26 times
          out of 26, while the keyword reject tier below fired twice in 251 articles. Skipped when the
-         title names a registered company, exactly as tier 1 is. This tier can only select a
-         non-financial type — a section must never manufacture a market classification — and it fails
-         open, so a missing or unmapped URL classifies as if none had been supplied (CLN-72).
+         title names a registered company, exactly as tier 1 is, or matches SECTION_OVERRIDE_CUES —
+         a desk can carry more than one kind of content (2026-09-09: DN's "kultur" desk also files
+         political columns, its "sport" desk also files crime-at-a-venue stories), and the section
+         alone cannot tell those apart. This tier can only select a non-financial type — a section
+         must never manufacture a market classification — and it fails open, so a missing or unmapped
+         URL classifies as if none had been supplied (CLN-72).
       1. **Non-financial keyword in the title** — sport/entertainment/lifestyle, which makes the
          reject explicit instead of letting a market keyword mistype it. Skipped when the title
          names a registered company, so "Nike lifts full-year guidance" is never suppressed by a
@@ -651,10 +711,12 @@ def classify_text(title: str, body: str = "", url: str = "") -> tuple[EventType,
     """
     haystack = _haystack(title)
     names_company = bool(_company_matches(haystack)[0])
+    section_overridden = any(_keyword_present(haystack, cue) for cue in SECTION_OVERRIDE_CUES)
 
     # A company-specific headline is financial news by definition; never reject it as sport. This
-    # guard covers tier 0 and tier 1 alike.
-    if not names_company:
+    # guard covers tier 0 and tier 1 alike. A headline matching SECTION_OVERRIDE_CUES gets the same
+    # treatment: it is not financial news either, but it is also not what the section thinks it is.
+    if not names_company and not section_overridden:
         from_section = section_event_type(url)
         if from_section is not None:
             # The keyword slot records WHY the article was rejected, so an audit export can show that

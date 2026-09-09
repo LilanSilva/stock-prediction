@@ -16,6 +16,7 @@ from typing import Protocol, runtime_checkable
 
 from shared.schemas.messages import EventType
 
+from cleansing.classify import LlmClassifier
 from cleansing.models import ExtractedAction
 from cleansing.taxonomy import (
     classify_polarity,
@@ -75,7 +76,16 @@ def _build_action(
 
 
 class KeywordExtractor:
-    """Deterministic taxonomy-keyword extractor (POC default, no external model)."""
+    """Deterministic taxonomy-keyword extractor (POC default, no external model).
+
+    ``llm_classifier`` is consulted only when ``classify_text`` returns OTHER — never for an article
+    the deterministic tiers already resolved, and never more than once per article. See
+    ``cleansing.classify`` for why: OTHER already means "no keyword fit", so this is the one case an
+    LLM call can improve on without second-guessing a confident local answer.
+    """
+
+    def __init__(self, llm_classifier: LlmClassifier | None = None) -> None:
+        self._llm_classifier = llm_classifier
 
     def is_ready(self) -> bool:
         return True
@@ -84,6 +94,8 @@ class KeywordExtractor:
         self, title: str, language: str, body: str = "", url: str = ""
     ) -> ExtractedAction:
         event_type, keyword = classify_text(title, body, url)
+        if event_type is EventType.OTHER and self._llm_classifier is not None:
+            event_type = await self._llm_classifier.classify(title, body, url)
         return _build_action(
             title,
             event_type,
@@ -97,7 +109,8 @@ class KeywordExtractor:
 class SpacyExtractor:
     """Real spaCy backend with per-language pipelines, imported lazily."""
 
-    def __init__(self) -> None:
+    def __init__(self, llm_classifier: LlmClassifier | None = None) -> None:
+        self._llm_classifier = llm_classifier
         self._pipelines: dict[str, object] = {}
         self._model_by_language = {
             "en": "en_core_web_sm",
@@ -129,6 +142,8 @@ class SpacyExtractor:
         if nlp is None:
             # Fall back to the deterministic classifier if no pipeline is loaded.
             event_type, keyword = classify_text(title, body, url)
+            if event_type is EventType.OTHER and self._llm_classifier is not None:
+                event_type = await self._llm_classifier.classify(title, body, url)
             return _build_action(
                 title,
                 event_type,
@@ -138,7 +153,7 @@ class SpacyExtractor:
                 original_lemma=keyword,
             )
 
-        def _parse() -> ExtractedAction:
+        def _parse() -> tuple[str | None, str | None, str | None, EventType]:
             doc = nlp(title)  # type: ignore[operator]
             actor: str | None = None
             action_lemma: str | None = None
@@ -157,23 +172,28 @@ class SpacyExtractor:
                 # (specific keywords only) the body.
                 mapped, keyword = classify_text(title, body, url)
                 action_lemma = action_lemma or keyword
-            return _build_action(
-                title,
-                mapped,
-                actor=actor,
-                action_lemma=action_lemma,
-                obj=obj,
-                original_lemma=action_lemma,
-            )
+            return actor, action_lemma, obj, mapped
 
-        return await asyncio.to_thread(_parse)
+        # spaCy parsing is synchronous CPU work, run off the event loop; the LLM fallback below is
+        # network I/O and must run back on it, so the two cannot share one to_thread call.
+        actor, action_lemma, obj, mapped = await asyncio.to_thread(_parse)
+        if mapped is EventType.OTHER and self._llm_classifier is not None:
+            mapped = await self._llm_classifier.classify(title, body, url)
+        return _build_action(
+            title,
+            mapped,
+            actor=actor,
+            action_lemma=action_lemma,
+            obj=obj,
+            original_lemma=action_lemma,
+        )
 
 
-def build_extractor(backend: str) -> ActionExtractor:
+def build_extractor(backend: str, llm_classifier: LlmClassifier | None = None) -> ActionExtractor:
     """Construct the configured extraction backend."""
     normalized = backend.strip().lower()
     if normalized == "keyword":
-        return KeywordExtractor()
+        return KeywordExtractor(llm_classifier)
     if normalized == "spacy":
-        return SpacyExtractor()
+        return SpacyExtractor(llm_classifier)
     raise ValueError(f"unknown nlp backend: {backend!r}")
