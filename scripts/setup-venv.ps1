@@ -9,7 +9,7 @@
       2. Create .venv at the repo root if missing.
       3. Upgrade pip.
       4. Install exact, checksum-verified dependencies from requirements.txt (--require-hashes).
-      5. Install the local `shared` package editable (--no-deps; deps already verified).
+      5. Install shared and all service packages editable (--no-deps; deps already verified).
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File scripts\setup-venv.ps1
@@ -35,6 +35,9 @@ if (-not (Test-Path ".venv")) {
     else {
         throw "Python 3.12+ was not found. Install it and re-run this script."
     }
+    if ($LASTEXITCODE -ne 0) {
+        throw "Creating the virtual environment failed (exit code $LASTEXITCODE)."
+    }
 }
 else {
     Write-Host ".venv already exists; syncing dependencies."
@@ -45,16 +48,26 @@ if (-not (Test-Path $venvPython)) {
     throw "Expected interpreter not found at $venvPython"
 }
 
+& $venvPython -c "import sys; sys.exit(0 if sys.version_info >= (3, 12) else 1)"
+if ($LASTEXITCODE -ne 0) {
+    throw "The virtual environment requires Python 3.12+."
+}
+
+function Invoke-Pip {
+    param([Parameter(Mandatory)][string[]]$Arguments)
+    & $venvPython -m pip @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "pip failed (exit code $LASTEXITCODE): $($Arguments -join ' ')"
+    }
+}
+
 # 2-4. Upgrade pip, install hash-verified dependencies, install the local packages editable.
-& $venvPython -m pip install --upgrade pip
-& $venvPython -m pip install --require-hashes -r requirements.txt
-& $venvPython -m pip install -e src\shared --no-deps
-& $venvPython -m pip install -e src\services\ingestion --no-deps
-& $venvPython -m pip install -e src\services\cleansing --no-deps
-& $venvPython -m pip install -e src\services\prediction --no-deps
-& $venvPython -m pip install -e src\services\market-data --no-deps
-& $venvPython -m pip install -e src\services\verification --no-deps
-& $venvPython -m pip install -e src\services\credibility --no-deps
+Invoke-Pip @("install", "--upgrade", "pip")
+Invoke-Pip @("install", "--require-hashes", "-r", "requirements.txt")
+foreach ($package in @("shared", "services\ingestion", "services\cleansing", "services\prediction", "services\market-data", "services\verification", "services\credibility", "services\notification")) {
+    Invoke-Pip @("install", "-e", "src\$package", "--no-deps")
+}
+Invoke-Pip @("check")
 
 Write-Host ""
 Write-Host "Virtual environment ready."

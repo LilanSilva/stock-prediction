@@ -46,6 +46,9 @@
 .PARAMETER NoBuild
     Skip the build and redeploy the images already present.
 
+.PARAMETER PythonBaseImage
+    Optional Python 3.12 base image with local CA certificates installed, for HTTPS-scanning networks.
+
 .PARAMETER NoCache
     Build without the layer cache.
 
@@ -86,6 +89,7 @@ param(
     [string[]]$Service,
     [string]$EnvFile,
     [switch]$NoBuild,
+    [string]$PythonBaseImage,
     [switch]$NoCache,
     [switch]$Pull,
     [switch]$Recreate,
@@ -239,6 +243,7 @@ Write-Host "Env file        : $EnvFile"
 Write-Host "Docker engine   : $($info.Lines -join '') (compose $($version.Lines -join ''))"
 
 $compose = @("compose", "--env-file", $EnvFile, "-f", $composeFile)
+if ($PlainProgress) { $compose += @("--progress", "plain") }
 
 # --- 2. Validate the rendered config ---------------------------------------------------------
 
@@ -354,7 +359,7 @@ else {
     Write-Step "Building service images"
 
     $buildArgs = @("build")
-    if ($PlainProgress) { $buildArgs += @("--progress", "plain") }
+    if ($PythonBaseImage) { $buildArgs += @("--build-arg", "PYTHON_BASE_IMAGE=$PythonBaseImage") }
     if ($NoCache) { $buildArgs += "--no-cache" }
     if ($Pull) { $buildArgs += "--pull" }
     $buildArgs += $targets
@@ -384,7 +389,6 @@ Write-Step "Deploying services (--no-deps: nothing else is started)"
 # would evaluate feed-prediction's and feed-credibility's depends_on and re-run the graph seed.
 # --remove-orphans is deliberately absent: this is a partial up by design.
 $upArgs = @("up", "-d", "--no-deps")
-if ($PlainProgress) { $upArgs += @("--progress", "plain") }
 if ($Recreate) { $upArgs += "--force-recreate" }
 $upArgs += $targets
 

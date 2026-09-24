@@ -67,6 +67,23 @@ docker compose --env-file infra\.env -f infra\docker-compose.yml up -d
 
 Full parameter list: `Get-Help scripts\build-and-deploy.ps1 -Detailed`.
 
+### Local HTTPS-scanning certificate
+
+If package downloads in Docker fail with `CERTIFICATE_VERIFY_FAILED`, build a local Python 3.12
+base containing your machine's trusted scanning CA, then pass it with `-PythonBaseImage`. TLS
+verification and requirement hashes remain enabled. The default base is still `python:3.12-slim`.
+
+On this workstation, `feed-analyzer/python-local-ca:3.12` contains the public AVG Web/Mail Shield
+root from the Windows trusted root store. Its build files are local to `.venv/docker-local-ca/`.
+
+```powershell
+docker build -t feed-analyzer/python-local-ca:3.12 .venv/docker-local-ca
+powershell -ExecutionPolicy Bypass -File scripts\build-and-deploy.ps1 -PythonBaseImage feed-analyzer/python-local-ca:3.12 -PlainProgress -TimeoutSeconds 600
+```
+
+Rebuild that local base if the scanning certificate changes. It sets `PIP_CERT`,
+`REQUESTS_CA_BUNDLE`, and `SSL_CERT_FILE` to the updated system CA bundle for builds and runtime.
+
 ## Asset registry
 
 Run these after **any** edit to `assets.json`. Structural validation alone cannot catch a typo'd

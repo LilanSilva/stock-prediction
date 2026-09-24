@@ -6,7 +6,8 @@
 # extra (torch / sentence-transformers / spaCy models) is intentionally NOT installed here. To run
 # the real BGE-m3 / spaCy backends, build a derived image that installs the `ml` extra and the spaCy
 # language models, and set CLEANSING_EMBEDDING_BACKEND=bge-m3 / CLEANSING_NLP_BACKEND=spacy.
-FROM python:3.12-slim
+ARG PYTHON_BASE_IMAGE=python:3.12-slim
+FROM ${PYTHON_BASE_IMAGE}
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \

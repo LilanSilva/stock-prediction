@@ -1,7 +1,8 @@
 # Market Data Service image, built from the org-approved official python:3.12-slim base.
 # Build context is the repository root (see infra/docker-compose.yml) so both the shared library and
 # the market-data package can be installed from source.
-FROM python:3.12-slim
+ARG PYTHON_BASE_IMAGE=python:3.12-slim
+FROM ${PYTHON_BASE_IMAGE}
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
