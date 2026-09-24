@@ -5,6 +5,10 @@ def test_normalize_collapses_whitespace_and_nfc() -> None:
     assert normalize_text("  Hello\n\tworld  ") == "Hello world"
 
 
+def test_normalize_repairs_rss_fragment_without_stripping_language() -> None:
+    assert normalize_text("<p>fÃ¶retag&nbsp;höjer €3</p><style>bad</style>") == "företag höjer €3"
+
+
 def test_truncate_caps_length() -> None:
     assert truncate("abcdef", 3) == "abc"
     assert truncate("ab", 5) == "ab"
@@ -22,7 +26,10 @@ def test_content_hash_differs_on_different_content() -> None:
 
 
 def test_strip_html_page_returns_empty_for_doctype_page() -> None:
-    html = '<!DOCTYPE html><html lang="en"><head><script>var x=1</script></head><body><p>news</p></body></html>'
+    html = (
+        '<!DOCTYPE html><html lang="en"><head><script>var x=1</script></head>'
+        "<body><p>news</p></body></html>"
+    )
     assert strip_html_page(html) == ""
 
 

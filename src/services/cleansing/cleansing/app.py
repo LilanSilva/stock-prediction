@@ -163,12 +163,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     llm_gateway = _build_llm_gateway(settings)
     extractor: ActionExtractor = build_extractor(
-        settings.nlp_backend, _build_llm_classifier(settings, llm_gateway)
+        settings.nlp_backend,
+        _build_llm_classifier(settings, llm_gateway),
+        classification_mode=settings.classification_mode,
     )
     if isinstance(extractor, SpacyExtractor):
         extractor.load()
 
-    repository = CleansingRepository(pool)
+    repository = CleansingRepository(pool, processing_version=settings.processing_version)
     outbox = EventOutboxPublisher(pool, rabbit)
     pipeline = CleansingPipeline(
         repository,

@@ -3,11 +3,10 @@ from __future__ import annotations
 from typing import cast
 
 import pytest
-from shared.reference import members_of
-from shared.schemas.messages import AssetId, ConditionCode, EventPolarity, EventType
-
 from cleansing.classify import LlmClassifier
 from cleansing.extraction import KeywordExtractor, SpacyExtractor, build_extractor
+from shared.reference import members_of
+from shared.schemas.messages import AssetId, ConditionCode, EventPolarity, EventType
 
 
 class _StubClassifier:
@@ -70,8 +69,7 @@ async def test_keyword_extractor_calls_llm_only_when_other() -> None:
 
 
 async def test_keyword_extractor_does_not_call_llm_when_already_classified() -> None:
-    # The whole point of the fallback: an article the deterministic tiers already resolved must never
-    # reach the LLM, regardless of whether a classifier is configured.
+    # Already-classified articles must never reach the LLM, even if one is configured.
     stub = _StubClassifier(EventType.LEGAL_DISPUTE)
     action = await KeywordExtractor(cast(LlmClassifier, stub)).extract(
         "EU imposes sanctions on Russian oil exports", "en"
@@ -119,3 +117,47 @@ def test_build_extractor_threads_the_llm_classifier_through() -> None:
 def test_build_extractor_rejects_unknown_backend() -> None:
     with pytest.raises(ValueError, match="unknown nlp backend"):
         build_extractor("nope")
+
+
+@pytest.mark.parametrize("backend", [KeywordExtractor, SpacyExtractor])
+async def test_safety_decision_cannot_reach_llm_or_spacy_shortcut(
+    backend: type[KeywordExtractor] | type[SpacyExtractor],
+) -> None:
+    stub = _StubClassifier(EventType.MILITARY_CONFLICT)
+    extractor = backend(cast(LlmClassifier, stub))
+    if isinstance(extractor, SpacyExtractor):
+        extractor._pipelines["en"] = lambda _: pytest.fail("unsafe input reached spaCy")
+    action = await extractor.extract("Union leaders should resign", "en", "Attack claim.")
+    assert action.event_type == EventType.OTHER
+    assert action.affected_asset_ids == ()
+    assert action.classification_audit["reason"] == "resignation_opinion"
+    assert stub.calls == 0
+
+
+async def test_title_only_mode_does_not_send_body_to_llm() -> None:
+    from unittest.mock import AsyncMock
+
+    classifier = AsyncMock(spec=LlmClassifier)
+    classifier.classify.return_value = EventType.OTHER
+    extractor = KeywordExtractor(classifier, classification_mode="title_only")
+    await extractor.extract("A quiet day", "en", "Company announces earnings")
+    assert classifier.classify.call_args.args[1] == ""
+
+
+@pytest.mark.parametrize(
+    "title,disagrees", [("Leaders impose sanctions", False), ("Leaders report earnings", True)]
+)
+async def test_spacy_audit_records_actual_source_and_tier_disagreement(
+    title: str, disagrees: bool
+) -> None:
+    from types import SimpleNamespace
+
+    extractor = SpacyExtractor()
+    extractor._pipelines["en"] = lambda _: [
+        SimpleNamespace(dep_="", pos_="VERB", lemma_="sanction", text="sanction")
+    ]
+    action = await extractor.extract(title, "en")
+    assert action.event_type == EventType.SANCTIONS
+    assert action.classification_audit["source"] == "spacy_lemma"
+    assert action.classification_audit["evidence"] == title
+    assert action.classification_audit["backend_disagreement"] is disagrees

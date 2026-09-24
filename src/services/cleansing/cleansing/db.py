@@ -106,6 +106,19 @@ CREATE TABLE IF NOT EXISTS cleansing.outbox_events (
 CREATE INDEX IF NOT EXISTS ix_outbox_events_pending
     ON cleansing.outbox_events (created_at)
     WHERE delivery_status = 'PENDING';
+
+ALTER TABLE cleansing.article_actions
+    ADD COLUMN IF NOT EXISTS classification_audit JSONB NOT NULL DEFAULT '{{}}';
+ALTER TABLE cleansing.article_fingerprints
+    ADD COLUMN IF NOT EXISTS processing_version TEXT NOT NULL DEFAULT 'legacy';
+ALTER TABLE cleansing.article_embeddings
+    ADD COLUMN IF NOT EXISTS processing_version TEXT NOT NULL DEFAULT 'legacy';
+ALTER TABLE cleansing.event_clusters
+    ADD COLUMN IF NOT EXISTS processing_version TEXT NOT NULL DEFAULT 'legacy';
+CREATE INDEX IF NOT EXISTS ix_clusters_processing_version
+    ON cleansing.event_clusters (processing_version, state, event_type);
+CREATE INDEX IF NOT EXISTS ix_fingerprints_processing_version
+    ON cleansing.article_fingerprints (processing_version, published_at);
 """
 
 

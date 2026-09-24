@@ -12,6 +12,7 @@ Downloaded content is untrusted. Per the functional document (sec 4) this fetche
 from __future__ import annotations
 
 import asyncio
+import codecs
 import ipaddress
 import socket
 
@@ -20,13 +21,40 @@ import httpx
 from ingestion.exceptions import BodyFetchError
 
 ALLOWED_SCHEMES = frozenset({"http", "https"})
-DEFAULT_ALLOWED_CONTENT_TYPES = frozenset(
-    {"text/html", "application/xhtml+xml", "text/plain"}
-)
+DEFAULT_ALLOWED_CONTENT_TYPES = frozenset({"text/html", "application/xhtml+xml", "text/plain"})
 DEFAULT_MAX_BYTES = 2_000_000
 DEFAULT_MAX_REDIRECTS = 3
 DEFAULT_OVERALL_TIMEOUT_SECONDS = 20.0
 _STRIPPED_REQUEST_HEADERS = ("authorization", "cookie", "proxy-authorization")
+
+
+def decode_body(data: bytes, encoding: str | None, *, truncated: bool = False) -> str:
+    """Prefer a BOM, then the declared encoding, with one strict UTF-8 fallback."""
+    bom_encoding = next(
+        (
+            name
+            for bom, name in (
+                (codecs.BOM_UTF32_LE, "utf-32"),
+                (codecs.BOM_UTF32_BE, "utf-32"),
+                (codecs.BOM_UTF8, "utf-8-sig"),
+                (codecs.BOM_UTF16_LE, "utf-16"),
+                (codecs.BOM_UTF16_BE, "utf-16"),
+            )
+            if data.startswith(bom)
+        ),
+        None,
+    )
+    for candidate in dict.fromkeys([bom_encoding or encoding or "utf-8", "utf-8"]):
+        try:
+            if not getattr(codecs.lookup(candidate), "_is_text_encoding", False):
+                continue
+            decoder = codecs.getincrementaldecoder(candidate)(errors="strict")
+            text = decoder.decode(data, final=not truncated)
+            if isinstance(text, str):
+                return text
+        except (UnicodeError, LookupError, ValueError):
+            continue
+    raise BodyFetchError("article encoding could not be decoded without data loss")
 
 
 class SsrfBlockedError(BodyFetchError):
@@ -107,9 +135,7 @@ class BodyFetcher:
             async with asyncio.timeout(self._overall_timeout_seconds):
                 return await self._fetch(url)
         except TimeoutError as exc:
-            raise BodyFetchError(
-                f"body fetch exceeded {self._overall_timeout_seconds}s"
-            ) from exc
+            raise BodyFetchError(f"body fetch exceeded {self._overall_timeout_seconds}s") from exc
 
     async def _fetch(self, url: str) -> str:
         current = httpx.URL(url)
@@ -138,12 +164,12 @@ class BodyFetcher:
                 chunks: list[bytes] = []
                 total = 0
                 async for chunk in response.aiter_bytes():
-                    chunks.append(chunk)
+                    chunks.append(chunk[: self._max_bytes - total])
                     total += len(chunk)
                     if total >= self._max_bytes:
                         break
                 body = b"".join(chunks)[: self._max_bytes]
-                return body.decode(response.encoding or "utf-8", errors="replace")
+                return decode_body(body, response.encoding, truncated=total >= self._max_bytes)
 
         raise BodyFetchError(f"exceeded {self._max_redirects} redirects")
 

@@ -11,11 +11,13 @@ Two responsibilities:
 from __future__ import annotations
 
 import uuid
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
 import structlog
 from shared.schemas.messages import ArticleIngested, EventDetected, EventType
+from shared.text import NORMALIZER_VERSION, assess_text
 
 from cleansing.clustering import (
     ClusterCandidate,
@@ -26,6 +28,7 @@ from cleansing.clustering import (
 from cleansing.config import CleansingSettings
 from cleansing.dedup import is_near_duplicate, simhash
 from cleansing.embedding import Embedder
+from cleansing.evidence import prepare_inputs
 from cleansing.exceptions import AmbiguousMergeError
 from cleansing.extraction import ActionExtractor
 from cleansing.merge import ClusterInputs, LlmMerger, build_local_event, detect_fact_conflicts
@@ -125,7 +128,14 @@ class CleansingPipeline:
             logger.info("article_replay_skipped", article_id=str(facts.article_id))
             return
 
-        text = f"{facts.title}\n{facts.body}"
+        title_quality = assess_text(facts.title, title=True)
+        body_quality = assess_text(facts.body)
+        title, body = prepare_inputs(facts.title, facts.body, self._settings.classification_mode)
+        # Embeddings still use all quality-approved context, independent of the classification mode.
+        text = f"{title_quality.usable}\n{body_quality.usable}"
+        facts = replace(
+            facts, title=title_quality.usable or "[unusable title]", body=body_quality.usable
+        )
         fingerprint = simhash(text)
 
         window_start = datetime.now(UTC) - timedelta(hours=self._settings.dedup_window_hours)
@@ -148,8 +158,28 @@ class CleansingPipeline:
         # publisher's own filing decision rather than an inference from text, and it can only reject
         # an article as non-financial, never type it as a market event. See taxonomy.classify_text
         # for the full tier order.
-        action = await self._extractor.extract(
-            facts.title, facts.language, facts.body, facts.canonical_url
+        action = await self._extractor.extract(title, facts.language, body, facts.canonical_url)
+        action = replace(
+            action,
+            classification_audit={
+                **action.classification_audit,
+                "title_quality": title_quality.status,
+                "title_reasons": list(title_quality.reasons),
+                "body_quality": body_quality.status,
+                "body_reasons": list(body_quality.reasons),
+                "normalizer_version": NORMALIZER_VERSION,
+                "processing_version": self._settings.processing_version,
+            },
+        )
+        logger.info(
+            "article_classified",
+            article_id=str(facts.article_id),
+            event_type=action.event_type.value,
+            reason=action.classification_audit.get("reason"),
+            evidence_source=action.classification_audit.get("source"),
+            body_quality=body_quality.status,
+            body_reasons=body_quality.reasons,
+            backend_disagreement=action.classification_audit.get("backend_disagreement"),
         )
 
         await self._repo.store_fingerprint(
@@ -224,9 +254,7 @@ class CleansingPipeline:
                     cluster_id=str(record.cluster_id),
                     error=str(exc),
                 )
-                await self._repo.set_cluster_state(
-                    record.cluster_id, ClusterState.ERROR_RETRYABLE
-                )
+                await self._repo.set_cluster_state(record.cluster_id, ClusterState.ERROR_RETRYABLE)
                 continue
 
             await self._repo.store_event_with_outbox(event)

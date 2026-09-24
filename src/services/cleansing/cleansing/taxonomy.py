@@ -17,7 +17,9 @@ from enum import StrEnum
 
 from shared.reference import members_of, registry
 from shared.schemas.messages import AssetId, ConditionCode, EventPolarity, EventType
+from shared.text import sentences
 
+from cleansing.evidence import ClassificationDecision, prepare_inputs, safety_reason
 from cleansing.sections import mapped_section_types, section_event_type
 
 # Keyword/lemma (lowercase) -> canonical event type. Swedish and English forms map to the same type.
@@ -665,6 +667,50 @@ def _scan(
 
 
 def classify_text(title: str, body: str = "", url: str = "") -> tuple[EventType, str | None]:
+    """Compatibility interface; decisions and safety metadata live in classify_decision."""
+    decision = classify_decision(title, body, url)
+    return decision.event_type, decision.keyword
+
+
+def classify_decision(
+    title: str, body: str = "", url: str = "", *, mode: str = "title_first"
+) -> ClassificationDecision:
+    title, body = prepare_inputs(title, body, mode)
+    if not title:
+        return ClassificationDecision(EventType.OTHER, None, "title", "unusable_title", "")
+    reason = safety_reason(title)
+    if reason:
+        kind = EventType.GEOPOLITICAL_TENSION if reason == "reported_joke" else EventType.OTHER
+        return ClassificationDecision(kind, None, "title", reason, title)
+    # Preserve the measured body veto and fallback; stricter lexical relevance is opt-in.
+    title_kind, title_keyword = _classify_tiers(title, "", url)
+    kind, keyword = _classify_tiers(title, body, url)
+    source = "title"
+    evidence = title
+    if keyword and keyword.startswith("section:"):
+        source = "publisher_section"
+        evidence = keyword
+    elif (kind, keyword) != (title_kind, title_keyword):
+        source = "body_veto" if kind in NON_FINANCIAL_EVENT_TYPES else "body"
+        evidence = next(
+            (
+                span
+                for span in sentences(body)
+                if keyword and _keyword_present(_haystack(span), keyword)
+            ),
+            body,
+        )
+    return ClassificationDecision(
+        kind,
+        keyword,
+        source,
+        "unmapped" if kind == EventType.OTHER else "tiered_rule",
+        evidence,
+        allow_llm=kind == EventType.OTHER,
+    )
+
+
+def _classify_tiers(title: str, body: str = "", url: str = "") -> tuple[EventType, str | None]:
     """Deterministically classify an article, most trustworthy evidence first.
 
     Returns the mapped event type and the matched keyword (the "action" evidence), or (OTHER, None)
@@ -949,7 +995,7 @@ def resolve_scope(text: str, event_type: EventType) -> AssetScope:
     private ice-cream maker's press release ("GRIPPO FOODS, INC.") matched the FOOD_INGREDIENTS
     industry keyword "food" and attached AAK to an OTHER event.
     """
-    if event_type in NON_CLUSTERING_EVENT_TYPES:
+    if event_type in NON_CLUSTERING_EVENT_TYPES or safety_reason(text):
         return AssetScope(NewsScope.NONE, ())
 
     haystack = _haystack(text)
@@ -1259,8 +1305,34 @@ def classify_polarity(text: str, event_type: EventType | None = None) -> EventPo
     # outcome, so they match either way. See RESOLUTION_NEGATION_CUES.
     if any(_cue_present(haystack, cue) for cue in RESOLUTION_NEGATION_CUES):
         return EventPolarity.OCCURRENCE
+    if event_type is not None:
+        return _event_relative_polarity(text, event_type)
     for cue in RESOLUTION_CUES:
         if _cue_present(haystack, cue):
+            return EventPolarity.RESOLUTION
+    return EventPolarity.OCCURRENCE
+
+
+def _event_relative_polarity(text: str, kind: EventType) -> EventPolarity:
+    lower = _normalise(text.casefold())
+    if safety_reason(text) or re.search(r"\b(?:expected|might|may|väntas|befaras)\b", lower):
+        return EventPolarity.OCCURRENCE
+    if kind in {EventType.MILITARY_CONFLICT, EventType.GEOPOLITICAL_TENSION} and re.search(
+        r"\b(?:ceasefire|truce|de escalation|vapenvila|eldupphör|fredsavtal)\b", lower
+    ):
+        return EventPolarity.RESOLUTION
+    if kind == EventType.STRAIT_CLOSURE and re.search(r"\b(?:reopen\w*|återöppna\w*)\b", lower):
+        return EventPolarity.RESOLUTION
+    if kind == EventType.SANCTIONS and re.search(
+        r"\b(?:lifts?|lifted|häver|hävda)\b.{0,30}\b(?:sanction\w*|sanktion\w*)\b", lower
+    ):
+        return EventPolarity.RESOLUTION
+    cancellation = r"(?:calls? off|called off|cancel\w*|avert\w*|avbryter|ställer in|blåser av)"
+    modifiers = r"(?:\s+(?:the|a|an|planned|proposed|military|iran|new|den|det|planerade)){0,3}"
+    for keyword, event_type in ACTION_TAXONOMY.items():
+        if event_type == kind and re.search(
+            r"\b" + cancellation + modifiers + r"\s+" + re.escape(keyword) + r"\w*\b", lower
+        ):
             return EventPolarity.RESOLUTION
     return EventPolarity.OCCURRENCE
 
@@ -1356,6 +1428,8 @@ def gated_assets_for_event_type(
     why the fallback fired. An event type with no evidenced family resolves to nothing, which makes
     Prediction drop the event.
     """
+    if safety_reason(text):
+        return (), ()
     families = cue_families_present(text)
     if not families:
         return (), ()

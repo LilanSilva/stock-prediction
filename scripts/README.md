@@ -161,7 +161,7 @@ Postgres and Neo4j via `docker exec`. Each writes a timestamped HTML file next t
 |---|---|
 | [query-daily-activity.ps1](query-daily-activity.ps1) | `daily-activity-<date>.html` — news retrieved and predictions with their verified results |
 | [debug-pipeline.ps1](debug-pipeline.ps1) | `debug-pipeline-<date>.html` — diagnostic report: ingestion/cleansing gaps, articles classified `OTHER`, predictions and verification state |
-| [export-cleansing-audit.ps1](export-cleansing-audit.ps1) | `cleansing-audit-<date>.json` — each cleansing cluster with its raw articles (title, body excerpt, NLP extraction) for manual LLM verification of event-group classification |
+| [export-cleansing-audit.ps1](export-cleansing-audit.ps1) | `cleansing-audit-<date>.json` — clusters with full stored title/body, URL, language, publication time and classification audit metadata for manual review |
 
 ```powershell
 powershell -File scripts\query-daily-activity.ps1 -Date 2026-08-06
@@ -174,6 +174,14 @@ All date filtering is UTC, matching the containers' server time.
 
 The generated `*.html` reports are point-in-time output, not documentation — they accumulate in this
 folder and are safe to delete.
+
+## Cleansing evaluation
+
+[evaluate-cleansing.py](evaluate-cleansing.py) replays the existing frozen classification corpora
+without calling an LLM or writing to a database. It emits a JSON report and supports title-only,
+strict-context and optional installed-spaCy comparisons. Invocation, metrics, dataset limitations
+and the fresh held-out review gate are owned by
+[SRS-03 §12.6](../requirements/SRS-03-cleansing.md#126-round-3--2026-09-24-safe-text-and-narrow-false-prediction-guards).
 
 ## Prediction accuracy
 

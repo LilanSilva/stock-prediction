@@ -8,7 +8,7 @@
 | Scope | Whole system — seven implemented components plus one approved (Notification) |
 | Requirement ID prefix | `SYS` |
 | Status | `Implemented` (components 1–7); `Approved` (Notification); Gateway and Dashboard not built |
-| Version | `1.3.0` |
+| Version | `1.4.1` |
 | Last verified against code | `2026-08-12` |
 
 ## 2. Purpose and scope
@@ -338,7 +338,10 @@ This walkthrough follows a single piece of news through all six services.
 **Step 2 — Cleansing**
 
 - Consumes the message from `cleansing.articles`.
-- Computes a SimHash; if a near-duplicate exists within 48 hours the article is discarded here.
+- Applies the text-quality gate before fingerprinting, embedding and extraction
+  ([SRS-03 §7.11](SRS-03-cleansing.md#711-text-quality-and-classification-evidence)).
+- Computes a SimHash; if a near-duplicate of the same processing version exists within 48 hours
+  the article is discarded here. Candidate clusters are also version-isolated (SRS-03 §9.8).
 - Generates a 1024-dimension embedding.
 - Extracts actor/action/object and maps the action to the taxonomy → `MILITARY_CONFLICT`.
 - Resolves scope from registry keywords. "Missile" is an industry keyword, so the event fans out to
@@ -729,6 +732,7 @@ first things a new reader uses to orient.
 
 | Date | Version | Change | Driver |
 |---|---|---|---|
+| `2026-09-24` | `1.4.1` | Linked quality-gated cleansing and processing-version isolation in the walkthrough | SRS-03 quality remediation |
 | `2026-08-05` | `1.0.0` | Initial system specification, written from the implemented E01–E07 code | E01–E07 complete; replaces the epic/task backlog structure |
 | `2026-08-05` | `1.1.0` | Added Notification Service (Approved): section 4.2 component row, section 7.1 routing topology binding, section 8.3 endpoint count, scope updated | SRS-10 added |
 | `2026-08-06` | `1.2.0` | Added section 6.5 governance (`SYS-73`…`SYS-76`, mostly `Approved`) and its verification rows | Merged from `docs/requirements/agreed-system-requirements.md` "Governance for the POC"; the disclaimer and source-terms obligations had no requirement ID anywhere |

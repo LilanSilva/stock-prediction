@@ -76,9 +76,10 @@ that currently fails:
 
 Because each set must match reality exactly, fixing an article breaks the build until its ref is
 removed, and breaking one breaks the build too. Improvements cannot land unrecorded and regressions
-cannot hide. `_KNOWN_ASSET_LEAKS` is the serious list: it currently holds three articles — a
-reader-service graphic moving two mining stocks, a reader's opinion letter moving Tesla, and a White
-House denial moving oil.
+cannot hide. `_KNOWN_ASSET_LEAKS` is the serious list. The three historical leaks (reader service,
+resignation advice and a reported military joke) were resolved without relabelling in the quality
+remediation documented in [SRS-03 §12.6](../../../../../requirements/SRS-03-cleansing.md#126-round-3--2026-09-24-safe-text-and-narrow-false-prediction-guards).
+These corpora are reviewed regression data, not held-out evidence of production accuracy.
 
 ## Provenance
 

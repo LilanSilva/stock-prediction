@@ -10,7 +10,7 @@ read the SRS for a service before changing it.
 
 | Folder | Contains | Specification |
 |---|---|---|
-| [shared/](shared/) | Installable `shared` package every service imports: message schemas, messaging client, LLM gateway, graph client, session calendar, asset registry, structured logging | [SRS-01](../requirements/SRS-01-shared-foundation.md) |
+| [shared/](shared/) | Installable `shared` package every service imports: message schemas, messaging client, LLM gateway, graph client, session calendar, asset registry, structured logging, Unicode text cleanup | [SRS-01](../requirements/SRS-01-shared-foundation.md) |
 | [services/](services/) | The seven services, one folder each | one SRS each, see below |
 | [poc/](poc/) | Completed proof-of-concept harnesses — standalone, not part of the running system | [backlog/POC/](../backlog/POC/README.md) |
 

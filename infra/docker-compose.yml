@@ -181,6 +181,7 @@ services:
       # Full-spec ML backends (baked into Dockerfile.ml): BGE-m3 embeddings + spaCy extraction.
       CLEANSING_EMBEDDING_BACKEND: ${CLEANSING_EMBEDDING_BACKEND:-bge-m3}
       CLEANSING_NLP_BACKEND: ${CLEANSING_NLP_BACKEND:-spacy}
+      CLEANSING_CLASSIFICATION_MODE: ${CLEANSING_CLASSIFICATION_MODE:-title_first}
       # Event-time cluster-close tuning; a cluster closes after this quiet gap with no new members.
       CLEANSING_QUIET_PERIOD_MINUTES: ${CLEANSING_QUIET_PERIOD_MINUTES:-30}
       # LLM-assisted merge is optional; when unset the service runs local-only.

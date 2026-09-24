@@ -23,6 +23,7 @@ class ConstantEmbedder:
 
     def __init__(self, dimension: int = 8) -> None:
         self._dimension = dimension
+        self.texts: list[str] = []
 
     @property
     def dimension(self) -> int:
@@ -32,6 +33,7 @@ class ConstantEmbedder:
         return True
 
     async def embed(self, text: str) -> list[float]:
+        self.texts.append(text)
         vector = [0.0] * self._dimension
         vector[0] = 1.0
         return vector
@@ -328,3 +330,33 @@ async def test_ready_cluster_produces_local_event() -> None:
     assert event.event_type == EventType.SANCTIONS
     assert event.llm_metadata is None
     assert cluster.state == ClusterState.MERGED
+
+
+async def test_quality_gate_protects_embeddings_and_persists_audit() -> None:
+    from cleansing.dedup import simhash
+
+    repo = FakeRepository()
+    embedder = ConstantEmbedder()
+    pipeline = CleansingPipeline(repo, embedder, KeywordExtractor(), CleansingSettings())
+    message = _message("Acme announces earnings", "Corrupted � text about military attack.")
+    await pipeline.process_article(message)
+    assert embedder.texts == [message.title + "\n"]
+    assert repo.fingerprints[message.article_id] == simhash(message.title + "\n")
+    audit = repo.actions[message.article_id].classification_audit
+    assert audit["body_quality"] == "rejected"
+    assert audit["body_reasons"] == ["unrecoverable_encoding"]
+    assert audit["processing_version"] == CleansingSettings().processing_version
+
+
+async def test_safety_rejection_keeps_singleton_but_cannot_gain_assets_at_merge() -> None:
+    repo = FakeRepository()
+    pipeline = _pipeline(repo)
+    message = _message("Vita huset: Trump skämtade om Hormuzsundet", "Trump skämtat.")
+    await pipeline.process_article(message)
+    await pipeline.process_article(message)
+    assert len(repo.actions) == len(repo.clusters) == 1
+    assert repo.actions[message.article_id].classification_audit["reason"] == "reported_joke"
+    cluster = next(iter(repo.clusters.values()))
+    cluster.quiet_deadline = datetime.now(UTC) - timedelta(minutes=1)
+    assert await pipeline.close_ready_clusters() == 1
+    assert repo.events[0].affected_asset_ids == []

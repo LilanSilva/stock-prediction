@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -35,6 +37,29 @@ class CleansingSettings(BaseSettings):
     nlp_backend: str = "keyword"
     embedding_dimension: int = Field(default=1024, gt=0)
     bge_model_name: str = "BAAI/bge-m3"
+    classification_mode: Literal["title_first", "title_only", "title_with_relevant_context"] = (
+        "title_first"
+    )
+
+    @property
+    def processing_version(self) -> str:
+        from shared.text import NORMALIZER_VERSION
+
+        from cleansing.evidence import CLASSIFIER_VERSION
+
+        return ":".join(
+            (
+                NORMALIZER_VERSION,
+                CLASSIFIER_VERSION,
+                self.classification_mode,
+                self.embedding_backend,
+                self.bge_model_name,
+                str(self.embedding_dimension),
+                self.nlp_backend,
+                str(self.llm_enabled and self.llm_classify_other),
+                self.llm_classify_prompt_version,
+            )
+        )
 
     # Dual-gate clustering.
     similarity_threshold: float = Field(default=0.80, ge=0.0, le=1.0)
@@ -55,10 +80,9 @@ class CleansingSettings(BaseSettings):
     llm_max_excerpts: int = Field(default=5, ge=1)
     llm_excerpt_chars: int = Field(default=600, gt=0)
 
-    # LLM-assisted classification. Consulted only for an article the deterministic taxonomy could not
-    # type at all (OTHER) — never for one it already resolved. Shares `llm_enabled`/the shared gateway
-    # with the merge step above; this flag exists to allow disabling just the classify fallback (e.g.
-    # to measure the deterministic-only accuracy floor) without also disabling merge.
+    # LLM classification: eligible unmapped text only, never quality/safety rejections.
+    # Shares llm_enabled/the gateway with merge; this switch disables classification alone
+    # so the deterministic accuracy floor can be measured without disabling merge.
     llm_classify_other: bool = True
     llm_classify_prompt_version: str = "cleansing-classify-v1"
     llm_classify_body_chars: int = Field(default=600, gt=0)

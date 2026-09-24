@@ -1,8 +1,30 @@
 import httpx
 import pytest
-
 from ingestion.exceptions import BodyFetchError
-from ingestion.fetcher import BodyFetcher, SsrfBlockedError, validate_public_url
+from ingestion.fetcher import BodyFetcher, SsrfBlockedError, decode_body, validate_public_url
+
+
+@pytest.mark.parametrize(
+    ("payload", "encoding", "expected"),
+    [
+        ("Räntan".encode(), "invalid-charset", "Räntan"),
+        ("日本語".encode("utf-16"), "utf-8", "日本語"),
+        ("€3".encode("cp1252"), "cp1252", "€3"),
+        (b"News", "zlib_codec", "News"),
+    ],
+)
+def test_decode_uses_bom_or_declared_text_charset(
+    payload: bytes, encoding: str, expected: str
+) -> None:
+    assert decode_body(payload, encoding) == expected
+
+
+def test_decode_rejects_damage_but_handles_byte_cap_mid_character() -> None:
+    with pytest.raises(BodyFetchError):
+        decode_body(b"Broken \xff", "utf-8")
+    assert decode_body("Text €".encode()[:-1], "utf-8", truncated=True) == "Text "
+    with pytest.raises(BodyFetchError):
+        decode_body(b"Broken \xff tail", "utf-8", truncated=True)
 
 
 async def test_rejects_non_http_scheme() -> None:

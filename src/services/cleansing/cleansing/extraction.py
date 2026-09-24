@@ -12,15 +12,17 @@ Gate 2 clustering and local event construction. Two backends are provided:
 
 from __future__ import annotations
 
+from dataclasses import asdict, replace
 from typing import Protocol, runtime_checkable
 
 from shared.schemas.messages import EventType
 
 from cleansing.classify import LlmClassifier
+from cleansing.evidence import CLASSIFIER_VERSION, ClassificationDecision, prepare_inputs
 from cleansing.models import ExtractedAction
 from cleansing.taxonomy import (
+    classify_decision,
     classify_polarity,
-    classify_text,
     infer_conditions,
     map_action,
     resolve_scope,
@@ -75,17 +77,48 @@ def _build_action(
     )
 
 
+def _audited(
+    action: ExtractedAction,
+    decision: ClassificationDecision,
+    *,
+    source: str,
+    mode: str,
+    evidence_override: str | None = None,
+) -> ExtractedAction:
+    return replace(
+        action,
+        classification_audit={
+            **asdict(decision),
+            "source": source,
+            "evidence": decision.evidence if evidence_override is None else evidence_override,
+            "tier_source": decision.source,
+            "tier_evidence": decision.evidence,
+            "predicate": action.original_lemma,
+            "decision_type": decision.event_type.value,
+            "event_type": action.event_type.value,
+            "classifier_version": CLASSIFIER_VERSION,
+            "classification_mode": mode,
+            "backend_disagreement": action.event_type != decision.event_type
+            and source == "spacy_lemma",
+        },
+    )
+
+
 class KeywordExtractor:
     """Deterministic taxonomy-keyword extractor (POC default, no external model).
 
-    ``llm_classifier`` is consulted only when ``classify_text`` returns OTHER — never for an article
-    the deterministic tiers already resolved, and never more than once per article. See
-    ``cleansing.classify`` for why: OTHER already means "no keyword fit", so this is the one case an
-    LLM call can improve on without second-guessing a confident local answer.
+    ``llm_classifier`` is consulted only for genuinely unmapped clean text, never an explicit
+    quality/safety rejection or an article already resolved by the tiers, and at most once.
     """
 
-    def __init__(self, llm_classifier: LlmClassifier | None = None) -> None:
+    def __init__(
+        self,
+        llm_classifier: LlmClassifier | None = None,
+        *,
+        classification_mode: str = "title_first",
+    ) -> None:
         self._llm_classifier = llm_classifier
+        self._classification_mode = classification_mode
 
     def is_ready(self) -> bool:
         return True
@@ -93,24 +126,39 @@ class KeywordExtractor:
     async def extract(
         self, title: str, language: str, body: str = "", url: str = ""
     ) -> ExtractedAction:
-        event_type, keyword = classify_text(title, body, url)
-        if event_type is EventType.OTHER and self._llm_classifier is not None:
+        title, body = prepare_inputs(title, body, self._classification_mode)
+        decision = classify_decision(title, body, url)
+        event_type, keyword = decision.event_type, decision.keyword
+        source = decision.source
+        if decision.allow_llm and self._llm_classifier is not None:
             event_type = await self._llm_classifier.classify(title, body, url)
-        return _build_action(
-            title,
-            event_type,
-            actor=None,
-            action_lemma=keyword,
-            obj=None,
-            original_lemma=keyword,
+            source = "llm_fallback"
+        return _audited(
+            _build_action(
+                title,
+                event_type,
+                actor=None,
+                action_lemma=keyword,
+                obj=None,
+                original_lemma=keyword,
+            ),
+            decision,
+            source=source,
+            mode=self._classification_mode,
         )
 
 
 class SpacyExtractor:
     """Real spaCy backend with per-language pipelines, imported lazily."""
 
-    def __init__(self, llm_classifier: LlmClassifier | None = None) -> None:
+    def __init__(
+        self,
+        llm_classifier: LlmClassifier | None = None,
+        *,
+        classification_mode: str = "title_first",
+    ) -> None:
         self._llm_classifier = llm_classifier
+        self._classification_mode = classification_mode
         self._pipelines: dict[str, object] = {}
         self._model_by_language = {
             "en": "en_core_web_sm",
@@ -138,22 +186,16 @@ class SpacyExtractor:
     ) -> ExtractedAction:
         import asyncio
 
+        title, body = prepare_inputs(title, body, self._classification_mode)
+        decision = classify_decision(title, body, url)
         nlp = self._pipelines.get(language) or self._pipelines.get("en")
-        if nlp is None:
+        if nlp is None or decision.reason not in {"unmapped", "tiered_rule"}:
             # Fall back to the deterministic classifier if no pipeline is loaded.
-            event_type, keyword = classify_text(title, body, url)
-            if event_type is EventType.OTHER and self._llm_classifier is not None:
-                event_type = await self._llm_classifier.classify(title, body, url)
-            return _build_action(
-                title,
-                event_type,
-                actor=None,
-                action_lemma=keyword,
-                obj=None,
-                original_lemma=keyword,
-            )
+            return await KeywordExtractor(
+                self._llm_classifier, classification_mode=self._classification_mode
+            ).extract(title, language, body, url)
 
-        def _parse() -> tuple[str | None, str | None, str | None, EventType]:
+        def _parse() -> tuple[str | None, str | None, str | None, EventType, bool]:
             doc = nlp(title)  # type: ignore[operator]
             actor: str | None = None
             action_lemma: str | None = None
@@ -166,34 +208,48 @@ class SpacyExtractor:
                 elif token.dep_ in {"dobj", "obj", "pobj"} and obj is None:
                     obj = token.text
             mapped = map_action(action_lemma)
+            lemma_mapped = mapped != EventType.OTHER
             if mapped == EventType.OTHER:
                 # The headline verb was not in the taxonomy. Back off to the tiered keyword scan,
                 # which may still recognise the event from the publisher section, the title, or
                 # (specific keywords only) the body.
-                mapped, keyword = classify_text(title, body, url)
+                mapped, keyword = decision.event_type, decision.keyword
                 action_lemma = action_lemma or keyword
-            return actor, action_lemma, obj, mapped
+            return actor, action_lemma, obj, mapped, lemma_mapped
 
         # spaCy parsing is synchronous CPU work, run off the event loop; the LLM fallback below is
         # network I/O and must run back on it, so the two cannot share one to_thread call.
-        actor, action_lemma, obj, mapped = await asyncio.to_thread(_parse)
-        if mapped is EventType.OTHER and self._llm_classifier is not None:
+        actor, action_lemma, obj, mapped, lemma_mapped = await asyncio.to_thread(_parse)
+        source = "spacy_lemma" if lemma_mapped else decision.source
+        if mapped is EventType.OTHER and decision.allow_llm and self._llm_classifier is not None:
             mapped = await self._llm_classifier.classify(title, body, url)
-        return _build_action(
-            title,
-            mapped,
-            actor=actor,
-            action_lemma=action_lemma,
-            obj=obj,
-            original_lemma=action_lemma,
+            source = "llm_fallback"
+        return _audited(
+            _build_action(
+                title,
+                mapped,
+                actor=actor,
+                action_lemma=action_lemma,
+                obj=obj,
+                original_lemma=action_lemma,
+            ),
+            decision,
+            source=source,
+            mode=self._classification_mode,
+            evidence_override=title if source == "spacy_lemma" else None,
         )
 
 
-def build_extractor(backend: str, llm_classifier: LlmClassifier | None = None) -> ActionExtractor:
+def build_extractor(
+    backend: str,
+    llm_classifier: LlmClassifier | None = None,
+    *,
+    classification_mode: str = "title_first",
+) -> ActionExtractor:
     """Construct the configured extraction backend."""
     normalized = backend.strip().lower()
     if normalized == "keyword":
-        return KeywordExtractor(llm_classifier)
+        return KeywordExtractor(llm_classifier, classification_mode=classification_mode)
     if normalized == "spacy":
-        return SpacyExtractor(llm_classifier)
+        return SpacyExtractor(llm_classifier, classification_mode=classification_mode)
     raise ValueError(f"unknown nlp backend: {backend!r}")

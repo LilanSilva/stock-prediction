@@ -66,13 +66,13 @@ _KNOWN_MISCLASSIFIED = frozenset({
     "B1", "B3", "B5", "B6", "B7", "B11", "B12", "B14", "B15", "B16",
     "B28", "B37", "B39", "B42", "B43", "B45", "B47", "B48", "B52",
     "B59", "B64", "B68", "B73", "B74", "B115", "B116", "B120", "B122", "B134",
-    "B137", "B141", "B144", "B145", "B147", "B157", "B158", "B160", "B162", "B176",
+    "B137", "B141", "B144", "B147", "B157", "B158", "B160", "B162", "B176",
     "B179", "B185", "B190", "B191", "B192", "B195", "B199", "B202", "B203", "B204",
-    "B213", "B220", "B221", "B222", "B223", "B227", "B229", "B230", "B231", "B235",
+    "B213", "B220", "B221", "B222", "B223", "B227", "B229", "B230",
     "B240", "B244", "B246", "B247",
 })
 
-# Articles that are misclassified AND still reach an asset, so they produce a prediction today. This
+# Articles that are misclassified AND still reach an asset, so they produce a false prediction. This
 # is the E12 defect class — a non-event moving a real instrument — and it is strictly worse than the
 # type errors above, which mostly resolve to nothing and are merely wrong.
 #
@@ -87,7 +87,8 @@ _KNOWN_MISCLASSIFIED = frozenset({
 #
 # Same ratchet as _KNOWN_MISCLASSIFIED: asserted to be exactly the leaking set, so fixing one forces
 # its removal here and introducing one fails the build.
-_KNOWN_ASSET_LEAKS = frozenset({"B145", "B231", "B235"})
+# Fixed 2026-09-24: explicit reader-service/advice/reported-joke guards; original labels unchanged.
+_KNOWN_ASSET_LEAKS: frozenset[str] = frozenset()
 
 # Share of labelled types the classifier gets right. Raised deliberately by each classification
 # change; never lowered to make a test pass.
@@ -98,7 +99,8 @@ _KNOWN_ASSET_LEAKS = frozenset({"B145", "B231", "B235"})
 #         does not depend on guessing vocabulary
 #   0.728 2026-09-09 audit: "i rätten"/"rättegång" LEGAL_DISPUTE keywords (fixes B27, "i rätten" —
 #         trial coverage that had no court-specific vocabulary before)
-_ACCURACY_FLOOR = 0.728
+#   0.741 2026-09-24: B145, B231 and B235 fixed without losing a previously correct type.
+_ACCURACY_FLOOR = 0.741
 
 
 def _classify(ref: str) -> EventType:

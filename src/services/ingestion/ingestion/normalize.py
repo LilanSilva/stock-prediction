@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import re
-import unicodedata
+
+from shared.text import clean_text
 
 _WHITESPACE = re.compile(r"\s+")
 # Matches the start of a full HTML page dump (case-insensitive, optional BOM).
@@ -12,8 +13,8 @@ _HTML_PAGE = re.compile(r"^\s*(?:﻿)?(?:<!doctype\s+html|<html[\s>])", re.IGNOR
 
 
 def normalize_text(value: str) -> str:
-    """NFC-normalize Unicode, collapse runs of whitespace, and strip ends."""
-    normalized = unicodedata.normalize("NFC", value)
+    """Repair encoding/HTML noise and NFC-normalize without removing valid language characters."""
+    normalized = clean_text(value)
     return _WHITESPACE.sub(" ", normalized).strip()
 
 

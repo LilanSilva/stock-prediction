@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "Shared library for Feed Analyzer services: canonical message schemas, messaging client, LLM gateway, logging."
 requires-python = ">=3.12"
 dependencies = [
+    "ftfy>=6.3,<7",
     "pydantic>=2.7,<3",
     "pydantic-settings>=2.3,<3",
     "aio-pika>=9.4,<10",

@@ -8,7 +8,7 @@
 | Component | Shared Python library (`shared`) and local infrastructure |
 | Requirement ID prefix | `SHR` |
 | Status | `Implemented` |
-| Version | `1.2.0` |
+| Version | `1.3.1` |
 | Source code | [src/shared/shared/](../src/shared/shared/), [infra/](../infra/) |
 | Tests | [src/shared/tests/](../src/shared/tests/) |
 | Last verified against code | `2026-08-12` |
@@ -92,6 +92,7 @@ Two parts:
 | `shared.calendar` | Session resolution and completion | [calendar/](../src/shared/shared/calendar/) |
 | `shared.reference` | Asset registry loading and accessors | [reference/](../src/shared/shared/reference/) |
 | `shared.logging` | JSON logging, correlation-ID middleware | [logging/](../src/shared/shared/logging/) |
+| `shared.text` | Unicode-preserving cleanup and text-quality assessment; ingestion usage in SRS-02 §7.5, evidence policy in SRS-03 §7.11 | [text.py](../src/shared/shared/text.py) |
 
 ### 4.3 Dependencies
 
@@ -929,6 +930,7 @@ Component-specific notes:
 
 | Date | Version | Change | Driver |
 |---|---|---|---|
+| `2026-09-24` | `1.3.1` | Documented the shared text module; behaviour owned by ING-62–64 and CLN-76 | Unicode-safe cleansing |
 | `2026-08-05` | `1.0.0` | Initial specification, written from the implemented code | E01 complete; replaces the E01 epic and task files |
 | `2026-08-07` | `1.1.0` | Added `SHR-76`…`SHR-78`: the graph client's weight update can target an `:AssetGroup`, and group counts are readable directly. `update_edge_weight`'s Cypher parameter renamed `asset_id` → `target_id` | Credibility could not apply learning from inherited group edges (see SRS-07 change history) |
 | `2026-08-12` | `1.2.0` | Cross-asset propagation. `ConditionCode` gains `UPSTREAM_UP` and `UPSTREAM_DOWN` (§8.2). Added `SHR-79`…`SHR-82`: `PropagationHop`, and `propagation_depth`/`propagation_chain` on `PredictionMade` plus `propagation_chain` on `PredictionScored`, all additive so `schema_version` stays `"1.0"`. Added `SHR-83`…`SHR-89`: `CorrelationEdge` and four `CORRELATES_WITH` client methods; `FiringEdge.factor_id` relaxed to optional, with `edge_id` using the literal `CORRELATION` when it is absent. Added `SHR-90`, `SHR-91`: the `CORRELATES_WITH` seed and its `condition` index (§8.5, §9.2) | E10 — a directional move in one asset causes a directional move in another, which the `CausalFactor`→`Asset` graph alone cannot express |

@@ -7,6 +7,7 @@ the service.
 
 from __future__ import annotations
 
+import builtins
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -58,6 +59,7 @@ class ExtractedAction:
     affected_asset_ids: tuple[AssetId, ...] = ()
     polarity: EventPolarity = EventPolarity.OCCURRENCE
     context_tags: tuple[ConditionCode, ...] = ()
+    classification_audit: dict[str, builtins.object] = field(default_factory=dict)
 
 
 @dataclass

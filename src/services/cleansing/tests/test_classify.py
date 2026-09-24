@@ -101,3 +101,15 @@ async def test_classify_gateway_failure_degrades_to_other_without_raising() -> N
     gateway = _FakeGateway(error=RuntimeError("boom"))
     event_type = await _classifier(gateway).classify("t", "", "")
     assert event_type is EventType.OTHER
+
+
+async def test_llm_receives_only_clean_evidence_and_cannot_override_safety() -> None:
+    gateway = _FakeGateway(result=_llm_result({"event_type": "OTHER"}))
+    classifier = _classifier(gateway)
+    await classifier.classify("A headline", "Bad � span. <b>Räntan höjs.</b>")
+    user = gateway.calls[0]["messages"][1]["content"]
+    assert "Räntan höjs." in user
+    assert "�" not in user and "<b>" not in user
+    await classifier.classify("Government denies military attack", "A conflicting claim.")
+    await classifier.classify("Damaged � title", "A perfectly clean body.")
+    assert len(gateway.calls) == 1

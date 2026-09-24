@@ -36,7 +36,8 @@
 |---|---|
 | Author | Feed Analyzer project |
 | Created | 2026-08-05 |
-| Last updated | 2026-08-18 |
+| Version | 2.0.0 |
+| Last updated | 2026-09-24 |
 | Replaces | `docs/functional-documents/cleansing-service-functional-document.md` (deleted 2026-08-06) |
 | Source code | `src/services/cleansing/` |
 | Config class | `cleansing.config.CleansingSettings` |
@@ -115,7 +116,7 @@ Specific responsibilities:
 - Publishes to exchange: `feed.events` with routing key `event.detected`
 - Database schema: `cleansing` (six application tables)
 - Shared graph client: not used at this stage (assets resolved locally from registry)
-- LLM gateway: used only when a fact conflict is detected (typically rare)
+- LLM gateway: optional unmapped-article classification and cluster fact-conflict resolution
 - Scheduled job: every 60 seconds — close mature clusters, sweep the outbox
 
 ---
@@ -134,8 +135,8 @@ Specific responsibilities:
 
 | ID | Requirement | Status |
 |---|---|---|
-| CLN-4 | The service shall compute a 64-bit SimHash fingerprint for each incoming article using the concatenation `title\nbody` | Implemented |
-| CLN-5 | The service shall compare the fingerprint against all fingerprints stored within the deduplication window (default 48 hours); if the Hamming distance to any stored fingerprint is ≤ 3 (configurable), the article shall be dropped as a near-duplicate | Implemented |
+| CLN-4 | The service shall compute a 64-bit SimHash fingerprint using quality-approved title and body, concatenated with a newline (CLN-76) | Implemented |
+| CLN-5 | The service shall compare the fingerprint against fingerprints of the same processing version within the deduplication window (default 48 hours); if the Hamming distance to any stored fingerprint is ≤ 3 (configurable), the article shall be dropped as a near-duplicate | Implemented |
 | CLN-6 | Near-duplicate articles shall be logged at INFO level with the reason `near_duplicate_dropped` and the `article_id`; no outbox row shall be created | Implemented |
 | CLN-7 | Articles that pass deduplication shall have their fingerprint stored in `cleansing.article_fingerprints` before the embedding step | Implemented |
 
@@ -175,8 +176,16 @@ Specific responsibilities:
 | CLN-71 | Where an article's `canonical_url` names a publisher section measured to be unambiguously non-financial, that section shall determine the event type ahead of every keyword tier. A section shall never select a causal event type; this shall be enforced at import | Implemented |
 | CLN-72 | The section signal shall be skipped when the title names a registered company, and shall fail open: a missing, malformed or unmapped URL shall classify exactly as if no URL had been supplied | Implemented |
 | CLN-73 | A title matching `SECTION_OVERRIDE_CUES` (narrow vocabulary marking political commentary or crime-at-a-venue coverage) shall skip the section tier and the non-financial keyword tier even when it names no registered company, since one publisher section can carry more than one kind of content (2026-09-09 audit) | Implemented |
-| CLN-74 | When the deterministic tiers classify an article `OTHER` and an LLM classifier is configured, the service shall call the LLM gateway once to attempt reclassification into a canonical event type; an article already classified by the deterministic tiers shall never reach the LLM | Implemented |
+| CLN-74 | When an article is genuinely unmapped (`OTHER`) and an LLM classifier is configured, the service shall call the LLM gateway once to attempt reclassification; already-classified articles and quality/safety rejections (CLN-79) shall never reach this fallback | Implemented |
 | CLN-75 | A classify-fallback failure of any kind (gateway error, malformed output, a returned value outside the `EventType` registry) shall resolve to `OTHER` rather than raise, so a failed call never blocks ingestion | Implemented |
+| CLN-76 | Before fingerprinting, embedding or extraction, the service shall repair recoverable encoding/HTML fragments and exclude damaged or boilerplate sentences; an unusable title shall classify as `OTHER`. Valid multilingual scripts, combining marks, joiners, numeric values and financial symbols shall be preserved | Implemented |
+| CLN-77 | The service shall support the three classification modes in §7.11, defaulting to `title_first`; both extraction backends and the classify fallback shall receive the selected quality-approved inputs | Implemented |
+| CLN-78 | Narrow resignation-advice, reader-service and denied-event headline patterns shall abstain (`OTHER`); a reported military/Hormuz joke shall be `GEOPOLITICAL_TENSION` with zero assets. Neither article scope nor cluster fallback shall reintroduce assets for these guarded headlines | Implemented |
+| CLN-79 | Quality and safety rejections shall bypass spaCy lemma mapping and LLM classification; `OTHER` and non-financial articles shall retain their normal singleton persistence and closing lifecycle | Implemented |
+| CLN-80 | Resolution polarity shall be relative to the selected event, not triggered by any unrelated cancellation word; the regulatory approval/enforcement rule (CLN-68) shall remain intact | Implemented |
+| CLN-81 | Persisted action audit metadata shall identify the decision, evidence source, matched keyword, quality reasons, backend disagreement and processing versions; logs shall expose the reason without full article text | Implemented |
+| CLN-82 | Fingerprints, embeddings and clusters shall carry a processing version; deduplication and candidate selection shall not mix versions. Migration shall preserve existing rows and global article-ID replay protection | Implemented |
+| CLN-83 | Offline evaluation shall reuse the frozen reviewed corpora without changing labels, report type and asset outcomes separately, and identify evaluation mode and optional spaCy disagreement | Implemented |
 | CLN-16 | The service shall resolve the news scope and affected asset IDs using the precedence: COMPANY → INDUSTRY → EVENT_TYPE → NONE (see 7.5 for the full algorithm) | Implemented |
 | CLN-17 | The service shall assign a polarity (`OCCURRENCE` or `RESOLUTION`) by scanning for de-escalation cues (see 7.6) | Implemented |
 | CLN-18 | The service shall infer context tags (`TRANSPORT_AFFECTED`, `SAFE_HAVEN_ONLY`) by scanning for transport cues and checking the event type (see 7.7); `RISK_PREMIUM_ELEVATED` is added later by the Prediction Service, never here | Implemented |
@@ -186,7 +195,7 @@ Specific responsibilities:
 
 | ID | Requirement | Status |
 |---|---|---|
-| CLN-20 | The service shall query OPEN and QUIET clusters of the same event type for candidates when assigning an article | Implemented |
+| CLN-20 | The service shall query OPEN and QUIET clusters of the same event type and processing version for candidates when assigning an article | Implemented |
 | CLN-21 | Gate 1 shall pass only if cosine similarity of the article's embedding to a candidate's centroid is ≥ the configured threshold (default 0.80) | Implemented |
 | CLN-22 | Gate 2 shall pass only if both the article and the candidate share the same event type AND that type is neither `OTHER` nor a non-financial type | Implemented |
 | CLN-23 | Both gates must pass; an article failing either gate does not join that candidate | Implemented |
@@ -268,7 +277,8 @@ This runs once per incoming `ArticleIngested` message from the `cleansing.articl
 - If already present: log `article_replay_skipped`, ack the message, return immediately
 
 **Step 2 — SimHash deduplication**
-- Concatenate `title + "\n" + body`
+- Apply the quality gate (§7.11), then concatenate the usable title and usable body with a newline
+- Restrict comparison to the current processing version (§9.8)
 - Compute 64-bit SimHash using BLAKE2b per token, accumulate bit weights, set bits where weight > 0
 - Load all fingerprints within the dedup window (`now - dedup_window_hours`): `SELECT simhash FROM article_fingerprints WHERE published_at >= $window_start`
 - For each stored fingerprint compute Hamming distance: `popcount(candidate XOR existing)`
@@ -281,6 +291,7 @@ This runs once per incoming `ArticleIngested` message from the `cleansing.articl
 - Result: a `list[float]` of length 1024
 
 **Step 4 — Action extraction**
+- Select classification inputs using §7.11 and apply the quality/safety guards before either backend
 - Call the configured NLP backend with `(title, language, body, canonical_url)`:
   - `keyword` backend: punctuation-normalise and lowercase the text; scan for taxonomy keywords using suffix-tolerant word-boundary matching. Evidence is tiered, first hit wins, because position within body prose is not a measure of relevance:
     0. the **publisher's section**, read from `canonical_url` and skipped when the title names a registered company (CLN-71, CLN-72). An editor's filing decision outranks any inference from text: the DN sport section was correct 26 of 26 times on the 2026-08-17 corpus, while the reject tier below fired twice in 251 articles. Only sections measured unambiguous are mapped, this tier can select **only** a non-financial type, and it fails open — an unmapped or malformed URL classifies as if none were supplied;
@@ -300,7 +311,8 @@ This runs once per incoming `ArticleIngested` message from the `cleansing.articl
 **Step 5 — Persist all three records**
 - Insert into `article_fingerprints` (SimHash, source_id, published_at)
 - Insert into `article_embeddings` (1024-dim vector)
-- Insert into `article_actions` (actor, action_lemma, object, event_type, affected_asset_ids, polarity, context_tags)
+- Insert into `article_actions` (actor, action_lemma, object, event_type, affected_asset_ids, polarity, context_tags, classification_audit)
+- Tag fingerprints, embeddings and clusters with the processing version (§9.8)
 
 **Step 6 — Cluster assignment (see 7.3)**
 
@@ -337,6 +349,7 @@ if event_type == OTHER:
 else:
     candidates = find_candidate_clusters(vector, event_type, limit=5)
     # SQL: SELECT clusters WHERE state IN ('OPEN','QUIET') AND event_type = $event_type
+    #      AND processing_version = $processing_version
     #      ORDER BY centroid <=> $vector LIMIT 5
 
 decision = decide_assignment(article_event_type, candidates, similarity_threshold)
@@ -454,12 +467,14 @@ and oil proxies anyway. It now gates on the cluster's own article titles.
 
 ### 7.6 Polarity classification (classify_polarity)
 
-- Haystack is punctuation-normalised (same as `classify_text`) before scanning
-- Scan for de-escalation/negation cue words
-- Examples (English): `calls off`, `cancel`, `ceasefire`, `truce`, `resolved`, `agreement`
-- Examples (Swedish): `avbryter`, `ställer in`, `blåser av`, `drar tillbaka`, `vapenvila`, `eldupphör`, `fredsavtal`, `pausa anfall`, `ger andrum`
-- If any cue present → `RESOLUTION`
-- Otherwise → `OCCURRENCE` (default)
+- Normalise punctuation and preserve the regulatory approval/enforcement exception (CLN-68).
+- For typed events, match event-relative resolution: conflict ceasefire/truce, strait reopening,
+  sanctions lifting, or cancellation immediately preceding that event's keyword (limited modifiers).
+- Negation, uncertainty and safety guards prevent a resolution claim. This is not a blanket
+  classification ban on forecasts or planned events.
+- An unrelated cancelled meeting or ordinary commercial agreement is not a resolution of the event.
+- Default to `OCCURRENCE`. The legacy call without an event type retains its global cue scan for
+  compatibility; extractors supply the event type.
 
 ### 7.7 Context tag inference (infer_conditions)
 
@@ -589,6 +604,34 @@ Only `canonical_summary` must be non-empty; all others may be null.
 
 ---
 
+### 7.11 Text quality and classification evidence
+
+`shared.text` repairs recognisable mojibake with `ftfy`, decodes HTML entities, removes fragment
+markup and script/style content, applies NFC, and normalises control characters and whitespace.
+It does not transliterate or use an ASCII-only allowlist. Full HTML pages are unusable. Missing
+bytes are not guessed: replacement characters, surrogates, unresolved mojibake, script residue,
+known English/Swedish boilerplate and duplicate sentences are excluded from evidence. A damaged
+title is rejected as a whole; a body can retain its undamaged sentences. Quality detection is
+heuristic, not proof that every accepted sentence is factual or relevant.
+
+The fingerprint and embedding always use the quality-approved title and body. Classification is
+separately controlled by `CLEANSING_CLASSIFICATION_MODE`:
+
+| Mode | Evidence used for classification |
+|---|---|
+| `title_first` (default) | Title-first tiers with the full quality-approved body available for the existing specific-keyword fallback and non-financial veto |
+| `title_only` | No body in deterministic, spaCy or LLM classification; intended for comparison |
+| `title_with_relevant_context` | Only clean body sentences sharing a non-stopword headline term of at least three characters; experimental comparison mode |
+
+There is no new first-N-sentences cutoff. Polarity, conditions and asset scope remain title-based.
+The ordinary spaCy first-verb shortcut remains unchanged, but the new quality/safety guards run
+before it. Its disagreement with the tier result is recorded for later measurement.
+
+Unusable-title and safety decisions cannot invoke the classify LLM. Genuinely unmapped clean text
+can still use the existing fallback, with the selected body and existing prompt-length limit.
+Rejected `OTHER` articles are not dropped: they persist, form singleton clusters and close normally.
+Cluster facts use the cleaned title, or `[unusable title]` when none survives.
+
 ## 8. Interfaces
 
 ### 8.1 Consumed message
@@ -598,7 +641,7 @@ Only `canonical_summary` must be non-empty; all others may be null.
 
 Key fields used:
 - `article_id` — idempotency key
-- `title` + `body` — SimHash and embedding input
+- `title` + `body` — quality-filtered SimHash and embedding input (§7.11)
 - `language` — NLP backend language selection
 - `source_id` — stored in cluster_articles
 - `canonical_url` — stored in cluster_articles
@@ -747,6 +790,31 @@ Index: `ix_outbox_events_pending ON (created_at) WHERE delivery_status = 'PENDIN
 
 ---
 
+### 9.8 Quality audit and processing-version migration
+
+Startup DDL adds `article_actions.classification_audit JSONB NOT NULL DEFAULT '{}'` and
+`processing_version TEXT NOT NULL DEFAULT 'legacy'` to fingerprints, embeddings and clusters, using
+idempotent `ADD COLUMN IF NOT EXISTS`. Existing data is retained. Version-aware indexes support
+fingerprint time-window queries and open-cluster candidate selection.
+
+New rows carry a version derived from normalizer/classifier versions, classification mode,
+embedding backend/model/dimension, NLP backend, classify-LLM enablement and prompt version.
+`classification_audit` records those versions, decision/final type, matched keyword, reason,
+evidence, source, title/body quality status and reasons, and spaCy/tier disagreement. This metadata
+is internal; the message schema is unchanged. Audit exports include it alongside full stored
+title/body, URL, language and publication time; older rows export an empty audit object.
+
+Deduplication and candidate matching only read the current version, so legacy fingerprints and
+centroids cannot contaminate new processing. Existing clusters may still close normally. Article-ID
+replay protection remains global: changing version does **not** reprocess historical articles or
+republish events. Version isolation may temporarily yield separate old/new clusters for the same
+story. It is not a historical backfill.
+
+Bump the normalizer/classifier version whenever its behaviour changes, including model-weight or
+gateway-model changes that retain the same configured name. Names are not immutable weight hashes.
+Deploy through the existing service-only workflow; do not reset volumes, reseed the KG or rebuild
+live embeddings as part of this migration.
+
 ## 10. Configuration
 
 All variables use the `CLEANSING_` prefix unless noted. Infrastructure variables (`DATABASE_URL`, `RABBITMQ_URL`, `LOG_LEVEL`) are shared and have no prefix.
@@ -761,6 +829,7 @@ All variables use the `CLEANSING_` prefix unless noted. Infrastructure variables
 | `CLEANSING_SIMHASH_MAX_DISTANCE` | `3` | Hamming distance threshold (0–64); ≤ threshold = near-duplicate |
 | `CLEANSING_EMBEDDING_BACKEND` | `hashing` | `hashing` or `bge-m3` |
 | `CLEANSING_NLP_BACKEND` | `keyword` | `keyword` or `spacy` |
+| `CLEANSING_CLASSIFICATION_MODE` | `title_first` | Evidence selection; see §7.11 for the two opt-in comparison modes |
 | `CLEANSING_EMBEDDING_DIMENSION` | `1024` | Vector dimension; must match the embedding backend output |
 | `CLEANSING_BGE_MODEL_NAME` | `BAAI/bge-m3` | Model name passed to sentence-transformers when backend=bge-m3 |
 | `CLEANSING_SIMILARITY_THRESHOLD` | `0.80` | Gate 1 cosine similarity minimum (0.0–1.0) |
@@ -814,6 +883,10 @@ When using `bge-m3`, the `ml` Python extra must be installed (`pip install .[ml]
 | CLN-71 (wiring) | `tests/test_pipeline.py` | `canonical_url` reaches the classifier through the real pipeline. The tier fails open, so without this the URL could stop being passed and every other test would still pass |
 | CLN-69 – CLN-72 (end to end) | `tests/test_audit_replay_2026_08_17.py` | All 251 clusters of the 2026-08-17 audit replayed against labelled types, with an accuracy floor and two exact-match ratchets (outstanding misclassifications, and articles that wrongly reach an asset) |
 | CLN-73 – CLN-75 (classify fallback) | `tests/test_classify.py`, `tests/test_extraction.py` | LLM-chosen type used; classifier called only when local result is OTHER; never called when already classified; gateway failure/invalid output degrades to OTHER |
+| CLN-76 – CLN-80 (quality and evidence) | `tests/test_evidence.py`, `tests/test_extraction.py`, `tests/test_classify.py`, shared `tests/test_text.py` | Multilingual preservation, damaged-sentence rejection, mode selection, event-relative polarity, no LLM or spaCy override of guards |
+| CLN-79, CLN-81 (pipeline) | `tests/test_pipeline.py` | Safe embedding/fingerprint input, audit reasons, singleton closing and replay protection |
+| CLN-82 (migration) | `tests/test_quality_database.py` | Opt-in PostgreSQL tests: additive migration twice, legacy isolation, current-version queries and Unicode audit persistence in disposable databases |
+| CLN-83 (evaluation) | `scripts/test_evaluate_cleansing.py`, both existing audit replay suites | Metric arithmetic independent of asset data; original labels and exact outcome ratchets retained |
 | End-to-end | `tests/test_integration.py` | Full article → event path using in-memory fakes |
 
 ---
@@ -937,6 +1010,48 @@ articles to 60.
 
 ---
 
+### 12.6 Round 3 — 2026-09-24: safe text and narrow false-prediction guards
+
+Re-measured from the refreshed checkout, not from the earlier reverted implementation. Original
+labels are unchanged. These are **reviewed regression corpora, not held-out accuracy estimates**.
+
+| Measure (keyword backend, no LLM) | Before | After |
+|---|---|---|
+| Correct types, 232 explicitly typed labels in the 251-article corpus | 169 / 232 (72.84%) | 172 / 232 (74.14%) |
+| False-prediction article refs in that corpus | B145, B231, B235 | None |
+| New asset-outcome regressions in the 73-article corpus | — | None |
+| Previously justified asset matches lost across both corpora | — | None |
+
+B145 (reader-service graphic) and B231 (resignation advice) now abstain. B235 (reported Hormuz joke)
+is geopolitical tension without affected assets. The matching refs were removed from the exact
+failure sets; no labels were relaxed. This resolves the three historical leaks in §12.4, not every
+remaining type error or the risk of new false predictions.
+
+**Measured and rejected as a default:** strict headline-word overlap for body context made seven
+previously correct Swedish classifications wrong. Therefore `title_first` retains the existing
+clean-body fallback/veto; strict relevance and title-only remain evaluation modes. No broad ban on
+plans or forecasts was introduced, and the ordinary spaCy verb shortcut was not replaced.
+
+Run from the repository root with its shared virtual environment:
+
+```powershell
+.venv/Scripts/python.exe scripts/evaluate-cleansing.py
+.venv/Scripts/python.exe scripts/evaluate-cleansing.py --mode title_only
+.venv/Scripts/python.exe scripts/evaluate-cleansing.py --mode title_with_relevant_context
+# Requires the separately installed English/Swedish spaCy models; makes no LLM calls:
+.venv/Scripts/python.exe scripts/evaluate-cleansing.py --spacy
+```
+
+The JSON report includes per-class precision/recall/F1, macro-F1, confusion counts, language
+slices, body-quality counts, market-type coverage, asset outcomes and optional spaCy disagreement
+refs. Null type labels are excluded from type metrics, never treated as correct classifications.
+Language in the frozen corpora is inferred metadata, not a human-reviewed language benchmark.
+
+Before broader rollout or accuracy claims, export a fresh day with full inputs, independently
+review its labels, keep it held out from tuning, and compare all modes plus the actual production
+spaCy/LLM configuration. This change was verified with deterministic backends and isolated
+PostgreSQL tests; live model accuracy and live deployment were not verified here.
+
 ## 13. Failure Handling
 
 | Failure scenario | Behaviour |
@@ -962,7 +1077,7 @@ articles to 60.
 | Decision | Rationale |
 |---|---|
 | Deterministic backends as default | The service runs in development and CI without downloading multi-GB models; production can switch to bge-m3 + spaCy |
-| LLM called only on fact conflicts | Keeps token spend proportional to genuine ambiguity; most clusters have a single source or no actor disagreement |
+| LLM limited to eligible unmapped articles and cluster fact conflicts | Quality/safety rejections cannot trigger reclassification; merge calls still require actor disagreement |
 | Running-mean centroid | Avoids storing all embeddings in memory; correct for k-means-style clustering; has a theoretical drift issue under adversarial inputs (not a concern for news POC) |
 | OTHER clusters never merge | Under-merging is safer than over-merging distinct causal events; two `OTHER` articles are assumed to be unrelated |
 | Quiet period rather than count-based close | A cluster that keeps growing (viral story) must eventually close via the lifetime watermark; a count threshold could close too early or too late |
@@ -977,7 +1092,7 @@ articles to 60.
 - **Keyword taxonomy coverage** — unmapped lemmas produce `OTHER` event type and a singleton cluster. Adding coverage requires updating `ACTION_TAXONOMY` in `taxonomy.py`.
 - **Publisher-section coverage is partial** — only one source exposes a reliable section. Two expose none at all (`svd` uses `/a/<id>/<slug>`, `aftonbladet` files nearly everything under `/nyheter/`) and one is a financial wire whose paths are formats rather than subjects. Roughly three quarters of a typical day still depends on keyword classification. See §12.4.
 - **Non-financial features have no lexical marker** — concert reviews, book reviews and columns from a source without a section still fall to `OTHER`. Closing this needs a feed-supplied category or a model, not more keywords. See §12.4.
-- **Three articles are misclassified and still reach an asset**, so they produce a prediction. This is a more serious failure mode than a wrong type, which usually resolves to nothing, and it is not addressed by the round-2 changes. Tracked by `_KNOWN_ASSET_LEAKS` in `tests/test_audit_replay_2026_08_17.py`; see §12.4.
+- **Residual classification errors remain.** The three known asset leaks are resolved (§12.6), but the frozen corpus is not a held-out evaluation and does not establish a zero false-prediction rate on new news.
 - **BGE-m3 model download** — first startup with `embedding_backend=bge-m3` downloads ~1.2 GB; no caching is pre-arranged in the Docker/docker-compose setup.
 - **SpaCy models** — `en_core_web_sm` and `sv_core_news_sm` must be installed separately (`python -m spacy download …`).
 
@@ -1017,6 +1132,7 @@ Update this document whenever any of the following changes:
 
 | Date | Description |
 |---|---|
+| 2026-09-24 | Version 2.0.0: Unicode-safe quality gate, title-first/comparison modes, narrow factuality guards, event-relative polarity, audit metadata and additive processing-version isolation (CLN-76–83). Frozen-corpus measurements and rejected strict-context default recorded in §12.6. |
 | 2026-08-05 | Initial as-built specification for E03 (Cleansing Service); CLN-1 through CLN-60 |
 | 2026-08-07 | **Defect fix.** Two taxonomy keywords were unreachable: `"spin-off"` could never match because normalisation turns punctuation into spaces, and `"appoints new cfo"` always lost to the generic `"appoint"` because single-token positions were compared one character early. Both event types are in REF-01 (`RESTRUCTURING`: spin-off; `EXECUTIVE_CHANGE`: appointed), so the code was the defect. CLN-61 and CLN-62 added; §7 step 4 updated |
 | 2026-08-14 | **Defect fix (E12 S01).** An audit of 2026-08-12 found 93 of 113 predictions were not justified by their news, and cleansing was the root cause. Four independent defects: (1) the non-financial reject tier ran *after* the specific-keyword tier, so a WWE headline containing "The **War** Raiders" was typed `MILITARY_CONFLICT` before `"wwe"` could reject it; (2) generic keywords were trusted in any headline, so "Forcing Early **Closure** Of Garden Display" became `STRAIT_CLOSURE` and "lower overuse injury **rates**" became `RATE_DECISION`; (3) `resolve_scope` skipped the punctuation normalisation that `_keyword_present` documents as a precondition, so `"Exxon, Inc."` missed its company and `"Lockheed-Martin wins missile contract"` fell through to an industry fan-out that predicted its competitors; (4) the event-type fallback fired on event type alone, so any article typed as a macro event reached the gold and oil proxies — three assets carried 76 of 113 predictions. CLN-63 through CLN-67 added. Also: `"default"` removed from the taxonomy (a settings default is not a credit event, and `DEBT_CRISIS` seeds an edge to every asset group), and `COMMODITY_PRICE_SHOCK` given a cue-gated fallback so a gold forecast reaches gold miners again — it had been producing nothing at all. §7.5 rewritten |

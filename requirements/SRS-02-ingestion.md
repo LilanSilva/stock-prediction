@@ -8,11 +8,11 @@
 | Component | Ingestion Service |
 | Requirement ID prefix | `ING` |
 | Status | `Implemented` (section 5.8 governance is `Approved`) |
-| Version | `1.1.0` |
+| Version | `1.2.0` |
 | Source code | [src/services/ingestion/ingestion/](../src/services/ingestion/ingestion/) |
 | Tests | [src/services/ingestion/tests/](../src/services/ingestion/tests/) |
 | Owned schema | `ingestion` |
-| Last verified against code | `2026-08-05` |
+| Last verified against code | `2026-09-24` (text normalisation and fetch decoding) |
 
 ## 2. Purpose and scope
 
@@ -131,6 +131,9 @@ in a clean and consistent form, with its provenance intact.**
 |---|---|---|---|
 | `ING-21` | The service **shall** canonicalise each article URL by lowercasing the scheme and host, removing a default port, dropping tracking parameters and the fragment, sorting the remaining query, and trimming a trailing slash on a non-root path. | Must | Implemented |
 | `ING-22` | The service **shall** apply Unicode NFC normalisation, collapse whitespace runs, and strip leading and trailing whitespace from the title and body. | Must | Implemented |
+| `ING-62` | Fetched bytes **shall** be decoded strictly using a BOM when present, otherwise the declared encoding, with UTF-8 fallback. Undecodable content shall raise a fetch error and use the existing feed-summary fallback; an incomplete final code point at the byte cap may be omitted. | Must | Implemented |
+| `ING-63` | Shared text cleanup **shall** repair recognisable mojibake, decode HTML entities and strip HTML fragments before normalisation and hashing, while preserving valid multilingual scripts, joiners and financial symbols. | Must | Implemented |
+| `ING-64` | Unrecoverable replacement markers **shall not** be silently deleted to fabricate clean words; Cleansing shall decide which text is usable as evidence (SRS-03 §7.11). | Must | Implemented |
 | `ING-23` | The service **shall** truncate a stored body to the configured maximum character count. | Must | Implemented |
 | `ING-24` | The service **shall** compute a SHA-256 content hash over the normalised title and body. | Must | Implemented |
 | `ING-25` | The service **shall** store `published_at` as a timezone-aware UTC datetime. | Must | Implemented |
@@ -267,7 +270,10 @@ for example a cloud metadata endpoint holding credentials.
       step 3.1 — so the new target is fully re-validated.
    4. Otherwise: raise for HTTP error status, check the content type against the allowlist, then read
       the body in chunks, stopping at the byte limit.
-   5. Decode using the response encoding, replacing undecodable bytes.
+   5. Decode strictly: UTF-32/UTF-8/UTF-16 BOM takes precedence, otherwise use the declared encoding
+      (UTF-8 if absent). Try UTF-8 once if that fails; reject unknown/non-text codecs. At the byte
+      cap, an incremental decoder may omit an incomplete trailing code point, but invalid interior
+      bytes still fail. A decoding error follows the feed-summary fallback in §7.2.
 4. Exceeding the redirect limit is an error.
 
 **Rules:**
@@ -306,7 +312,10 @@ https://example.com/news/story?id=5
 
 **Steps** → [normalize.py](../src/services/ingestion/ingestion/normalize.py)
 
-1. **Unicode NFC** on the title and body, so visually identical text has one byte representation.
+1. **Shared text cleanup** (`shared.text.clean_text`): repair recognisable encoding damage, decode
+   HTML entities, remove fragment markup and script/style content, then apply Unicode NFC. Full
+   HTML pages are unusable. Valid scripts, joiners, numbers and symbols are preserved. Unrecoverable
+   replacement markers remain visible for the downstream quality gate in [SRS-03 §7.11](SRS-03-cleansing.md#711-text-quality-and-classification-evidence).
 2. **Collapse whitespace** — every run of whitespace becomes one space; ends are stripped.
 3. **Truncate** the body to `BODY_MAX_CHARS` (default 2000).
 4. **Hash** — SHA-256 over the normalised title and body joined by a null byte. The null separator
@@ -617,6 +626,7 @@ accepted content types `text/html`, `application/xhtml+xml`, `text/plain`.
 | `ING-19` | Test | [test_pipeline_concurrency.py](../src/services/ingestion/tests/test_pipeline_concurrency.py) — concurrency bounded by the semaphore |
 | `ING-21` | Test | [test_urls.py](../src/services/ingestion/tests/test_urls.py) — every canonicalisation rule |
 | `ING-22`…`ING-24` | Test | [test_normalize.py](../src/services/ingestion/tests/test_normalize.py) — NFC, whitespace, truncation, stable hash, HTML page detection |
+| `ING-62`…`ING-64` | Test | [test_fetcher.py](../src/services/ingestion/tests/test_fetcher.py), [test_normalize.py](../src/services/ingestion/tests/test_normalize.py), [shared test_text.py](../src/shared/tests/test_text.py) — BOM/charset handling, invalid bytes and byte-cap boundaries, RSS fragments, multilingual preservation and idempotent cleanup |
 | `ING-25`…`ING-27` | Test | [test_integration.py](../src/services/ingestion/tests/test_integration.py) — UTC timestamps, code formats, fresh correlation ID |
 | `ING-28`, `ING-29` | Test | [test_integration.py](../src/services/ingestion/tests/test_integration.py) — re-poll creates no duplicate row or message |
 | `ING-30`, `ING-31` | Test | [test_integration.py](../src/services/ingestion/tests/test_integration.py) — routing key correct, no raw HTML present |
@@ -700,5 +710,6 @@ Component-specific notes:
 
 | Date | Version | Change | Driver |
 |---|---|---|---|
+| `2026-09-24` | `1.2.0` | Strict fetched-byte decoding and shared Unicode/HTML cleanup (ING-62–64) | Keep corrupted article text out of classification while preserving legitimate scripts |
 | `2026-08-05` | `1.0.0` | Initial specification, written from the implemented code | E02 complete; replaces the E02 epic and task files |
 | `2026-08-06` | `1.1.0` | Added section 5.8 source governance (`ING-58`…`ING-61`, all `Approved`) | Merged from `docs/requirements/agreed-system-requirements.md` "Governance for the POC", which had no SRS equivalent |

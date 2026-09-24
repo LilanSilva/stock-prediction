@@ -10,7 +10,8 @@
 
       - cluster_id             : key to reference a cluster in your LLM reply
       - classified_event_type  : the event group the Cleansing service assigned
-      - articles[]             : article_id (key), title, canonical_url, and the full body
+      - articles[]             : article_id, full title/body, canonical_url, language,
+                                 published_at, and classification_audit (empty on legacy rows)
 
     The body is exported in full and the canonical URL alongside it, because both are inputs to
     classification and an export that omits either cannot reproduce it. Truncating the body to an
@@ -112,11 +113,15 @@ SELECT
     ec.event_type                                       AS classified_event_type,
     ia.article_id,
     ia.canonical_url,
-    left(ia.title, 200)                                 AS title,
+    ia.language,
+    ia.published_at,
+    coalesce(to_jsonb(aa)->'classification_audit', '{}'::jsonb) AS classification_audit,
+    ia.title,
     regexp_replace(ia.body, E'[\\n\\r]+', ' ', 'g')     AS body
 FROM ingestion.articles ia
 JOIN cleansing.cluster_articles ca ON ca.article_id = ia.article_id
 JOIN cleansing.event_clusters   ec ON ec.cluster_id = ca.cluster_id
+LEFT JOIN cleansing.article_actions aa ON aa.article_id = ia.article_id
 WHERE ia.ingested_at::date = '$Date'::date
 ORDER BY ec.cluster_id, ia.published_at;
 "@
@@ -149,6 +154,9 @@ foreach ($row in $rows) {
         canonical_url = $row.canonical_url
         title         = $row.title
         body          = $row.body
+        language      = $row.language
+        published_at  = $row.published_at
+        classification_audit = ($row.classification_audit | ConvertFrom-Json)
     })
 }
 
@@ -160,11 +168,11 @@ $clusters = @($clusterMap.Values)
 
 [ordered]@{
     date             = $Date
-    llm_instructions = "The system classified each news cluster into one of the event_types_used below. For each cluster, check if the classified_event_type matches the article titles. Reply per cluster: cluster_id | classified_event_type | correct/incorrect | reason."
+    llm_instructions = "The system classified each news cluster into one of the event_types_used below. Independently check the classification against its title, full body and publisher section. Distinguish reported events from advice, denials, jokes and speculation; the stored classification audit is not a ground-truth label. Reply per cluster: cluster_id | classified_event_type | correct/incorrect | reason."
     event_types_used = $eventTypes
     cluster_count    = $clusters.Count
     clusters         = $clusters
-} | ConvertTo-Json -Depth 6 | Out-File -FilePath $out -Encoding utf8
+} | ConvertTo-Json -Depth 12 | Out-File -FilePath $out -Encoding utf8
 
 [Console]::OutputEncoding = $previousOutputEncoding
 

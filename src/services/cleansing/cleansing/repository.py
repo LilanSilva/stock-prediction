@@ -8,6 +8,7 @@ one transaction (functional document sec 3 step 12).
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime
 
@@ -15,6 +16,7 @@ import asyncpg
 from shared.schemas.messages import EventDetected, EventType, RoutingKey
 
 from cleansing.clustering import ClusterCandidate, update_centroid
+from cleansing.config import CleansingSettings
 from cleansing.db import parse_vector, vector_literal
 from cleansing.models import ArticleFacts, ClusterRecord, ClusterState, ExtractedAction
 
@@ -22,8 +24,9 @@ from cleansing.models import ArticleFacts, ClusterRecord, ClusterState, Extracte
 class CleansingRepository:
     """Owns all reads/writes against the `cleansing` schema."""
 
-    def __init__(self, pool: asyncpg.Pool) -> None:
+    def __init__(self, pool: asyncpg.Pool, *, processing_version: str | None = None) -> None:
         self._pool = pool
+        self._processing_version = processing_version or CleansingSettings().processing_version
 
     async def article_already_processed(self, article_id: uuid.UUID) -> bool:
         """True when the article already has a fingerprint (idempotent replay guard)."""
@@ -36,8 +39,10 @@ class CleansingRepository:
     async def recent_fingerprints(self, since: datetime) -> list[int]:
         """Return SimHash fingerprints seen since `since` (the rolling dedup window)."""
         rows = await self._pool.fetch(
-            "SELECT simhash FROM cleansing.article_fingerprints WHERE published_at >= $1",
+            "SELECT simhash FROM cleansing.article_fingerprints "
+            "WHERE published_at >= $1 AND processing_version = $2",
             since,
+            self._processing_version,
         )
         return [int(row["simhash"]) for row in rows]
 
@@ -51,25 +56,27 @@ class CleansingRepository:
         await self._pool.execute(
             """
             INSERT INTO cleansing.article_fingerprints
-                (article_id, simhash, source_id, published_at)
-            VALUES ($1, $2, $3, $4)
+                (article_id, simhash, source_id, published_at, processing_version)
+            VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT (article_id) DO NOTHING
             """,
             article_id,
             str(simhash),
             source_id,
             published_at,
+            self._processing_version,
         )
 
     async def store_embedding(self, article_id: uuid.UUID, vector: list[float]) -> None:
         await self._pool.execute(
             """
-            INSERT INTO cleansing.article_embeddings (article_id, embedding)
-            VALUES ($1, $2::vector)
+            INSERT INTO cleansing.article_embeddings (article_id, embedding, processing_version)
+            VALUES ($1, $2::vector, $3)
             ON CONFLICT (article_id) DO NOTHING
             """,
             article_id,
             vector_literal(vector),
+            self._processing_version,
         )
 
     async def store_action(
@@ -79,8 +86,9 @@ class CleansingRepository:
             """
             INSERT INTO cleansing.article_actions
                 (article_id, actor, action_lemma, object, original_lemma,
-                 event_type, language, affected_asset_ids, polarity, context_tags)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                 event_type, language, affected_asset_ids, polarity, context_tags,
+                 classification_audit)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)
             ON CONFLICT (article_id) DO NOTHING
             """,
             article_id,
@@ -93,6 +101,7 @@ class CleansingRepository:
             [asset.value for asset in action.affected_asset_ids],
             action.polarity.value,
             [tag.value for tag in action.context_tags],
+            json.dumps(action.classification_audit),
         )
 
     async def find_candidate_clusters(
@@ -112,13 +121,14 @@ class CleansingRepository:
             SELECT cluster_id, event_type,
                    1 - (centroid <=> $1::vector) AS similarity
             FROM cleansing.event_clusters
-            WHERE state IN ('OPEN', 'QUIET') AND event_type = $2
+            WHERE state IN ('OPEN', 'QUIET') AND event_type = $2 AND processing_version = $4
             ORDER BY centroid <=> $1::vector
             LIMIT $3
             """,
             vector_literal(vector),
             event_type.value,
             limit,
+            self._processing_version,
         )
         return [
             ClusterCandidate(
@@ -146,8 +156,9 @@ class CleansingRepository:
                     """
                     INSERT INTO cleansing.event_clusters
                         (cluster_id, event_type, state, article_count, first_seen_at,
-                         last_seen_at, quiet_deadline, lifetime_deadline, centroid)
-                    VALUES ($1, $2, 'OPEN', 1, $3, $3, $4, $5, $6::vector)
+                         last_seen_at, quiet_deadline, lifetime_deadline, centroid,
+                         processing_version)
+                    VALUES ($1, $2, 'OPEN', 1, $3, $3, $4, $5, $6::vector, $7)
                     """,
                     cluster_id,
                     event_type.value,
@@ -155,6 +166,7 @@ class CleansingRepository:
                     quiet_deadline,
                     lifetime_deadline,
                     vector_literal(vector),
+                    self._processing_version,
                 )
                 await self._insert_membership(conn, cluster_id, facts)
         return cluster_id
