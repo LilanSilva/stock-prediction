@@ -10,7 +10,8 @@
 # no network at runtime. Expect a multi-GB image and a slow first build.
 #
 # Run with CLEANSING_EMBEDDING_BACKEND=bge-m3 and CLEANSING_NLP_BACKEND=spacy (set in compose).
-FROM python:3.12-slim
+ARG PYTHON_BASE_IMAGE=python:3.12-slim
+FROM ${PYTHON_BASE_IMAGE}
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -24,6 +25,7 @@ COPY requirements.txt ./
 RUN pip install --require-hashes -r requirements.txt
 
 # 2) Heavy optional ML backends (unpinned within version ranges; pulls torch CPU).
+RUN pip install torch --index-url https://download.pytorch.org/whl/cpu
 RUN pip install "sentence-transformers>=3,<4" "spacy>=3.7,<4"
 
 # 3) spaCy language models (installed as wheels into site-packages, available to all users).
