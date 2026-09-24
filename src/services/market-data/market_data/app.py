@@ -32,8 +32,9 @@ from pydantic import BaseModel
 from shared.logging import setup_logging
 from shared.messaging.client import RabbitMQClient
 from shared.messaging.exceptions import MessagePoisonError
+from shared.messaging.intraday_topology import ensure_intraday_topology
 from shared.reference import supported_assets
-from shared.schemas.messages import AssetId, PriceRequested
+from shared.schemas.messages import AssetId, IntradayRequested, PriceRequested
 
 from market_data.adapters.biquote import BiquoteAdapter
 from market_data.adapters.router import AdapterRouter
@@ -42,6 +43,9 @@ from market_data.config import MarketDataSettings
 from market_data.db import apply_schema, create_pool
 from market_data.exceptions import InvalidObservationError
 from market_data.handler import PriceRequestProcessor
+from market_data.intraday import DDL as INTRADAY_DDL
+from market_data.intraday import IntradayCollector
+from market_data.intraday_adapter import IntradayAdapter
 from market_data.storage import (
     MAX_RECENT_SESSIONS,
     MIN_RECENT_SESSIONS,
@@ -87,6 +91,8 @@ class AppContext:
     outbox: OutboxPublisher
     state: ServiceState
     consumer_task: asyncio.Task[None] | None = field(default=None)
+    intraday: IntradayCollector | None = None
+    intraday_task: asyncio.Task[None] | None = None
 
 
 async def _handle_price_request(app: FastAPI, message: AbstractIncomingMessage) -> None:
@@ -142,6 +148,29 @@ async def _consume_loop(app: FastAPI) -> None:
     await ctx.rabbit.consume(ctx.settings.price_requests_queue, callback)
 
 
+async def _run_intraday_tick(app: FastAPI) -> None:
+    ctx: AppContext = app.state.ctx
+    try:
+        if ctx.intraday:
+            await ctx.intraday.tick()
+    except Exception:
+        logger.exception("intraday_collection_tick_failed")
+
+
+async def _consume_intraday(app: FastAPI) -> None:
+    ctx: AppContext = app.state.ctx
+
+    async def consume(message: AbstractIncomingMessage) -> None:
+        try:
+            request = IntradayRequested.model_validate_json(message.body)
+            if ctx.intraday:
+                await ctx.intraday.register(request)
+        except ValueError as exc:
+            raise MessagePoisonError(str(exc)) from exc
+
+    await ctx.rabbit.consume(ctx.settings.intraday_requests_queue, consume)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = MarketDataSettings()
@@ -153,6 +182,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         max_size=settings.db_pool_max_size,
     )
     await apply_schema(pool)
+    await pool.execute(INTRADAY_DDL)
 
     rabbit = RabbitMQClient(settings.rabbitmq_url)
     await rabbit.connect()
@@ -182,11 +212,22 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         abandon_after_settlement_days=settings.abandon_after_settlement_days,
     )
     outbox = OutboxPublisher(pool, rabbit)
+    intraday = None
+    if settings.intraday_enabled:
+        await ensure_intraday_topology(settings.rabbitmq_url)
+        intraday = IntradayCollector(
+            pool, rabbit, IntradayAdapter(http, settings.yahoo_base_url), settings
+        )
 
     # Rehydrate durable work left by a previous run before scheduling or consuming anything new.
     await outbox.publish_pending()
 
     scheduler = AsyncIOScheduler()
+    if intraday:
+        scheduler.add_job(
+            _run_intraday_tick, "interval", seconds=settings.intraday_poll_seconds,
+            args=[app], id="intraday_collection", max_instances=1, coalesce=True,
+        )
     scheduler.add_job(
         _run_scheduler_tick,
         "interval",
@@ -195,7 +236,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         id="settlement_poll",
         max_instances=1,
         coalesce=True,
-        misfire_grace_time=300,  # tolerate up to 5 min event-loop lag (e.g. host display-off throttle)
+        misfire_grace_time=300,  # Tolerate five minutes of event-loop lag.
         next_run_time=datetime.now(UTC),  # reconcile pending work shortly after startup
     )
     scheduler.start()
@@ -210,13 +251,22 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         processor=processor,
         outbox=outbox,
         state=ServiceState(),
+        intraday=intraday,
     )
     consumer_task = asyncio.create_task(_consume_loop(app))
     app.state.ctx.consumer_task = consumer_task
+    intraday_task = asyncio.create_task(_consume_intraday(app)) if intraday else None
+    app.state.ctx.intraday_task = intraday_task
     logger.info("market_data_started", queue=settings.price_requests_queue)
     try:
         yield
     finally:
+        if intraday_task:
+            intraday_task.cancel()
+            try:
+                await intraday_task
+            except asyncio.CancelledError:
+                pass
         consumer_task.cancel()
         try:
             await consumer_task
@@ -243,6 +293,7 @@ async def health() -> dict[str, object]:
         "due_requests": state.due_requests,
         "last_published": state.last_published,
         "consumed_total": state.consumed_total,
+        "intraday_enabled": ctx.settings.intraday_enabled,
     }
 
 
@@ -257,6 +308,10 @@ async def ready() -> JSONResponse:
     except Exception:  # noqa: BLE001 - readiness probe never raises
         checks["postgres"] = False
     checks["rabbitmq"] = ctx.rabbit.is_connected
+    if ctx.intraday:
+        checks["intraday_consumer"] = (
+            ctx.intraday_task is not None and not ctx.intraday_task.done()
+        )
     checks["scheduler"] = ctx.scheduler.running
     checks["registry"] = len(supported_assets()) > 0
 

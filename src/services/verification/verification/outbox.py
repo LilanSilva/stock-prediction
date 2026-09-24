@@ -11,9 +11,10 @@ import uuid
 from typing import Protocol
 
 import asyncpg
-from shared.schemas.messages import FeedMessage, PredictionScored, PriceRequested
+from shared.schemas.messages import FeedMessage, IntradayRequested, PredictionScored, PriceRequested
 
 _DECODERS = {
+    "IntradayRequested": IntradayRequested.model_validate_json,
     "PriceRequested": PriceRequested.model_validate_json,
     "PredictionScored": PredictionScored.model_validate_json,
 }

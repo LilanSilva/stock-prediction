@@ -29,6 +29,26 @@
   ],
   "queues": [
     {
+      "name": "market-data.intraday-requests", "vhost": "/", "durable": true,
+      "auto_delete": false,
+      "arguments": {"x-queue-type": "classic", "x-dead-letter-exchange": "feed.dlx",
+                    "x-dead-letter-routing-key": "intraday.requested"}
+    },
+    {
+      "name": "market-data.intraday-requests.dlq", "vhost": "/", "durable": true,
+      "auto_delete": false, "arguments": {"x-queue-type": "classic"}
+    },
+    {
+      "name": "verification.intraday-prices", "vhost": "/", "durable": true,
+      "auto_delete": false,
+      "arguments": {"x-queue-type": "classic", "x-dead-letter-exchange": "feed.dlx",
+                    "x-dead-letter-routing-key": "intraday.observed"}
+    },
+    {
+      "name": "verification.intraday-prices.dlq", "vhost": "/", "durable": true,
+      "auto_delete": false, "arguments": {"x-queue-type": "classic"}
+    },
+    {
       "name": "cleansing.articles",
       "vhost": "/",
       "durable": true,
@@ -188,6 +208,14 @@
     }
   ],
   "bindings": [
+    {"source": "feed.events", "vhost": "/", "destination": "market-data.intraday-requests",
+     "destination_type": "queue", "routing_key": "intraday.requested", "arguments": {}},
+    {"source": "feed.dlx", "vhost": "/", "destination": "market-data.intraday-requests.dlq",
+     "destination_type": "queue", "routing_key": "intraday.requested", "arguments": {}},
+    {"source": "feed.events", "vhost": "/", "destination": "verification.intraday-prices",
+     "destination_type": "queue", "routing_key": "intraday.observed", "arguments": {}},
+    {"source": "feed.dlx", "vhost": "/", "destination": "verification.intraday-prices.dlq",
+     "destination_type": "queue", "routing_key": "intraday.observed", "arguments": {}},
     {
       "source": "feed.events",
       "vhost": "/",

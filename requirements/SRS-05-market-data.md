@@ -34,6 +34,7 @@
 | Field | Value |
 |---|---|
 | Author | Feed Analyzer project |
+| Version | `1.1.0` |
 | Created | 2026-08-05 |
 | Last updated | 2026-08-05 |
 | Replaces | `docs/functional-documents/market-data-service-functional-document.md` (deleted 2026-08-06) |
@@ -117,6 +118,15 @@ External providers:
 ---
 
 ## 5. Functional Requirements
+
+### Intraday collection
+
+| ID | Requirement | Status |
+|---|---|---|
+| MKT-56 | The optional collector shall share one durable price stream per requested asset/session | Implemented |
+| MKT-57 | The collector shall publish completed unadjusted minute-bar additions/corrections via an outbox | Implemented |
+| MKT-58 | The intraday adapter shall reject wrong listing identity, malformed OHLC and split events | Implemented |
+| MKT-59 | Collection shall recover expired leases and stop retrying by its session-anchored deadline | Implemented |
 
 ### 5.1 Message consumption
 
@@ -236,6 +246,31 @@ External providers:
 ---
 
 ## 7. How It Works
+
+### Intraday collector
+
+`IntradayRequested` starts a durable stream when `INTRADAY_ENABLED=true`. Its regular exchange
+session boundaries come from Verification. A scheduler polls due streams every 60 seconds. The
+Yahoo adapter requests `interval=1m`, `includePrePost=false`, and split/dividend event metadata,
+using the browser User-Agent. It requires symbol, currency and timezone identity. Positive finite
+OHLC, minute alignment and high/low ordering are validated; null bars remain missing. Incomplete
+minutes and extended-hours bars are excluded. Split events invalidate the session.
+
+Registry version must match at registration. Market Data freezes its own full provider reference
+series in the stream row; registry edits cannot switch providers/listings midstream. It stores one
+current bar map per stream. Each fetch is bounded to the one regular session; this deliberately
+revisits earlier minutes to repair gaps. Only additions and changed bars are published as ordered
+`IntradayObserved` revisions, shared by every prediction in that session. No per-prediction full
+session snapshots are sent. Null/absent bars do not revoke an already observed valid bar.
+
+After close, a five-minute provider buffer applies. Full coverage then finalizes the stream.
+Otherwise retry until close plus 24 hours (configurable up to 48); then publish a final incomplete
+result. Invalid provider data terminates with an explicit reason. Transient errors retry on the
+poll interval, not a hot loop. A new lease lasts five minutes; a stale worker cannot commit after
+another worker acquired its lease. Network calls hold no SQL transaction/connection. Bar state,
+revision and outbox publication are committed together. Failed publishing leaves the outbox pending;
+delivery is at least once and receivers deduplicate stream revisions. Broker outages do not block
+collecting provider evidence into the database.
 
 ### 7.1 Request lifecycle overview
 
@@ -384,6 +419,10 @@ content_hash = SHA-256(hash_input.encode("utf-8")).hexdigest()
 
 ## 8. Interfaces
 
+Optional intraday consumer: `market-data.intraday-requests`, bound to `intraday.requested`.
+Producer: `intraday.observed`, consumed only by shadow verification. Contracts and topology are in
+[SRS-01](SRS-01-shared-foundation.md#84-rabbitmq-topology). `/health.intraday_enabled` reports the flag.
+
 ### 8.1 Consumed message
 
 **Queue:** `market-data.price-requests`  
@@ -431,6 +470,13 @@ Key fields set by this service:
 ---
 
 ## 9. Data Design
+
+Intraday DDL is idempotently applied at startup:
+
+| Table | Columns / invariants |
+|---|---|
+| `market_data.intraday_streams` | `stream_id` primary key; immutable `request` and frozen `series`; current JSONB `bars`; monotonically increasing `revision`; `done`, `lease`, `next_attempt_at`, `last_error`, `updated_at`; partial due-work index |
+| `market_data.intraday_outbox` | `message_id` primary key, immutable serialized `payload`, `delivered`, `created_at`; retains delta history for audit |
 
 ### 9.1 Table: `market_data.price_requests`
 
@@ -496,6 +542,14 @@ Note: both `message_id` and `aggregate_id` have UNIQUE constraints. The `aggrega
 
 ## 10. Configuration
 
+| Intraday variable | Default | Effect |
+|---|---|---|
+| `INTRADAY_ENABLED` | `false` | Enables only the shadow collector; Compose maps `MARKET_DATA_INTRADAY_ENABLED` |
+| `INTRADAY_REQUESTS_QUEUE` | `market-data.intraday-requests` | Owned work queue; default topology name |
+| `INTRADAY_POLL_SECONDS` | `60` | Poll/retry interval; Compose maps `MARKET_DATA_INTRADAY_POLL_SECONDS` |
+| `INTRADAY_FINALIZATION_SECONDS` | `300` | Minimum delay after actual exchange close before complete data finalizes |
+| `INTRADAY_RETRY_HOURS` | `24` | Final deadline after close; range 1–48 hours |
+
 No `MARKET_DATA_` prefix; this service uses unprefixed variables directly (`MarketDataSettings` has `model_config = SettingsConfigDict(extra="ignore")` with no `env_prefix`).
 
 | Variable | Default | Effect |
@@ -518,6 +572,12 @@ No `MARKET_DATA_` prefix; this service uses unprefixed variables directly (`Mark
 ---
 
 ## 11. Verification
+
+Intraday adapter requirements MKT-57–MKT-58 are proved by `tests/test_intraday_adapter.py`:
+completed bars, null gaps, browser header, identity, split events, OHLC bounds, array lengths and 429.
+MKT-56/MKT-57/MKT-59 are exercised with real PostgreSQL in Verification's
+`tests/test_intraday_persistence.py` (shared stream, delta outbox, duplicate requests and expired lease).
+The database tests require an explicitly configured disposable `INTRADAY_TEST_DATABASE_URL`.
 
 | Requirement | Test file | What is verified |
 |---|---|---|
@@ -610,4 +670,5 @@ Update this document whenever any of the following changes:
 
 | Date | Description |
 |---|---|
+| 2026-09-24 | v1.1.0: optional durable intraday stream collector, strict Yahoo minute evidence, bounded retries and delta outbox |
 | 2026-08-05 | Initial as-built specification for E05 (Market Data Service); MKT-1 through MKT-52 |

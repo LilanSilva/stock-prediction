@@ -274,6 +274,8 @@ services:
       ASSET_REGISTRY_PATH: /config/assets.json
       # How often to re-drive pending requests whose settlement session has not yet completed.
       SETTLEMENT_POLL_INTERVAL_SECONDS: ${MARKET_DATA_SETTLEMENT_POLL_INTERVAL_SECONDS:-3600}
+      INTRADAY_ENABLED: ${MARKET_DATA_INTRADAY_ENABLED:-false}
+      INTRADAY_POLL_SECONDS: ${MARKET_DATA_INTRADAY_POLL_SECONDS:-60}
     ports:
       - "8004:8000"
     healthcheck:
@@ -299,6 +301,10 @@ services:
       feed-rabbitmq:
         condition: service_healthy
     environment:
+      VERIFICATION_INTRADAY_MODE: ${VERIFICATION_INTRADAY_MODE:-OFF}
+      VERIFICATION_INTRADAY_CALENDARS: '${VERIFICATION_INTRADAY_CALENDARS:-{}}'
+      VERIFICATION_INTRADAY_TARGET_RETURN: ${VERIFICATION_INTRADAY_TARGET_RETURN:-0.003}
+      VERIFICATION_INTRADAY_NEUTRAL_BAND: ${VERIFICATION_INTRADAY_NEUTRAL_BAND:-0.003}
       # Container-network connection strings (override the host-side values in .env). The service
       # reaches Postgres/RabbitMQ by their compose service names, not localhost.
       DATABASE_URL: postgresql://${POSTGRES_USER:-feed_user}:${POSTGRES_PASSWORD:?set in .env}@feed-postgres:5432/${POSTGRES_DB:-feed}

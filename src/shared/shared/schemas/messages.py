@@ -27,6 +27,7 @@ from pydantic import (
     ConfigDict,
     Field,
     HttpUrl,
+    model_validator,
 )
 
 # Re-exported (redundant alias form) so `from shared.schemas.messages import AssetId` keeps working
@@ -45,6 +46,8 @@ class RoutingKey(StrEnum):
     PRICE_REQUESTED = "price.requested"
     PRICE_OBSERVED = "price.observed"
     PREDICTION_SCORED = "prediction.scored"
+    INTRADAY_REQUESTED = "intraday.requested"
+    INTRADAY_OBSERVED = "intraday.observed"
 
 
 # --- Canonical enums ---
@@ -349,6 +352,8 @@ class PredictionMade(FeedMessage):
     rationale: Annotated[str, Field(min_length=1, max_length=2000)]
     contributing_edges: list[ContributingEdge] = Field(default_factory=list)
     decision_at: UtcDatetime
+    # Time this delivery was attempted, not an assertion of broker or user receipt.
+    publication_attempt_at: UtcDatetime | None = None
     supersedes_prediction_id: uuid.UUID | None = None
     decision_method: DecisionMethod
     llm_metadata: LlmMetadata | None = None
@@ -402,6 +407,57 @@ class PredictionScored(FeedMessage):
 
 
 # Map each message model to the routing key it is published with.
+class IntradayBar(BaseModel):
+    """One completed, unadjusted, UTC minute bar. Timestamp denotes its opening."""
+
+    model_config = ConfigDict(frozen=True)
+    start: UtcDatetime
+    open: Annotated[Decimal, Field(gt=0, allow_inf_nan=False)]
+    high: Annotated[Decimal, Field(gt=0, allow_inf_nan=False)]
+    low: Annotated[Decimal, Field(gt=0, allow_inf_nan=False)]
+    close: Annotated[Decimal, Field(gt=0, allow_inf_nan=False)]
+
+    @model_validator(mode="after")
+    def coherent_bar(self) -> IntradayBar:
+        if self.start.second or self.start.microsecond:
+            raise ValueError("minute bar timestamp must be minute aligned")
+        if not self.low <= min(self.open, self.close) <= max(self.open, self.close) <= self.high:
+            raise ValueError("inconsistent OHLC bounds")
+        return self
+
+
+class IntradayRequested(FeedMessage):
+    """One shared regular-session stream, requested only by Verification."""
+
+    stream_id: uuid.UUID
+    asset_id: AssetId
+    registry_version: NonEmptyStr
+    calendar_id: NonEmptyStr
+    opens_at: UtcDatetime
+    closes_at: UtcDatetime
+
+    @model_validator(mode="after")
+    def valid_session(self) -> IntradayRequested:
+        seconds = (self.closes_at - self.opens_at).total_seconds()
+        if not 0 < seconds <= 24 * 3600 or seconds % 60:
+            raise ValueError("invalid regular session interval")
+        if self.opens_at.second or self.opens_at.microsecond:
+            raise ValueError("session must start on a minute boundary")
+        return self
+
+
+class IntradayObserved(FeedMessage):
+    """Ordered stream revisions; bars contain additions/corrections, never implicit deletions."""
+
+    stream_id: uuid.UUID
+    asset_id: AssetId
+    registry_version: NonEmptyStr
+    revision: Annotated[int, Field(ge=1)]
+    bars: Annotated[list[IntradayBar], Field(max_length=1500)]
+    final: bool = False
+    failure: str | None = None
+
+
 ROUTING_KEY_BY_MESSAGE: dict[type[FeedMessage], RoutingKey] = {
     ArticleIngested: RoutingKey.ARTICLE_INGESTED,
     EventDetected: RoutingKey.EVENT_DETECTED,
@@ -409,4 +465,6 @@ ROUTING_KEY_BY_MESSAGE: dict[type[FeedMessage], RoutingKey] = {
     PriceRequested: RoutingKey.PRICE_REQUESTED,
     PriceObserved: RoutingKey.PRICE_OBSERVED,
     PredictionScored: RoutingKey.PREDICTION_SCORED,
+    IntradayRequested: RoutingKey.INTRADAY_REQUESTED,
+    IntradayObserved: RoutingKey.INTRADAY_OBSERVED,
 }

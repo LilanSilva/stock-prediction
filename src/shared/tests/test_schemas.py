@@ -97,7 +97,7 @@ def test_routing_keys_match_contract() -> None:
     assert ROUTING_KEY_BY_MESSAGE[ArticleIngested] is RoutingKey.ARTICLE_INGESTED
     assert ROUTING_KEY_BY_MESSAGE[PredictionMade] is RoutingKey.PREDICTION_MADE
     # Every message type has a registered routing key.
-    assert len(ROUTING_KEY_BY_MESSAGE) == 6
+    assert len(ROUTING_KEY_BY_MESSAGE) == 8
 
 
 # --- PropagationHop tests ---

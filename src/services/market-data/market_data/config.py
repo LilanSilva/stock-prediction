@@ -15,6 +15,11 @@ class MarketDataSettings(BaseSettings):
 
     # Owned work queue (declared by infra/rabbitmq/definitions.json; the client only looks it up).
     price_requests_queue: str = "market-data.price-requests"
+    intraday_enabled: bool = False
+    intraday_requests_queue: str = "market-data.intraday-requests"
+    intraday_poll_seconds: int = Field(default=60, ge=10)
+    intraday_finalization_seconds: int = Field(default=300, ge=60)
+    intraday_retry_hours: int = Field(default=24, ge=1, le=48)
 
     # Provider: the Yahoo chart API serves every registry asset. Canonical asset IDs are resolved to
     # provider symbols via the shared asset registry; no provider symbol is configured here.

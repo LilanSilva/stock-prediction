@@ -17,6 +17,8 @@ WORK_QUEUE_BINDINGS = {
     "market-data.price-requests": "price.requested",
     "verification.prices": "price.observed",
     "credibility.scored": "prediction.scored",
+    "market-data.intraday-requests": "intraday.requested",
+    "verification.intraday-prices": "intraday.observed",
 }
 LIVE_QUEUE_BINDINGS = {
     "gateway.predictions.live": "prediction.made",

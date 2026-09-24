@@ -8,6 +8,7 @@ crash/restart so a publish failure after commit never loses or duplicates a pred
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from typing import Protocol
 
 import asyncpg
@@ -47,6 +48,9 @@ class PredictionOutboxPublisher:
             payload = raw_payload if isinstance(raw_payload, str) else str(raw_payload)
             try:
                 message = PredictionMade.model_validate_json(payload)
+                message = message.model_copy(
+                    update={"publication_attempt_at": datetime.now(UTC)}
+                )
                 await self._publisher.publish(message)
             except Exception as exc:  # noqa: BLE001 - recorded per-row; other rows still proceed
                 await self._pool.execute(

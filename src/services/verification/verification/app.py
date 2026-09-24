@@ -8,6 +8,7 @@ and exposes ``/health`` and ``/ready``. No Neo4j and no LLM.
 from __future__ import annotations
 
 import asyncio
+import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -23,7 +24,8 @@ from pydantic import ValidationError
 from shared.logging import setup_logging
 from shared.messaging.client import ConsumerCallback, RabbitMQClient
 from shared.messaging.exceptions import MessagePoisonError
-from shared.schemas.messages import PredictionMade, PriceObserved
+from shared.messaging.intraday_topology import ensure_intraday_topology
+from shared.schemas.messages import IntradayObserved, PredictionMade, PriceObserved
 
 from verification.config import VerificationSettings
 from verification.db import apply_schema, create_pool
@@ -32,6 +34,8 @@ from verification.exceptions import (
     OrphanedObservationError,
     PriceValidationError,
 )
+from verification.intraday import DDL as INTRADAY_DDL
+from verification.intraday import IntradayVerification
 from verification.outbox import VerificationOutboxPublisher
 from verification.pipeline import VerificationPipeline
 from verification.repository import VerificationRepository
@@ -60,6 +64,7 @@ class AppContext:
     outbox: VerificationOutboxPublisher
     consumer_tasks: list[asyncio.Task[None]]
     state: ServiceState
+    intraday: IntradayVerification | None = None
 
 
 async def _run_sweep(app: FastAPI) -> None:
@@ -82,6 +87,8 @@ def _make_prediction_consumer(app: FastAPI) -> ConsumerCallback:
             raise MessagePoisonError(f"invalid PredictionMade: {exc}") from exc
         try:
             await ctx.pipeline.process_prediction(prediction)
+            if ctx.intraday:
+                await ctx.intraday.register(prediction)
         except InvalidPredictionError as exc:
             raise MessagePoisonError(str(exc)) from exc
         ctx.state.predictions_seen += 1
@@ -125,6 +132,27 @@ def _make_price_consumer(app: FastAPI) -> ConsumerCallback:
     return _on_message
 
 
+def _make_intraday_consumer(app: FastAPI) -> ConsumerCallback:
+    async def consume(message: AbstractIncomingMessage) -> None:
+        ctx: AppContext = app.state.ctx
+        try:
+            observed = IntradayObserved.model_validate_json(message.body)
+            if ctx.intraday:
+                await ctx.intraday.observe(observed)
+        except ValueError as exc:
+            raise MessagePoisonError(str(exc)) from exc
+    return consume
+
+
+async def _run_intraday(app: FastAPI) -> None:
+    ctx: AppContext = app.state.ctx
+    try:
+        if ctx.intraday:
+            await ctx.intraday.tick()
+    except Exception:
+        logger.exception("intraday_verification_tick_failed")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = VerificationSettings()
@@ -136,6 +164,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         max_size=settings.db_pool_max_size,
     )
     await apply_schema(pool)
+    await pool.execute(INTRADAY_DDL)
 
     rabbit = RabbitMQClient(settings.rabbitmq_url)
     await rabbit.connect()
@@ -143,6 +172,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     repository = VerificationRepository(pool)
     outbox = VerificationOutboxPublisher(pool, rabbit)
     pipeline = VerificationPipeline(repository, settings)
+    intraday = None
+    if settings.intraday_mode == "SHADOW":
+        await ensure_intraday_topology(settings.rabbitmq_url)
+        intraday = IntradayVerification(pool, settings)
 
     # Reconcile any outbox rows left pending by a previous crash before starting new work.
     await outbox.publish_pending()
@@ -157,6 +190,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     ]
 
     scheduler = AsyncIOScheduler()
+    if intraday:
+        consumer_tasks.append(asyncio.create_task(
+            rabbit.consume(settings.intraday_prices_queue, _make_intraday_consumer(app))
+        ))
+        scheduler.add_job(
+            _run_intraday, "interval", seconds=settings.intraday_poll_seconds,
+            args=[app], id="intraday_verification", max_instances=1, coalesce=True,
+        )
     scheduler.add_job(
         _run_sweep,
         "interval",
@@ -179,6 +220,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         outbox=outbox,
         consumer_tasks=consumer_tasks,
         state=ServiceState(),
+        intraday=intraday,
     )
     logger.info(
         "verification_started",
@@ -216,6 +258,7 @@ async def health() -> dict[str, object]:
         "prices_orphaned": state.prices_orphaned,
         "last_sweep_at": state.last_sweep_at.isoformat() if state.last_sweep_at else None,
         "last_published": state.last_published,
+        "intraday_mode": ctx.settings.intraday_mode,
     }
 
 
@@ -230,6 +273,23 @@ async def ready() -> JSONResponse:
     except Exception:  # noqa: BLE001 - readiness probe never raises
         checks["postgres"] = False
     checks["rabbitmq"] = ctx.rabbit.is_connected
+    if ctx.intraday:
+        checks["intraday_consumers"] = all(not task.done() for task in ctx.consumer_tasks)
 
     ok = all(checks.values())
     return JSONResponse({"ready": ok, "checks": checks}, status_code=200 if ok else 503)
+
+
+@app.get("/verification/intraday/{prediction_id}")
+async def intraday_report(prediction_id: uuid.UUID) -> JSONResponse:
+    ctx: AppContext = app.state.ctx
+    report = await IntradayVerification(ctx.pool, ctx.settings).report(prediction_id)
+    return JSONResponse(report or {"detail": "No intraday evaluation"},
+                        status_code=200 if report else 404)
+
+
+@app.get("/verification/intraday")
+async def intraday_summary() -> dict[str, object]:
+    ctx: AppContext = app.state.ctx
+    return {"mode": ctx.settings.intraday_mode,
+            "cohorts": await IntradayVerification(ctx.pool, ctx.settings).summary()}

@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 # The shared library (feed-analyzer-shared) is installed editable into the same root .venv and is
 # intentionally NOT listed here so pip does not try to resolve it from PyPI.
 dependencies = [
+    "exchange-calendars==4.13.1",
     "asyncpg>=0.29,<1",
     "apscheduler>=3.10,<4",
     "uvicorn>=0.30,<1",

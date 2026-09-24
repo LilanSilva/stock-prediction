@@ -6,8 +6,8 @@
 |---|---|
 | Document ID | `ADR` |
 | Type | Decision record |
-| Status | `Implemented` (ADR-001 … ADR-008 all Accepted) |
-| Version | `1.1.0` |
+| Status | `Implemented` (ADR-001 … ADR-009 all Accepted) |
+| Version | `1.2.0` |
 | Diagrams | [docs/architectural-documents/](../docs/architectural-documents/) |
 | Last verified against code | `2026-08-12` |
 
@@ -34,6 +34,7 @@ An ADR is **never rewritten to match a later decision.** A superseded ADR keeps 
 | ADR-006 | Conditional causal graph with event polarity and offline structure learning | Accepted | [SyRS §9.2](SyRS-system.md#92-neo4j-graph-model), [SRS-07](SRS-07-credibility.md) |
 | ADR-007 | Multi-market coverage via a file-driven asset registry | Accepted | [`SYS-9` … `SYS-14`](SyRS-system.md#52-identity-and-reference-data), [REF-02](REF-02-asset-registry.md) |
 | ADR-008 | Cross-asset `CORRELATES_WITH` propagation with visited-set cycle guard | Accepted | [SRS-04](SRS-04-prediction.md), [SRS-07](SRS-07-credibility.md) |
+| ADR-009 | Separate intraday target-hit evidence from daily close-to-close learning | Accepted | [SRS-06](SRS-06-verification.md), [SRS-05](SRS-05-market-data.md) |
 
 ## ADR-001: Multi-event context before prediction
 
@@ -240,6 +241,24 @@ now has two update paths (`CAUSES` and `CORRELATES_WITH`); they are structurally
 constraint backs the condition property, a hand-written Cypher edit could introduce an
 unconditioned edge that the propagation query would never match.
 
+## ADR-009: Intraday shadow evidence
+
+Daily close-to-close returns can credit movement that preceded a forecast and miss a valid
+post-forecast move that reversed before closing. A target-hit claim and a closing-direction claim
+are different experiments, so changing the existing score in place would mix learning evidence.
+
+Keep daily scoring as the live contract while collecting a separate, disabled-by-default intraday
+policy. Share one asset/session stream across predictions, persist ordered minute-bar corrections,
+and resolve actual exchange sessions. Freeze each prediction's policy and baseline. Unknown or
+incomplete evidence is unscorable, not a negative training example. Existing graph learning and
+notification consumers cannot receive these shadow results accidentally.
+
+Costs accepted: an exchange-calendar dependency, two additive queues, extra SQL evidence, and
+conservative abstention for minute gaps, partial-minute starts and unsupported session breaks.
+Yahoo minute coverage and thresholds need empirical validation before any live promotion. Provider
+revisions after finalization and exactly-once cross-store learning need a separately reviewed
+promotion design; v1 does not claim either is solved by deduplicating messages alone.
+
 ## 3. How to update this document
 
 **When to add an ADR** — a decision that changes the system's shape and whose reasoning would not be
@@ -262,5 +281,6 @@ messaging-topology change, or the reversal of an earlier ADR.
 
 | Date | Version | Change | Driver |
 |---|---|---|---|
+| `2026-09-24` | `1.2.0` | ADR-009: independent shadow target-hit evaluation | Intraday verification |
 | `2026-08-06` | `1.0.0` | Moved into `requirements/` from `docs/decisions/README.md`. Added ADR-007 to the index (present in the body but missing from the table), requirement-ID cross-references, and update rules | Requirements consolidation |
 | `2026-08-12` | `1.1.0` | Added ADR-008: cross-asset `CORRELATES_WITH` propagation | E10 epic |

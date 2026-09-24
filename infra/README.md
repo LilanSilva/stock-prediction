@@ -168,6 +168,12 @@ tracked file. This applies to everyone — humans and coding agents alike.
 
 ## Validating a change
 
+Intraday rollout configuration and the empirical coverage gate are owned by
+[SRS-06](../requirements/SRS-06-verification.md#13-assumptions-and-limitations). Both services are
+disabled by default. Enabling either performs an additive queue migration against the existing
+broker; this does not require restarting RabbitMQ or reseeding Neo4j. The exact queue contract is in
+[SRS-01](../requirements/SRS-01-shared-foundation.md#84-rabbitmq-topology).
+
 At minimum:
 
 ```bash

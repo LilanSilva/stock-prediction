@@ -34,6 +34,7 @@
 | Field | Value |
 |---|---|
 | Author | Feed Analyzer project |
+| Version | `1.1.0` |
 | Created | 2026-08-05 |
 | Last updated | 2026-08-05 |
 | Replaces | `docs/functional-documents/verification-service-functional-document.md` (deleted 2026-08-06) |
@@ -124,6 +125,20 @@ Specific responsibilities:
 
 ## 5. Functional Requirements
 
+### Intraday shadow policy
+
+Daily requirements below remain the live learning contract. The separate shadow policy adds:
+
+| ID | Requirement | Status |
+|---|---|---|
+| VER-39 | Intraday evaluation shall be disabled by default and register only explicitly allowed assets in SHADOW mode | Implemented |
+| VER-40 | Intraday evaluation shall exclude prices before the decision and use only complete minute bars | Implemented |
+| VER-41 | The service shall record target-hit and closing-direction outcomes separately | Implemented |
+| VER-42 | Incomplete observations shall be unscorable; a proven hit may remain diagnostic evidence | Implemented |
+| VER-43 | The service shall freeze the policy and starting price per prediction | Implemented |
+| VER-44 | The service shall use exchange sessions including holidays, early closes and DST | Implemented |
+| VER-45 | Duplicate, reordered and superseding messages shall not duplicate evaluation or live learning | Implemented |
+
 ### 5.1 Prediction processing
 
 | ID | Requirement | Status |
@@ -202,6 +217,52 @@ Specific responsibilities:
 ---
 
 ## 7. How It Works
+
+### Intraday shadow flow
+
+`INTRADAY_TARGET_V1` measures a different claim from close-to-close direction. `PredictionMade`
+registers an evaluation; a 60-second scheduler evaluates completed minute bars. The stream is
+collected once per asset, registry version, exchange calendar and session, not once per prediction.
+`IntradayRequested` is committed with the stream in the verification outbox. See
+[SRS-05](SRS-05-market-data.md#7-how-it-works) for collection and final reconciliation.
+
+Start is `max(decision_at, exchange open)`, rounded up to the next minute when needed. A bar containing
+pre-decision trading is excluded. Baseline is the first eligible bar's open; at most 60 seconds of
+delay is accepted by default, with the delay recorded. Late messages retain their original decision
+time. `publication_attempt_at` and first durable `received_at` expose latency; neither proves user
+receipt, and neither silently replaces model decision time. This is model accuracy, not executable
+trade performance. The policy, its SHA-256 cohort hash, registry version and session are frozen on
+first registration. A revised baseline invalidates evaluation rather than changing its denominator.
+
+UP hits when a subsequent high reaches baseline times `(1 + target_return)`; DOWN hits when a low
+reaches `(1 - target_return)`. The default meaningful target is 0.3%, independent of the prediction's
+magnitude label; this threshold is a shadow experiment setting, not a validated trading threshold.
+A later reversal does not undo a hit. The first-hit timestamp identifies a minute, not an exact trade.
+NEUTRAL requires every eligible bar's high/low to stay inside the neutral band and cannot succeed
+early. Max up/down excursions are reported independently; no stop-loss ordering is inferred.
+
+Closing return uses the last complete minute's close. Closing direction applies the neutral band.
+These are regular-session bar outcomes, not an official auction settlement or costs-adjusted return.
+All expected minutes must be present for a scored result. Missing minutes (including trade halts or
+illiquid periods) are not filled. A hit observed despite gaps remains diagnostic, while status is
+UNSCORABLE and closing metrics are withheld. Provisional hit evidence can change with provider
+corrections before final reconciliation. Invalid identity, splits, expired data, and baseline revisions
+never become automatic wrong predictions.
+
+`exchange_calendars` 4.13.1 resolves real sessions. Before open/after close predictions use the next
+eligible regular session. During trading, the current close is the deadline. Fewer than 15 eligible
+minutes is UNSCORABLE, not a rollover. Calendars with scheduled intraday breaks are unsupported in v1;
+calendar timezone must match the listing. Unknown calendars fail closed. Calendar mappings are an
+explicit allowlist and must match the actual exchange, not merely its timezone.
+
+Revisions are replayed in sequence; FINAL received before an earlier delta waits for that delta.
+No SQL transaction spans a network request. A 50-hour observation deadline protects verification
+against lost/disabled collectors (the collector deadline is at most 48 hours). Pre-open supersession
+uses durable tombstones, including when messages arrive in reverse order or supersession arrives
+after scoring. Supersession after trading began preserves the independent measurement.
+
+Shadow results never publish `PredictionScored`. Current credibility updates and email/WhatsApp
+alerts therefore receive only their existing daily score, avoiding mixed learning or duplicate alerts.
 
 ### 7.1 PredictionMade processing pipeline
 
@@ -365,6 +426,13 @@ disappearing — which is why it is logged at WARNING rather than INFO.
 
 ## 8. Interfaces
 
+Intraday consumes `intraday.observed` on `verification.intraday-prices` and publishes
+`intraday.requested`. Wire contracts are owned by [SRS-01](SRS-01-shared-foundation.md#84-rabbitmq-topology).
+`GET /verification/intraday/{prediction_id}` returns the frozen policy, window, timestamps and result
+(404 if absent; invalid UUID is 422). `GET /verification/intraday` compares target hits and existing
+daily correctness by policy hash and status. UNSCORABLE rows are a separate cohort, not accuracy
+denominators. `/health.intraday_mode` exposes OFF/SHADOW.
+
 ### 8.1 Consumed messages
 
 | Queue | Message type | Purpose |
@@ -397,6 +465,21 @@ See SRS-01 sections 5.7, 5.8, 5.9 for full field tables.
 ---
 
 ## 9. Data Design
+
+Additional service-owned tables, applied idempotently at startup by `intraday.DDL`:
+
+| Table | Columns / invariants |
+|---|---|
+| `intraday_streams` | `stream_id` primary key; immutable serialized `request` |
+| `intraday_batches` | `(stream_id, revision)` primary key; serialized `payload`, FK to stream; durable additions/corrections retained for audit |
+| `intraday_withdrawals` | `prediction_id` primary key; earliest `superseded_at` |
+| `intraday_evaluations` | `prediction_id` primary key; immutable `prediction`, `received_at`, `stream_id`, `session_window`, `policy`, `policy_hash`, `registry_version`; mutable `status`, `result`, `updated_at`; pending-stream index |
+
+Result records baseline timestamp/price/delay, target reached (nullable), first-hit bar timestamp,
+closing return/correctness, max up/down returns, expected/observed bar counts, completeness and reason.
+Terminal results remain immutable except a subsequently received pre-open withdrawal. Corrections
+after stream finalization require a separately versioned audit/re-evaluation; v1 never silently
+rewrites finalized evidence or updates graph weights from it.
 
 ### 9.1 Table: `verification.evaluations`
 
@@ -472,6 +555,17 @@ Note: `payload` is stored as `TEXT` (not `JSONB`). The `message_type` field is u
 
 ## 10. Configuration
 
+| Intraday variable | Default | Effect |
+|---|---|---|
+| `VERIFICATION_INTRADAY_MODE` | `OFF` | `OFF` or `SHADOW` only; LIVE is deliberately unavailable |
+| `VERIFICATION_INTRADAY_CALENDARS` | `{}` | JSON map of canonical asset ID to calendar name; empty enables no assets |
+| `VERIFICATION_INTRADAY_PRICES_QUEUE` | `verification.intraday-prices` | Owned delta queue; default topology name |
+| `VERIFICATION_INTRADAY_POLL_SECONDS` | `60` | Local evaluation interval, minimum 10 seconds |
+| `VERIFICATION_INTRADAY_TARGET_RETURN` | `0.003` | Fixed directional target, frozen per evaluation |
+| `VERIFICATION_INTRADAY_NEUTRAL_BAND` | `0.003` | Neutral path and closing-direction band |
+| `VERIFICATION_INTRADAY_MIN_MINUTES` | `15` | Minimum remaining observation window |
+| `VERIFICATION_INTRADAY_MAX_BASELINE_DELAY_SECONDS` | `60` | Maximum accepted start-price delay |
+
 All variables use the `VERIFICATION_` prefix unless noted.
 
 | Variable | Default | Effect |
@@ -491,6 +585,15 @@ All variables use the `VERIFICATION_` prefix unless noted.
 ---
 
 ## 11. Verification
+
+| Intraday requirement | Proving test |
+|---|---|
+| VER-39, VER-45 | `tests/test_intraday_persistence.py`: duplicate registration, OFF mode, shared stream, reordered FINAL, crash recovery, supersession and no live score output |
+| VER-40–VER-43 | `tests/test_intraday_policy.py`: both user examples, reversal, partial minute, neutral path, gaps, baseline revision and insufficient window |
+| VER-44 | `tests/test_intraday_policy.py`: Thanksgiving, early close, after-hours rollover, DST and timezone mismatch |
+
+Persistence tests require a disposable `INTRADAY_TEST_DATABASE_URL`; they create tables and insert
+synthetic evidence. Unit tests require no provider connection and do not depend on registry contents.
 
 | Requirement | Test file | What is verified |
 |---|---|---|
@@ -521,6 +624,14 @@ All variables use the `VERIFICATION_` prefix unless noted.
 ---
 
 ## 13. Assumptions and Limitations
+
+**Shadow rollout gate:** build/deploy does not enable intraday scoring. Validate Yahoo minute
+coverage for each intended listing; configure a small calendar allowlist and enable both SHADOW and
+the Market Data collector. Inspect the report cohorts and individual evidence over multiple sessions,
+including reversals and gaps. No live provider coverage or empirical accuracy is asserted by unit tests.
+Promotion remains a separate change after review: select one learning policy, make cross-store weight
+updates and correction handling idempotent, adapt notification wording, and prevent historical daily
+and intraday evidence from training the same graph as if they were the same outcome.
 
 ### 13.1 Accepted design decisions
 
@@ -572,5 +683,6 @@ Update this document whenever any of the following changes:
 
 | Date | Description |
 |---|---|
+| 2026-09-24 | v1.1.0: isolated intraday shadow policy, real exchange sessions, durable minute evidence and comparison reports; OFF by default |
 | 2026-08-05 | Initial as-built specification for E06 (Verification Service); VER-1 through VER-37 |
 | 2026-08-14 | **Defect fix.** `PriceObserved` for a missing evaluation and `PriceObserved` that contradicts its evaluation both raised `PriceValidationError`, so both were dead-lettered as poison. Orphans can never be resolved by retry or by inspecting the message, so the `verification.prices.dlq` queue filled with unactionable traffic (14 messages, all orphans, zero real defects) while genuine mismatches would have been indistinguishable in it. Split into `OrphanedObservationError`, which is acknowledged, logged at WARNING as `price_observed_orphaned`, and counted in `/health.prices_orphaned`. `PriceValidationError` still dead-letters. VER-38 added; §12 and the scoring section updated |

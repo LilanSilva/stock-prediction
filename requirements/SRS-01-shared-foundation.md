@@ -32,7 +32,7 @@ Two parts:
 
 ### 2.2 In scope
 
-- Pydantic message models for all six messages, plus every shared enum and nested type.
+- Pydantic models for the six daily-flow messages and two intraday messages, plus shared value types.
 - The `AssetId` type and the JSON asset registry loader.
 - The async RabbitMQ client wrapper.
 - The provider-configurable LLM gateway with caching and validation.
@@ -55,7 +55,7 @@ Two parts:
 | Term | Meaning |
 |---|---|
 | Envelope | The five fields every message carries: `message_id`, `correlation_id`, `causation_id`, `occurred_at`, `schema_version` |
-| `FeedMessage` | The frozen Pydantic base class all six messages inherit |
+| `FeedMessage` | The frozen Pydantic base class all domain messages inherit |
 | `AssetId` | A `str` subclass validated against the loaded registry |
 | Registry version | A label identifying one snapshot of the asset registry, e.g. `multi-market-v2` |
 | Firing edge | A `CAUSES` or `CORRELATES_WITH` edge returned by the graph query because its condition is satisfied |
@@ -104,6 +104,11 @@ Two parts:
 | An LLM provider | Ambiguous cleansing only | Ambiguous clusters wait; nothing is fabricated |
 
 ## 5. Functional requirements
+
+| ID | Requirement | Priority | Status |
+|---|---|---|---|
+| `SHR-92` | The library shall provide separate intraday request/observation contracts with canonical routes and validated minute OHLC | Must | Implemented |
+| `SHR-93` | Enabling intraday collection shall add its owned queues/DLQs/bindings without modifying legacy topology | Must | Implemented |
 
 ### 5.1 Message schemas
 
@@ -449,7 +454,7 @@ Result: one `correlation_id` filter shows the entire journey from article to lea
 
 ### 8.1 Message envelope
 
-Defined on `FeedMessage`, inherited by all six messages.
+Defined on `FeedMessage`, inherited by all domain messages.
 
 | Field | Type | Default | Purpose |
 |---|---|---|---|
@@ -556,6 +561,26 @@ cannot disagree with the other.
 | `is_adjusted` | bool | |
 | `registry_version` | non-empty string | Registry snapshot used |
 
+### Intraday message contracts
+
+The six existing domain messages retain their meaning. `PredictionMade` adds nullable
+`publication_attempt_at` (UTC), filled immediately before each publisher attempt. It is neither a
+broker-confirmed timestamp nor user delivery time; `decision_at` remains immutable.
+
+Two version-1.0 messages add isolated shadow collection; both retain the standard envelope:
+
+| Message | Fields beyond envelope | Route |
+|---|---|---|
+| `IntradayRequested` | `stream_id` UUID, canonical `asset_id`, `registry_version`, `calendar_id`, UTC `opens_at`/`closes_at` | `intraday.requested` |
+| `IntradayObserved` | `stream_id`, canonical `asset_id`, `registry_version`, positive integer `revision`, `bars`, `final=false`, nullable `failure` | `intraday.observed` |
+
+`bars` is a bounded (1500 maximum) list of completed unadjusted one-minute OHLC values. `start` is UTC,
+minute-aligned, and denotes the opening of the interval. Decimal prices must be finite and positive;
+low <= open/close <= high. Observations are ordered deltas, not complete session snapshots. The
+consumer must receive all revisions through FINAL before finalization. No provider symbols cross
+this boundary. New contract tests: `tests/test_intraday_contracts.py` and Market Data's
+`tests/test_intraday_adapter.py` (malformed evidence rejection).
+
 ### 8.4 RabbitMQ topology
 
 Declared in [infra/rabbitmq/definitions.json](../infra/rabbitmq/definitions.json).
@@ -572,11 +597,20 @@ Declared in [infra/rabbitmq/definitions.json](../infra/rabbitmq/definitions.json
 | `verification.predictions` | `prediction.made` | yes | `verification.predictions.dlq` |
 | `verification.prices` | `price.observed` | yes | `verification.prices.dlq` |
 | `market-data.price-requests` | `price.requested` | yes | `market-data.price-requests.dlq` |
+| `market-data.intraday-requests` | `intraday.requested` | yes | `market-data.intraday-requests.dlq` |
+| `verification.intraday-prices` | `intraday.observed` | yes | `verification.intraday-prices.dlq` |
 | `credibility.scored` | `prediction.scored` | yes | `credibility.scored.dlq` |
 | `gateway.predictions.live` | `prediction.made` | no | — |
 | `gateway.scored.live` | `prediction.scored` | no | — |
 
 Gateway live queues are non-durable and auto-delete because REST supplies catch-up state.
+
+Enabling either intraday component runs `shared.messaging.intraday_topology.ensure_intraday_topology`
+before consuming/publishing. This is an additive migration for already running brokers: it declares
+only the two intraday work queues, their DLQs and bindings, using existing exchanges. It never
+recreates a broker or modifies legacy queues. Incompatible existing definitions fail startup visibly.
+`test_additive_topology_does_not_redeclare_existing_queues` and the topology contract test prove the
+declaration set. Custom intraday queue names require matching separately provisioned bindings.
 
 ### 8.5 Neo4j seed scripts
 
@@ -826,6 +860,9 @@ Current version `multi-market-v2`: 14 groups, 29 assets,
 
 ## 11. Verification
 
+SHR-92/SHR-93: `tests/test_intraday_contracts.py` proves round-trip serialization, routes and the
+additive declaration set; `tests/test_infrastructure.py` checks the deployed definitions.
+
 | Requirement | Method | Evidence |
 |---|---|---|
 | `SHR-1`…`SHR-12` | Test | [test_schemas.py](../src/shared/tests/test_schemas.py) — all six models, round trip, frozen, envelope, constraints |
@@ -931,6 +968,7 @@ Component-specific notes:
 | Date | Version | Change | Driver |
 |---|---|---|---|
 | `2026-09-24` | `1.3.1` | Documented the shared text module; behaviour owned by ING-62–64 and CLN-76 | Unicode-safe cleansing |
+| `2026-09-24` | `1.3.0` | Intraday contracts, isolated queues and additive broker migration; publication-attempt timestamp | Intraday verification |
 | `2026-08-05` | `1.0.0` | Initial specification, written from the implemented code | E01 complete; replaces the E01 epic and task files |
 | `2026-08-07` | `1.1.0` | Added `SHR-76`…`SHR-78`: the graph client's weight update can target an `:AssetGroup`, and group counts are readable directly. `update_edge_weight`'s Cypher parameter renamed `asset_id` → `target_id` | Credibility could not apply learning from inherited group edges (see SRS-07 change history) |
 | `2026-08-12` | `1.2.0` | Cross-asset propagation. `ConditionCode` gains `UPSTREAM_UP` and `UPSTREAM_DOWN` (§8.2). Added `SHR-79`…`SHR-82`: `PropagationHop`, and `propagation_depth`/`propagation_chain` on `PredictionMade` plus `propagation_chain` on `PredictionScored`, all additive so `schema_version` stays `"1.0"`. Added `SHR-83`…`SHR-89`: `CorrelationEdge` and four `CORRELATES_WITH` client methods; `FiringEdge.factor_id` relaxed to optional, with `edge_id` using the literal `CORRELATION` when it is absent. Added `SHR-90`, `SHR-91`: the `CORRELATES_WITH` seed and its `condition` index (§8.5, §9.2) | E10 — a directional move in one asset causes a directional move in another, which the `CausalFactor`→`Asset` graph alone cannot express |

@@ -34,7 +34,7 @@
 | Field | Value |
 |---|---|
 | Author | Feed Analyzer project |
-| Version | `1.1.0` |
+| Version | `1.2.0` |
 | Created | 2026-08-05 |
 | Last updated | 2026-08-12 |
 | Last verified against code | `2026-08-12` |
@@ -136,6 +136,10 @@ Specific responsibilities:
 ---
 
 ## 5. Functional Requirements
+
+| ID | Requirement | Status |
+|---|---|---|
+| PRD-63 | Each publish attempt shall carry its attempt timestamp without changing decision time | Implemented |
 
 ### 5.1 Message consumption
 
@@ -652,6 +656,12 @@ All three predictions share the same `context_id` and `context_version`; their i
 
 ## 8. Interfaces
 
+`PredictionMade.publication_attempt_at` is an optional UTC timestamp, default null for old producers.
+The outbox fills it immediately before each publish attempt without changing `decision_at` or
+`message_id`. A retry may have a later attempt timestamp; it is not proof of broker/user delivery.
+This permits downstream shadow evaluation to report latency without rebasing the forecast start.
+Proving test: `tests/test_publication_timing.py`.
+
 ### 8.1 Consumed message
 
 **Queue:** `prediction.events`  
@@ -829,6 +839,9 @@ Neo4j connection variables are from the shared `Neo4jSettings` class: `NEO4J_URI
 
 ## 11. Verification
 
+PRD-63: `tests/test_publication_timing.py` verifies nullable legacy timing and dispatch timing while
+preserving the original decision timestamp.
+
 | Requirement | Test file | What is verified |
 |---|---|---|
 | PRD-4 – PRD-5 (window alignment) | `tests/test_context.py` | Bucket alignment; same event_time → same window; edge of window |
@@ -941,6 +954,7 @@ Update this document whenever any of the following changes:
 
 | Date | Description |
 |---|---|
+| 2026-09-24 | v1.2.0: backward-compatible publication-attempt timing; decision timestamp unchanged |
 | 2026-08-05 | Initial as-built specification for E04 (Prediction Service); PRD-1 through PRD-47 |
 | 2026-08-12 | **Feature: cross-asset propagation (E10).** `close_ready_contexts` now runs pass 0 (the direct CAUSES prediction) followed by a depth-capped breadth-first sweep over `CORRELATES_WITH` edges, so a directional prediction on one asset produces secondary predictions on its correlated assets. `decide()` is reused verbatim — a correlation edge is wrapped as a `FiringEdge` with `factor_id = None`, and only two helpers in `decision.py` gained None-guards (`_effective_direction` skips the polarity flip, `_rationale` renders `CORRELATION`). Cycles are prevented by a per-pipeline-run `visited` set seeded with the direct asset; a `GraphError` in a propagation pass skips one source instead of failing the run. M1 / GRAPH_ONLY is unchanged: zero LLM calls added. New section 5.8 with PRD-48…PRD-59; section 5.8 (health and readiness) renumbered to 5.9; §2.1, §3, §4, §7.3, §8.2, §10, §11, §12, §13 and §14.1 updated; §7.10 (propagation algorithm) and §7.11 (worked propagation example) added |
 | 2026-08-14 | **Defect fix (E12 S03).** An audit of 2026-08-12 found that 39 of 113 predictions (35%) carried no causal factor at all — they were synthesised by correlation propagation — and scored 10 correct / 21 wrong against 27/30 for direct predictions. Worse, the contradictions were structural: `EVENT_TYPE_ASSETS` sent one macro event to both ends of an anti-correlated pair, each opened its own context, and each propagated a contradiction onto the other, so NEM_NYSE held 16 UP and 13 DOWN from the same news. Three changes: a confidence floor on the source decision (PRD-60); direct decisions for the whole batch made before any propagation, plus refusal to overturn a standing opposing stance (PRD-61); and `event_ids` narrowed to the events whose factor actually fired (PRD-62) — it had been every event in the 15-minute window, so a prediction driven by one article cited up to five unrelated headlines, and Notification showed them to users. §7.10 updated; PRD-60 through PRD-62 added |

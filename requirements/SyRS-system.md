@@ -35,6 +35,7 @@ The loop is: **news → event → prediction → price → score → learning.**
 - Outcome vocabulary: direction `UP`/`DOWN`/`NEUTRAL`, magnitude `SMALL`/`MEDIUM`/`LARGE`, plus a
   confidence in `[0,1]`.
 - Evaluation using immutable close-to-close price observations.
+- Optional OFF-by-default intraday shadow evaluation, specified in [SRS-06](SRS-06-verification.md).
 - Learning that adjusts causal edge weights from scored outcomes.
 - Local-only deployment via Docker Compose.
 
@@ -44,7 +45,7 @@ The loop is: **news → event → prediction → price → score → learning.**
 |---|---|
 | Executing trades | The system is an experiment, not a trading platform |
 | Personalised financial advice | Not a regulated advisory product |
-| Intraday or multi-day horizons | Only `ONE_TRADING_DAY` is validated |
+| Live intraday learning or multi-day horizons | Intraday is shadow-only until coverage and outcome review; only `ONE_TRADING_DAY` trains the live graph |
 | Public internet deployment | Security boundary is local-only |
 | Authentication, rate limiting, external CORS | Deferred until external deployment is approved |
 | Prediction-time LLM arbitration | Blocked by the POC-6 `STOP` result (see 13.2) |
@@ -147,6 +148,10 @@ then scores the result.
 | RabbitMQ | 3.13 | The durable topic exchange `feed.events` and all consumer queues |
 
 ## 5. Functional requirements
+
+| ID | Requirement | Priority | Status |
+|---|---|---|---|
+| `SYS-78` | Intraday shadow evidence shall remain separate from daily score messages, live graph updates and notification alerts | Must | Implemented |
 
 ### 5.1 Product behaviour
 
@@ -625,6 +630,10 @@ Shared variables, set in `infra/.env` from
 
 ## 11. Verification
 
+SYS-78: Verification's `tests/test_intraday_persistence.py` proves isolated stream/evaluation storage
+and absence of `PredictionScored` output; daily verification/prediction unit suites protect the live
+contract. Actual provider coverage remains an empirical rollout gate, not a unit-test claim.
+
 System-level behaviours and the tests that prove them.
 
 | Requirement | Method | Evidence |
@@ -733,6 +742,7 @@ first things a new reader uses to orient.
 | Date | Version | Change | Driver |
 |---|---|---|---|
 | `2026-09-24` | `1.4.1` | Linked quality-gated cleansing and processing-version isolation in the walkthrough | SRS-03 quality remediation |
+| `2026-09-24` | `1.4.0` | Added separate intraday shadow streams and reports; existing daily learning and notifications remain live | Intraday verification |
 | `2026-08-05` | `1.0.0` | Initial system specification, written from the implemented E01–E07 code | E01–E07 complete; replaces the epic/task backlog structure |
 | `2026-08-05` | `1.1.0` | Added Notification Service (Approved): section 4.2 component row, section 7.1 routing topology binding, section 8.3 endpoint count, scope updated | SRS-10 added |
 | `2026-08-06` | `1.2.0` | Added section 6.5 governance (`SYS-73`…`SYS-76`, mostly `Approved`) and its verification rows | Merged from `docs/requirements/agreed-system-requirements.md` "Governance for the POC"; the disclaimer and source-terms obligations had no requirement ID anywhere |
