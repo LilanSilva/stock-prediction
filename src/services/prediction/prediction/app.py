@@ -32,6 +32,7 @@ from prediction.outbox import PredictionOutboxPublisher
 from prediction.pipeline import PredictionPipeline
 from prediction.price_reader import PriceReader
 from prediction.repository import PredictionRepository
+from prediction.research import ResearchRecorder, ResearchRepository
 
 logger = structlog.get_logger(__name__)
 
@@ -56,6 +57,7 @@ class AppContext:
     outbox: PredictionOutboxPublisher
     consumer_task: asyncio.Task[None]
     state: ServiceState
+    research: ResearchRecorder | None = None
 
 
 async def _run_close(app: FastAPI) -> None:
@@ -107,7 +109,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     repository = PredictionRepository(pool)
     outbox = PredictionOutboxPublisher(pool, rabbit)
-    pipeline = PredictionPipeline(repository, graph, price_reader, settings)
+    research = (
+        ResearchRecorder(ResearchRepository(pool), settings)
+        if settings.research_mode == "CAPTURE" else None
+    )
+    pipeline = PredictionPipeline(repository, graph, price_reader, settings, research=research)
 
     # Reconcile any outbox rows left pending by a previous crash before starting new work.
     await outbox.publish_pending()
@@ -142,6 +148,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         outbox=outbox,
         consumer_task=consumer_task,
         state=ServiceState(),
+        research=research,
     )
     logger.info(
         "prediction_started",
@@ -178,6 +185,16 @@ async def health() -> dict[str, object]:
         "last_close_at": state.last_close_at.isoformat() if state.last_close_at else None,
         "last_predictions_produced": state.last_predictions_produced,
         "last_published": state.last_published,
+        "research": {
+            "mode": ctx.settings.research_mode,
+            "captured": ctx.research.captured if ctx.research else 0,
+            "failures": ctx.research.failures if ctx.research else 0,
+            "invalid": ctx.research.invalid if ctx.research else 0,
+            "last_success_at": (
+                ctx.research.last_success_at.isoformat()
+                if ctx.research and ctx.research.last_success_at else None
+            ),
+        },
     }
 
 

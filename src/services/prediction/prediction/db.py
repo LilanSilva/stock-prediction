@@ -84,6 +84,41 @@ CREATE TABLE IF NOT EXISTS prediction.outbox_events (
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     delivered_at     TIMESTAMPTZ
 );
+
+-- Research evidence has its own lifecycle, independent of alert filtering and context retention.
+-- Never backfill receipt timestamps for old operational rows: unavailable provenance stays absent.
+CREATE TABLE IF NOT EXISTS prediction.research_event_versions (
+    event_id           UUID NOT NULL,
+    content_hash       TEXT NOT NULL,
+    payload            TEXT NOT NULL,
+    first_received_at  TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY (event_id, content_hash)
+);
+CREATE TABLE IF NOT EXISTS prediction.research_opportunities (
+    opportunity_id    UUID PRIMARY KEY,
+    context_id        UUID NOT NULL,
+    context_version   INTEGER NOT NULL,
+    asset_id          TEXT NOT NULL,
+    capture_version   TEXT NOT NULL,
+    feature_cutoff    TIMESTAMPTZ NOT NULL,
+    snapshot          TEXT NOT NULL,
+    snapshot_hash     TEXT NOT NULL,
+    quality           TEXT NOT NULL CHECK (quality IN ('VALID', 'INVALID_INPUT')),
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    UNIQUE (context_id, capture_version)
+);
+CREATE INDEX IF NOT EXISTS research_opportunities_cutoff_idx
+    ON prediction.research_opportunities (feature_cutoff, opportunity_id);
+CREATE TABLE IF NOT EXISTS prediction.research_predictions (
+    opportunity_id    UUID NOT NULL REFERENCES prediction.research_opportunities(opportunity_id),
+    predictor_id      TEXT NOT NULL,
+    result_status     TEXT NOT NULL CHECK (result_status IN ('PREDICTED', 'ABSTAINED', 'FAILED')),
+    payload           TEXT NOT NULL,
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    available_at      TIMESTAMPTZ,
+    PRIMARY KEY (opportunity_id, predictor_id)
+);
+ALTER TABLE prediction.research_predictions ADD COLUMN IF NOT EXISTS available_at TIMESTAMPTZ;
 """
 
 

@@ -34,9 +34,9 @@
 | Field | Value |
 |---|---|
 | Author | Feed Analyzer project |
-| Version | `1.2.0` |
+| Version | `1.3.0` |
 | Created | 2026-08-05 |
-| Last updated | 2026-08-12 |
+| Last updated | 2026-09-25 |
 | Last verified against code | `2026-08-12` |
 | Replaces | `docs/functional-documents/prediction-service-functional-document.md` (deleted 2026-08-06) |
 | Source code | `src/services/prediction/` |
@@ -130,7 +130,7 @@ Specific responsibilities:
 - Publishes to exchange: `feed.events` with routing key `prediction.made`
 - Calls: Market Data Service HTTP API for recent close prices (Scope-B gate)
 - Calls: Neo4j graph for CAUSES edges (direct) and CORRELATES_WITH edges (propagation)
-- Database schema: `prediction` (five application tables)
+- Database schema: `prediction` (five operational tables plus three research evidence tables)
 - No LLM calls at any point
 
 ---
@@ -140,6 +140,12 @@ Specific responsibilities:
 | ID | Requirement | Status |
 |---|---|---|
 | PRD-63 | Each publish attempt shall carry its attempt timestamp without changing decision time | Implemented |
+| PRD-64 | In CAPTURE mode, the service shall persist each semantic EventDetected version with its first durable local receipt time, retaining that time on redelivery | Implemented |
+| PRD-65 | In CAPTURE mode, the service shall record each direct context opportunity before abstention and official publication filtering | Implemented |
+| PRD-66 | Research snapshots shall reject missing, ambiguous, mismatched, corrupt or future event evidence as INVALID_INPUT without inventing historical receipt times | Implemented |
+| PRD-67 | An opportunity snapshot and its KG result shall be stored atomically and remain unchanged on repeated capture of the same context and capture version | Implemented |
+| PRD-68 | Research capture shall leave official publication and learning routes unchanged, with bounded I/O waits and observable capture failures | Implemented |
+| PRD-69 | Evidence exports shall use a read-only consistent snapshot, include integrity hashes and an atomic completion manifest, and refuse to overwrite an existing export | Implemented |
 
 ### 5.1 Message consumption
 
@@ -654,6 +660,63 @@ All three predictions share the same `context_id` and `context_version`; their i
 
 ---
 
+### 7.12 Research evidence capture
+
+**Implemented and tested locally: PRD-64–PRD-69.** This section owns the completed E15 capture
+functionality; section 11 maps it to proving tests. E15's remaining model/training work is not part
+of this implemented scope.
+
+`PREDICTION_RESEARCH_MODE=OFF` is the default. `CAPTURE` enables evidence recording within the
+existing service; it does not enable trained inference, a training scheduler, or model replacement.
+Compose forwards this setting and the capture timeout. Changes take effect on service restart.
+
+Before contextualizing an event, `ResearchRecorder` stores its structured payload (including the
+canonical summary, cluster ID, sources and extraction method) and semantic SHA-256. Delivery envelope
+IDs and `occurred_at` are excluded from the semantic hash. PostgreSQL records the first durable local
+receipt time; publisher times are not substituted for receipt times. Duplicate content preserves the
+first record. Changed content creates a new version. No raw article bodies or prompts are added.
+
+During a direct context close, capture follows input reads and decision computation but precedes
+abstention and stance/daily-cap filtering. Its cutoff is the actual current UTC time after those reads,
+not the earlier sweep timestamp. It records the input event versions, observed firing edges and their
+hash, graph decision thresholds and hash, the Scope-B boolean and the KG output. NEUTRAL is a
+`PREDICTED` direction; no decision is `ABSTAINED`; a graph read error is `FAILED`. These statuses are
+independent of evidence quality. Propagated decisions are not additional research opportunities here.
+
+Event evidence must match context membership and be available by cutoff. Missing receipt history,
+multiple versions of an event, content hash mismatch, context mismatch or future event evidence mark
+the snapshot `INVALID_INPUT`, retaining reason codes and expected event IDs. Multiple versions are
+conservatively rejected because current context membership does not pin an event revision hash.
+Old context rows are never retroactively given fabricated receipts.
+
+Snapshots/results use dedicated tables without a broker publisher, official outbox entry or learning
+hook. A bounded capture failure increments a health counter and allows official processing to
+continue; cancellation still propagates. `/health.research` reports mode, captured/invalid/failure
+counts and last successful capture attempt time. Counters reset on process restart; a duplicate
+successful attempt updates the last-success time but not the captured count. Readiness remains based
+on official dependencies. Monitoring must treat capture failures as missing research evidence.
+
+Export from the repository root with the shared environment and `DATABASE_URL` configured:
+
+```powershell
+.venv/Scripts/python.exe -m prediction.research_export --output research-export-20260925 --cutoff 2026-09-25T12:00:00+00:00
+```
+
+Choose a new output directory and a timezone-aware past cutoff. The exporter uses a read-only
+repeatable-read transaction and includes only snapshots with a post-commit availability marker at or
+before that cutoff. It writes deterministic `opportunities.jsonl`, verifies input snapshot hashes, and writes
+`manifest.json` atomically last. A directory without that completion manifest is incomplete. A
+corrupt snapshot aborts export; existing output directories are never overwritten. The manifest
+contains the file hash, row/quality/status counts, versions and cutoff; it excludes connection secrets.
+
+**Evidence limits:** exports explicitly set `training_eligible=false`. Timestamped market features and
+finalized research labels are not built yet. The captured KG is the observed live KG, not a frozen
+experimental comparator; the edge snapshot is not a full Neo4j snapshot. The Scope-B boolean is not
+auditable market feature history. No probability calibration or new accuracy claim is implied.
+Evidence retention is independent of operational contexts; agree source retention and archival
+capacity before enabling long-running capture. Further E15 stages must provide verified labels,
+point-in-time market features, revision pinning and the controlled comparison protocol.
+
 ## 8. Interfaces
 
 `PredictionMade.publication_attempt_at` is an optional UTC timestamp, default null for old producers.
@@ -808,6 +871,22 @@ Note: this table stores `payload` as `TEXT` (not `JSONB`) unlike some other serv
 
 ---
 
+### 9.6 Research evidence tables
+
+| Table | Columns and constraints |
+|---|---|
+| `prediction.research_event_versions` | PK `(event_id UUID, content_hash TEXT)`; semantic `payload TEXT`; `first_received_at TIMESTAMPTZ DEFAULT clock_timestamp()` |
+| `prediction.research_opportunities` | `opportunity_id UUID` PK derived from context/capture version; `context_id UUID`, `context_version INTEGER`, `asset_id TEXT`, `capture_version TEXT`, `feature_cutoff TIMESTAMPTZ`, `snapshot TEXT`, `snapshot_hash TEXT`, `quality TEXT` constrained to VALID/INVALID_INPUT, `created_at TIMESTAMPTZ`; unique `(context_id, capture_version)`; index `(feature_cutoff, opportunity_id)` |
+| `prediction.research_predictions` | PK `(opportunity_id UUID, predictor_id TEXT)`; FK to research opportunity; `result_status TEXT` constrained to PREDICTED/ABSTAINED/FAILED, `payload TEXT`, `created_at TIMESTAMPTZ`, nullable `available_at TIMESTAMPTZ`; initial predictor ID KG_LIVE_CAPTURE |
+
+All timestamps are timezone-aware. Captured content is append-only; the operational context
+has no cascading FK into research history. Opportunity/result insertion is one transaction. First
+capture wins even if a retry observes changed graph weights. After that transaction commits, a
+separate write fills `available_at` once as a conservative local availability marker. A retry can fill
+a missing marker after a crash, but never changes captured content or an existing marker. Exports
+exclude unmarked records; an insert timestamp alone is not proof of commit. This is local research
+availability, not user/broker delivery. No new message contract is introduced.
+
 ## 10. Configuration
 
 All variables use the `PREDICTION_` prefix unless noted. Infrastructure variables use no prefix.
@@ -830,6 +909,8 @@ All variables use the `PREDICTION_` prefix unless noted. Infrastructure variable
 | `PREDICTION_MARKET_DATA_TIMEOUT_SECONDS` | `5.0` | HTTP timeout for Market Data calls |
 | `PREDICTION_DB_POOL_MIN_SIZE` | `1` | asyncpg minimum pool connections |
 | `PREDICTION_DB_POOL_MAX_SIZE` | `5` | asyncpg maximum pool connections |
+| `PREDICTION_RESEARCH_MODE` | `OFF` | OFF or CAPTURE; research evidence capture only |
+| `PREDICTION_RESEARCH_CAPTURE_TIMEOUT_SECONDS` | `1.0` | Positive, at most 5 seconds; bound for each event/opportunity capture I/O attempt |
 | `PREDICTION_MAX_PROPAGATION_DEPTH` | `3` | Maximum `CORRELATES_WITH` hops from the direct asset; validated to 1–10 inclusive |
 | `PREDICTION_PROPAGATION_MIN_CONFIDENCE` | `0.30` | Minimum confidence a direct decision needs before it is propagated. Set at the boundary separating expert-strength evidence from evidence Credibility has walked down: it admits a single edge of weight ≥ 0.43, so seeded 0.50 priors still propagate (they give 0.33), while a learned-down edge does not (NEM_NYSE's 0.107 gives 0.10). Because reliability is a constant 0.5, a single-edge confidence is `w / (w + 1)` and cannot exceed 0.50 — a threshold of 0.5 would disable propagation rather than gate it |
 
@@ -841,6 +922,23 @@ Neo4j connection variables are from the shared `Neo4jSettings` class: `NEO4J_URI
 
 PRD-63: `tests/test_publication_timing.py` verifies nullable legacy timing and dispatch timing while
 preserving the original decision timestamp.
+
+PRD-64–PRD-69: `tests/test_research.py` covers receipt/evidence validity, stable identities, capture
+before suppression/abstention, graph failure, timeout isolation and cancellation.
+`tests/test_research_storage.py` covers repeatable migrations, actual receipt timestamps, revision
+handling, concurrent idempotency, atomic rollback, absence of official outbox writes, reproducible
+exports, durable-receipt cutoff filtering and corrupt/incomplete exports. These integration tests
+require `E15_TEST_DATABASE_URL` and refuse any database name other than `e15_test`; run them against a
+dedicated disposable PostgreSQL instance, never the live application database.
+
+| Implemented E15 requirement | Proving tests |
+|---|---|
+| PRD-64: event versions and receipt history | `test_first_receipt_survives_redelivery_and_revisions_are_distinct` |
+| PRD-65: capture before official filtering | `test_capture_precedes_official_filtering_and_keeps_failures`; `test_snapshot_freezes_provenance_without_claiming_training_readiness` |
+| PRD-66: invalid event evidence | `test_invalid_news_is_preserved_as_invalid_not_silently_used`; `test_first_receipt_survives_redelivery_and_revisions_are_distinct` |
+| PRD-67: immutable atomic storage | `test_atomic_capture_and_concurrent_redelivery_never_touch_outbox`; `test_identity_and_snapshot_do_not_depend_on_event_or_edge_iteration_order` |
+| PRD-68: isolated capture failures | `test_research_timeout_does_not_block_event_assignment_or_official_prediction`; `test_cancellation_is_not_swallowed`; `test_configuration_is_opt_in_and_does_not_offer_unimplemented_model_mode` |
+| PRD-69: reproducible evidence export | `test_export_is_reproducible_and_filters_by_durable_receipt`; `test_corrupt_snapshot_cannot_produce_complete_export` |
 
 | Requirement | Test file | What is verified |
 |---|---|---|
@@ -951,6 +1049,10 @@ Update this document whenever any of the following changes:
 ---
 
 ## 15. Change History
+
+2026-09-25 — E15 evidence foundation: opt-in immutable event/opportunity capture, separate KG research
+results, health visibility and read-only exports; PRD-64–PRD-69. Trained models and replacement are
+not part of this delivery.
 
 | Date | Description |
 |---|---|

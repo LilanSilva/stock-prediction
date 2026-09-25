@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -19,6 +19,10 @@ class PredictionSettings(BaseSettings):
     log_level: str = Field(default="INFO", validation_alias="LOG_LEVEL")
 
     events_queue: str = Field(default="prediction.events")
+
+    # Evidence capture only: no model inference, training, or replacement is activated here.
+    research_mode: Literal["OFF", "CAPTURE"] = "OFF"
+    research_capture_timeout_seconds: float = Field(default=1.0, gt=0, le=5)
 
     # Event-time context aggregation. Distinct events for one asset within a tumbling window of this
     # size form one versioned context (ADR-001). Article/event count never triggers a prediction.

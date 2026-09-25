@@ -6,8 +6,8 @@
 |---|---|
 | Document ID | `ADR` |
 | Type | Decision record |
-| Status | `Implemented` (ADR-001 … ADR-009 all Accepted) |
-| Version | `1.2.0` |
+| Status | `Implemented` (ADR-001 … ADR-009 and ADR-011 Accepted) |
+| Version | `1.4.0` |
 | Diagrams | [docs/architectural-documents/](../docs/architectural-documents/) |
 | Last verified against code | `2026-08-12` |
 
@@ -35,6 +35,7 @@ An ADR is **never rewritten to match a later decision.** A superseded ADR keeps 
 | ADR-007 | Multi-market coverage via a file-driven asset registry | Accepted | [`SYS-9` … `SYS-14`](SyRS-system.md#52-identity-and-reference-data), [REF-02](REF-02-asset-registry.md) |
 | ADR-008 | Cross-asset `CORRELATES_WITH` propagation with visited-set cycle guard | Accepted | [SRS-04](SRS-04-prediction.md), [SRS-07](SRS-07-credibility.md) |
 | ADR-009 | Separate intraday target-hit evidence from daily close-to-close learning | Accepted | [SRS-06](SRS-06-verification.md), [SRS-05](SRS-05-market-data.md) |
+| ADR-011 | Capture research evidence independently of official KG publication | Accepted | PRD-64–PRD-69 in [SRS-04](SRS-04-prediction.md#712-research-evidence-capture) |
 
 ## ADR-001: Multi-event context before prediction
 
@@ -259,6 +260,22 @@ Yahoo minute coverage and thresholds need empirical validation before any live p
 revisions after finalization and exactly-once cross-store learning need a separately reviewed
 promotion design; v1 does not claim either is solved by deduplicating messages alone.
 
+## ADR-011: Research evidence before official publication filtering
+
+The official prediction stream omits abstentions and suppressed stances, while context membership
+does not retain complete received event versions. Using that stream alone to compare future models
+would select the examples using the KG's publication rules and lose input availability evidence.
+
+Optional capture therefore appends event receipt/version evidence and direct context opportunities
+inside the Prediction schema before publication filtering. KG research results and official outbox
+records are separate; capture has no broker publisher or graph-learning hook. Research failures are
+bounded and observable without interrupting official processing. Exports remain explicitly ineligible
+for training until point-in-time market features and finalized labels exist.
+
+Costs accepted: extra storage, bounded database latency and incomplete research evidence when capture
+fails. Ambiguous event revisions are rejected until context membership can pin their hashes. This
+decision establishes evidence capture only; it does not activate a model or change official routing.
+
 ## 3. How to update this document
 
 **When to add an ADR** — a decision that changes the system's shape and whose reasoning would not be
@@ -267,7 +284,7 @@ messaging-topology change, or the reversal of an earlier ADR.
 
 **Steps**
 
-1. Add the record with the next free number (`ADR-009`). Never reuse a number.
+1. Add the record with the next free number (`ADR-012`). Never reuse a number.
 2. State the problem that forced the decision, then the decision, then the cost accepted. An ADR with
    no stated cost is usually incomplete.
 3. Add a row to the section 2 index, naming the requirements the decision binds to.
@@ -281,6 +298,7 @@ messaging-topology change, or the reversal of an earlier ADR.
 
 | Date | Version | Change | Driver |
 |---|---|---|---|
+| 2026-09-25 | 1.4.0 | ADR-011: separate opt-in research evidence capture from official publication | E15 |
 | `2026-09-24` | `1.2.0` | ADR-009: independent shadow target-hit evaluation | Intraday verification |
 | `2026-08-06` | `1.0.0` | Moved into `requirements/` from `docs/decisions/README.md`. Added ADR-007 to the index (present in the body but missing from the table), requirement-ID cross-references, and update rules | Requirements consolidation |
 | `2026-08-12` | `1.1.0` | Added ADR-008: cross-asset `CORRELATES_WITH` propagation | E10 epic |

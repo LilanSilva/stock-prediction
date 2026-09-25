@@ -37,6 +37,7 @@ the one remediation epic `P06`, which does use the epic/story/task nesting.
 | E12 | Prediction quality remediation | M4 | **Complete** — 93 of 113 predictions on 2026-08-12 were not justified by their news; specified as CLN-63 – CLN-68 in [SRS-03](../requirements/SRS-03-cleansing.md) and PRD-60 – PRD-62 in [SRS-04](../requirements/SRS-04-prediction.md) |
 | E13 | Cleansing classification accuracy | M4 | **Complete** — an audit of 2026-08-17 found 110 of 251 clusters correctly classified; raised to 72.4%. Specified as CLN-69 – CLN-72 in [SRS-03](../requirements/SRS-03-cleansing.md), with the method and the rejected approaches in [SRS-03 §12](../requirements/SRS-03-cleansing.md#12-classification-accuracy-improvements) |
 | [E11](E11-Data-Retention/README.md) | Bounded growth/retention for unbounded tables | Unscheduled | Proposed; only Ingestion has a retention cleaner today |
+| [E15](E15-KG-Model-Comparison/README.md) | Parallel KG/model predictions, offline training, evidence-gated model replacement and rollback | Unscheduled | In progress; first evidence-capture delivery implemented locally; remaining scope in the [development plan](E15-KG-Model-Comparison/development-plan.md) |
 
 E08 and E09 have no SRS by design: [requirements/](../requirements/README.md) specifies implemented
 components only. An SRS-08 and SRS-09 get written when those services are built.

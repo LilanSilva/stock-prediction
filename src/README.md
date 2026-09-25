@@ -23,7 +23,7 @@ Each service folder has the same shape: a `Dockerfile`, a `pyproject.toml`, the 
 |---|---|---|
 | [ingestion/](services/ingestion/) | `ingestion` | [SRS-02](../requirements/SRS-02-ingestion.md) |
 | [cleansing/](services/cleansing/) | `cleansing` | [SRS-03](../requirements/SRS-03-cleansing.md) |
-| [prediction/](services/prediction/) | `prediction` | [SRS-04](../requirements/SRS-04-prediction.md) |
+| [prediction/](services/prediction/README.md) | `prediction` | [SRS-04](../requirements/SRS-04-prediction.md) |
 | [market-data/](services/market-data/) | `market_data` | [SRS-05](../requirements/SRS-05-market-data.md) |
 | [verification/](services/verification/) | `verification` | [SRS-06](../requirements/SRS-06-verification.md) |
 | [credibility/](services/credibility/) | `credibility` | [SRS-07](../requirements/SRS-07-credibility.md) |

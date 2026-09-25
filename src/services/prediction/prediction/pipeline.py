@@ -29,6 +29,7 @@ from prediction.config import PredictionSettings
 from prediction.context import window_bounds
 from prediction.decision import decide
 from prediction.models import ActivePrediction, ContextEvent, ContextRecord, ContextState, Decision
+from prediction.research import ResearchRecorder
 
 logger = structlog.get_logger(__name__)
 
@@ -125,14 +126,18 @@ class PredictionPipeline:
         graph: GraphSource,
         price_reader: PriceSource,
         settings: PredictionSettings,
+        research: ResearchRecorder | None = None,
     ) -> None:
         self._repo = repository
         self._graph = graph
         self._price_reader = price_reader
         self._settings = settings
+        self._research = research
 
     async def process_event(self, event: EventDetected) -> None:
         """Add a distinct event to each affected asset's event-time context window."""
+        if self._research is not None:
+            await self._research.record_event(event)
         if not event.affected_asset_ids:
             logger.info(
                 "event_no_assets", event_id=str(event.event_id), event_type=event.event_type.value
@@ -526,6 +531,10 @@ class PredictionPipeline:
             try:
                 edges = await self._firing_edges(record.asset_id, events, elevated=elevated)
             except GraphError as exc:
+                if self._research is not None:
+                    await self._research.capture(
+                        record, events, [], elevated, None, datetime.now(UTC), graph_failed=True,
+                    )
                 logger.warning(
                     "graph_inference_deferred",
                     context_id=str(record.context_id),
@@ -547,6 +556,12 @@ class PredictionPipeline:
                 elevated=elevated,
                 evidence_halfpoint=self._settings.confidence_evidence_halfpoint,
             )
+            if self._research is not None:
+                # Use actual input availability after reads, never the sweep's earlier `now`.
+                # Capture before abstention, stance suppression, caps, and propagation.
+                await self._research.capture(
+                    record, events, edges, elevated, decision, datetime.now(UTC),
+                )
             if decision is None:
                 await self._repo.set_context_state(record.context_id, ContextState.PREDICTED)
                 logger.info(
