@@ -18,8 +18,14 @@ a second run must change nothing.
 | [rabbitmq/render-definitions.sh](rabbitmq/render-definitions.sh) | Injects the broker user at startup and computes its password hash at runtime |
 | [neo4j/init/](neo4j/init/) | Seven Cypher scripts: constraints, then the causal graph seed data |
 | [assets/assets.json](assets/assets.json) | The deployed asset registry, mounted read-only at `/config/assets.json` |
+| [assets/avanza-listings.json](assets/avanza-listings.json) | Disabled, validated companion listing mappings; identity/version rules in [REF-02](../requirements/REF-02-asset-registry.md#avanza-companion-mappings) |
 
 ## Bring up the stack
+
+The optional `snapshots` profile adds a browser worker. Deployment, CA setup, resource limits,
+rollout/rollback and recovery are owned by
+[SRS-05](../requirements/SRS-05-market-data.md#snapshot-deployment-and-recovery).
+Normal stack startup does not enable it.
 
 ```bash
 cp infra/.env.example infra/.env   # then edit infra/.env with local values

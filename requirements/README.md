@@ -39,7 +39,7 @@ them:
 |---|---|
 | [REF-01-event-taxonomy.md](REF-01-event-taxonomy.md) | The 32 canonical event types and multilingual normalization rules |
 | [REF-02-asset-registry.md](REF-02-asset-registry.md) | Asset registry file shape, provider routing, session calendars, registry version history |
-| [ADR-decisions.md](ADR-decisions.md) | ADR-001…007 — why the system is shaped this way |
+| [ADR-decisions.md](ADR-decisions.md) | ADR-001…010 — why the system is shaped this way |
 
 ## Reading order
 
@@ -93,6 +93,10 @@ and its number is never reused.
 | `NTF` | Notification |
 
 ## Conventions
+
+The Avanza addition owns MKT-60–MKT-66, VER-46–VER-50 and SHR-94–SHR-95. Implementation and proving
+tests are in the respective SRS documents; the outstanding live pilot is tracked in
+[E14](../backlog/E14-Avanza-Price-Snapshots/README.md).
 
 **Requirement wording** — every requirement is one testable statement using `shall`:
 

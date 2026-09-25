@@ -8,6 +8,7 @@ and exposes ``/health`` and ``/ready``. No Neo4j and no LLM.
 from __future__ import annotations
 
 import asyncio
+import json
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -25,7 +26,13 @@ from shared.logging import setup_logging
 from shared.messaging.client import ConsumerCallback, RabbitMQClient
 from shared.messaging.exceptions import MessagePoisonError
 from shared.messaging.intraday_topology import ensure_intraday_topology
-from shared.schemas.messages import IntradayObserved, PredictionMade, PriceObserved
+from shared.messaging.snapshot_topology import ensure_snapshot_topology
+from shared.schemas.messages import (
+    IntradayObserved,
+    PredictionMade,
+    PriceObserved,
+    PriceSampleObserved,
+)
 
 from verification.config import VerificationSettings
 from verification.db import apply_schema, create_pool
@@ -39,6 +46,8 @@ from verification.intraday import IntradayVerification
 from verification.outbox import VerificationOutboxPublisher
 from verification.pipeline import VerificationPipeline
 from verification.repository import VerificationRepository
+from verification.sampled import DDL as SAMPLED_DDL
+from verification.sampled import SampleVerification
 
 logger = structlog.get_logger(__name__)
 
@@ -65,6 +74,7 @@ class AppContext:
     consumer_tasks: list[asyncio.Task[None]]
     state: ServiceState
     intraday: IntradayVerification | None = None
+    sampled: SampleVerification | None = None
 
 
 async def _run_sweep(app: FastAPI) -> None:
@@ -141,6 +151,7 @@ def _make_intraday_consumer(app: FastAPI) -> ConsumerCallback:
                 await ctx.intraday.observe(observed)
         except ValueError as exc:
             raise MessagePoisonError(str(exc)) from exc
+
     return consume
 
 
@@ -151,6 +162,30 @@ async def _run_intraday(app: FastAPI) -> None:
             await ctx.intraday.tick()
     except Exception:
         logger.exception("intraday_verification_tick_failed")
+
+
+def _make_sample_consumer(app: FastAPI, *, predictions: bool = False) -> ConsumerCallback:
+    async def consume(message: AbstractIncomingMessage) -> None:
+        ctx: AppContext = app.state.ctx
+        if not ctx.sampled:
+            return
+        try:
+            if predictions:
+                await ctx.sampled.register(PredictionMade.model_validate_json(message.body))
+            else:
+                await ctx.sampled.observe(PriceSampleObserved.model_validate_json(message.body))
+        except ValueError as exc:
+            raise MessagePoisonError(str(exc)) from exc
+    return consume
+
+
+async def _run_samples(app: FastAPI) -> None:
+    ctx: AppContext = app.state.ctx
+    try:
+        if ctx.sampled:
+            await ctx.sampled.tick()
+    except Exception:
+        logger.exception("sample_verification_tick_failed")
 
 
 @asynccontextmanager
@@ -173,6 +208,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     outbox = VerificationOutboxPublisher(pool, rabbit)
     pipeline = VerificationPipeline(repository, settings)
     intraday = None
+    sampled = None
+    if settings.sample_mode == "SHADOW":
+        await pool.execute(SAMPLED_DDL)
+        await ensure_snapshot_topology(settings.rabbitmq_url)
+        sampled = SampleVerification(pool, settings)
     if settings.intraday_mode == "SHADOW":
         await ensure_intraday_topology(settings.rabbitmq_url)
         intraday = IntradayVerification(pool, settings)
@@ -190,6 +230,24 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     ]
 
     scheduler = AsyncIOScheduler()
+    if sampled:
+        consumer_tasks.extend(
+            [
+                asyncio.create_task(
+                    rabbit.consume("verification.price-samples", _make_sample_consumer(app))
+                ),
+                asyncio.create_task(
+                    rabbit.consume(
+                        "verification.sample-predictions",
+                        _make_sample_consumer(app, predictions=True),
+                    )
+                ),
+            ]
+        )
+        scheduler.add_job(
+            _run_samples, "interval", seconds=30, args=[app],
+            id="sample_verification", max_instances=1, coalesce=True,
+        )
     if intraday:
         consumer_tasks.append(asyncio.create_task(
             rabbit.consume(settings.intraday_prices_queue, _make_intraday_consumer(app))
@@ -221,6 +279,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         consumer_tasks=consumer_tasks,
         state=ServiceState(),
         intraday=intraday,
+        sampled=sampled,
     )
     logger.info(
         "verification_started",
@@ -244,6 +303,22 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Feed Analyzer Verification", lifespan=lifespan)
+
+
+@app.get("/verification/sampled/{prediction_id}")
+async def sampled_result(prediction_id: uuid.UUID) -> JSONResponse:
+    ctx: AppContext = app.state.ctx
+    if not ctx.sampled:
+        return JSONResponse({"mode": "OFF"}, status_code=503)
+    result = await ctx.sampled.get(prediction_id)
+    if result is None:
+        return JSONResponse({"detail": "not found"}, status_code=404)
+    return JSONResponse({
+        "prediction_id": str(prediction_id), "mode": "SHADOW", "status": result["status"],
+        "policy": json.loads(str(result["policy"])),
+        "window": json.loads(str(result["session_window"])),
+        "result": json.loads(str(result["result"])) if result["result"] else None,
+    })
 
 
 @app.get("/health")

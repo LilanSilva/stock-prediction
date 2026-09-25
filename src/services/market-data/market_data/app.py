@@ -46,6 +46,7 @@ from market_data.handler import PriceRequestProcessor
 from market_data.intraday import DDL as INTRADAY_DDL
 from market_data.intraday import IntradayCollector
 from market_data.intraday_adapter import IntradayAdapter
+from market_data.snapshots.api import router as snapshot_router
 from market_data.storage import (
     MAX_RECENT_SESSIONS,
     MIN_RECENT_SESSIONS,
@@ -280,6 +281,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Feed Analyzer Market Data", lifespan=lifespan)
+app.include_router(snapshot_router)
 
 
 @app.get("/health")

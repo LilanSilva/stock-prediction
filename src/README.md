@@ -61,6 +61,33 @@ Each has its own README with run commands and gate results.
 
 ## Working here
 
+The [Market Data snapshot package](services/market-data/market_data/snapshots/) contains the separate
+worker, browser adapter, scheduler, mapping CLI and read-only router; `Dockerfile.snapshots` and its
+hash-pinned `requirements-snapshots.txt` isolate browser dependencies from the API image.
+[sampled.py](services/verification/verification/sampled.py) and
+[sampled_policy.py](services/verification/verification/sampled_policy.py) own the separate shadow path.
+Behavior and configuration are in [SRS-05](../requirements/SRS-05-market-data.md) and
+[SRS-06](../requirements/SRS-06-verification.md).
+
+Run each suite separately (their test-package names overlap):
+
+```bash
+python -m pytest src/services/market-data/tests -m "not integration"
+python -m pytest src/services/verification/tests -m "not integration"
+python -m pytest src/shared/tests -m "not integration"
+```
+
+Optional snapshot SQL tests require `SNAPSHOT_TEST_DATABASE_URL` pointing to a disposable database
+named `snapshot_test`; they reset snapshot tables. Run `test_snapshot_storage.py` in Market Data and
+`test_sampled_storage.py` in Verification separately. The optional shared `test_snapshot_broker.py`
+requires `SNAPSHOT_TEST_RABBITMQ_URL` pointing to a disposable broker. Never use application resources.
+Compile the browser lock with `pip-compile --generate-hashes
+--output-file=src/services/market-data/requirements-snapshots.txt
+src/services/market-data/requirements-snapshots.in` after a deliberate Playwright version change.
+
+The cache regression in Market Data's `test_snapshots.py` runs with `SNAPSHOT_TEST_BROWSER=1` and
+installed Chromium (available in the snapshot image). It uses a local HTTP fixture, not Avanza.
+
 One shared virtual environment at the repository root (`.venv/`) serves every service — see the
 repository [README](../README.md#development-environment). Validation from `src/shared/`:
 

@@ -29,6 +29,14 @@ flowchart LR
     EX --> QGS[gateway.scored.live]
     QGS --> G
 
+    S[Optional snapshot worker] -->|price.sample.observed| EX
+    EX --> QS[verification.price-samples]
+    EX --> QSP[verification.sample-predictions]
+    QS --> VS[Sampled SHADOW - no live scores]
+    QSP --> VS
+    QS -. verification.price-samples.failed .-> DS[verification.price-samples.dlq]
+    QSP -. verification.sample-predictions.failed .-> DSP[verification.sample-predictions.dlq]
+
     classDef q fill:#fff3cd,stroke:#b8860b,color:#000
     class QA,QE,QVP,QGP,QPR,QPX,QCS,QGS q
 

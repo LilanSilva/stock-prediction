@@ -17,6 +17,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+snapshots = [
+    "playwright==1.55.0",
+    "exchange-calendars==4.13.1",
+]
 dev = [
     "pytest>=8",
     "pytest-asyncio>=0.23",

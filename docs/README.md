@@ -20,8 +20,8 @@ Preview").
 
 | File | What it shows |
 |---|---|
-| [01-architecture-components.mmd](architectural-documents/01-architecture-components.mmd) | Components, schemas, graph store, and connections |
-| [02-architecture-queues.mmd](architectural-documents/02-architecture-queues.mmd) | Topic exchange and independent consumer queues |
+| [01-architecture-components.mmd](architectural-documents/01-architecture-components.mmd) | Components, schemas, graph store, and optional snapshot worker |
+| [02-architecture-queues.mmd](architectural-documents/02-architecture-queues.mmd) | Topic exchange, independent consumer queues and sampled SHADOW path |
 | [03-sequence-prediction-pipeline.mmd](architectural-documents/03-sequence-prediction-pipeline.mmd) | Ingestion, cleansing, multi-event context, and token-efficient prediction |
 | [04-sequence-verification-credibility.mmd](architectural-documents/04-sequence-verification-credibility.mmd) | Dual-session price request, scoring, and idempotent learning |
 | [05-sequence-dashboard.mmd](architectural-documents/05-sequence-dashboard.mmd) | Read-only API access and live fan-out — the Dashboard is not built yet |

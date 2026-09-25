@@ -17,7 +17,7 @@ import uuid
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import (
     AfterValidator,
@@ -48,6 +48,7 @@ class RoutingKey(StrEnum):
     PREDICTION_SCORED = "prediction.scored"
     INTRADAY_REQUESTED = "intraday.requested"
     INTRADAY_OBSERVED = "intraday.observed"
+    PRICE_SAMPLE_OBSERVED = "price.sample.observed"
 
 
 # --- Canonical enums ---
@@ -458,6 +459,48 @@ class IntradayObserved(FeedMessage):
     failure: str | None = None
 
 
+class PriceSampleObserved(FeedMessage):
+    """A point observation, never an OHLC bar or an asserted official close."""
+
+    sample_id: uuid.UUID
+    asset_id: AssetId
+    mapping_version: NonEmptyStr
+    registry_version: NonEmptyStr
+    session: date
+    opens_at: UtcDatetime
+    closes_at: UtcDatetime
+    scheduled_at: UtcDatetime
+    observed_at: UtcDatetime
+    provider_quote_at: AwareDatetime | None = None
+    price: Annotated[Decimal, Field(gt=0, allow_inf_nan=False)]
+    quote_delay_seconds: Annotated[int, Field(ge=0)] | None = None
+    currency: Annotated[str, Field(pattern=r"^[A-Z]{3}$")]
+    quote_unit: NonEmptyStr
+    source: Literal["avanza"] = "avanza"
+    interval_seconds: Literal[900] = 900
+    kind: Literal["REGULAR", "CLOSE_CHECK"]
+    market_state: Literal[
+        "PRE_OPEN", "REGULAR_OPEN", "REGULAR_CLOSED", "EXTENDED_HOURS", "HALTED", "UNKNOWN"
+    ]
+    quality: Literal["FRESH", "STALE", "FRESHNESS_UNKNOWN", "SESSION_MISMATCH"]
+
+    @model_validator(mode="after")
+    def valid_sample(self) -> PriceSampleObserved:
+        if not self.opens_at < self.closes_at:
+            raise ValueError("invalid sample session")
+        if self.observed_at < self.scheduled_at:
+            raise ValueError("sample observed before its slot")
+        if self.provider_quote_at and self.provider_quote_at > self.observed_at:
+            raise ValueError("quote timestamp is in the future")
+        if self.quality == "FRESH" and self.provider_quote_at is None:
+            raise ValueError("freshness requires a provider timestamp")
+        if self.kind == "REGULAR" and not self.opens_at <= self.scheduled_at < self.closes_at:
+            raise ValueError("regular sample outside its session")
+        if self.kind == "CLOSE_CHECK" and not self.closes_at <= self.scheduled_at:
+            raise ValueError("close check before close")
+        return self
+
+
 ROUTING_KEY_BY_MESSAGE: dict[type[FeedMessage], RoutingKey] = {
     ArticleIngested: RoutingKey.ARTICLE_INGESTED,
     EventDetected: RoutingKey.EVENT_DETECTED,
@@ -467,4 +510,5 @@ ROUTING_KEY_BY_MESSAGE: dict[type[FeedMessage], RoutingKey] = {
     PredictionScored: RoutingKey.PREDICTION_SCORED,
     IntradayRequested: RoutingKey.INTRADAY_REQUESTED,
     IntradayObserved: RoutingKey.INTRADAY_OBSERVED,
+    PriceSampleObserved: RoutingKey.PRICE_SAMPLE_OBSERVED,
 }

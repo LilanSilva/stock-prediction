@@ -176,7 +176,17 @@ DELETE FROM credibility.processed_predictions
 WHERE processed_at < now() - make_interval(days => :idempotency_retention_days);  -- e.g. 30
 ```
 
-## Suggested implementation shape
+## Snapshot evidence retention
+
+Include the additive snapshot and sampled-evaluation tables described in
+[SRS-05](../../requirements/SRS-05-market-data.md#9-data-design) and
+[SRS-06](../../requirements/SRS-06-verification.md#9-data-design). Preserve mapping versions, jobs and
+sample evidence referenced by retained evaluations; never delete undelivered outbox rows or pending
+jobs/evaluations. Account for at-least-once replay before pruning deduplication identities. Agree an
+archive/export policy before enabling deletion. Current worker capacity limits pause reads instead
+of silently discarding old evidence.
+
+## Suggested retention implementation
 
 - Add a `RetentionCleaner` (mirroring Ingestion) to each of Cleansing, Prediction, Market Data,
   Verification, and Credibility, scoped to that service's own schema.

@@ -362,9 +362,39 @@ currency, calendars, and fallback quality.
 - **`poc6-yahoo-reference-v1`** — retired; `GC=F`/`BZ=F` via the Yahoo chart endpoint. Retired for
   `HTTP 429`s later shown to be a User-Agent problem rather than IP rate limiting.
 
+## Avanza companion mappings
+
+[infra/assets/avanza-listings.json](../infra/assets/avanza-listings.json) is a separate versioned
+companion; it does not change the canonical registry's daily/minute provider selection. Schema v1
+contains `mapping_version` and `listings`. Each listing stores canonical `asset_id`, `market_code`,
+`search_terms`, numeric Avanza `instrument_id`, HTTPS `page_url`, `display_name`, exact `ticker`,
+`instrument_type` (`STOCK` or `DEPOSITARY_RECEIPT`), optional `share_class`/`isin`, canonical
+`expected_exchange`, visible `page_exchange`, `expected_currency`, `quote_unit`, `calendar_id`,
+`timezone`, `enabled`, `validation_status`, `validated_at` and `evidence_url`.
+
+`market_code`, exchange, currency and timezone must agree with the canonical registry. The URL must
+use `www.avanza.se`, the exact instrument ID and no credentials/query/fragment. v1 supports major
+currency units only; it cannot silently turn pence into pounds. Asset and instrument IDs are unique.
+Enabling requires VERIFIED status with a timestamp and matching evidence URL. All initial mappings
+are disabled. Instrument identity includes the listing, not merely the company name; a depositary
+receipt cannot be silently treated as an ordinary share or a US ADR.
+
+Discovery searches ticker text, filters share results by exchange and currency, requires one exact
+ticker match, then validates the destination page's ticker, instrument type and price currency.
+Ambiguous/missing results are reported and omitted; no first-result or LLM guess is accepted.
+Exchange aliases currently map NASDAQ/NYSE to XNYS, STO to XSTO, CPH to XCSE, AMS to XAMS and ETR to
+XETR. Calendar/timezone agreement is checked at runtime. New venues need explicit validation.
+
+Use the [discovery commands](../scripts/README.md#avanza-listing-discovery) to create a candidate file
+at a new path, review its report, validate it, and publish a **new** mapping version. Never overwrite
+a deployed version's contents. SQL retains each prior version/hash and freezes it into jobs/samples.
+Mapping edits cannot rewrite historical currency or evidence. A registry change requires service
+restart and companion revalidation. An LLM is unnecessary for the recurring collector or discovery.
+
 ## 12. Change history
 
 | Date | Version | Change | Driver |
 |---|---|---|---|
+| 2026-09-25 | 1.2.0 | Add disabled Avanza companion mappings and discovery/versioning rules | Prospective price samples |
 | `2026-08-29` | `1.1.0` | All assets routed to `yahoo`; biquote.io retired; the three `_YH` mirror assets removed; counts corrected to 14 groups / 29 assets | biquote session gaps stalling price requests |
 | `2026-08-06` | `1.0.0` | Moved into `requirements/` from `docs/reference/asset-registry.md`. Corrected group count to 16 (both the old document and SRS-01 §9.3 were wrong); added the group list, the full session-calendar table, the fallback-asset table, and update rules | Requirements consolidation |

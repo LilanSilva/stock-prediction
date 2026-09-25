@@ -28,6 +28,10 @@
     }
   ],
   "queues": [
+    {"name": "verification.price-samples", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {"x-queue-type": "classic", "x-dead-letter-exchange": "feed.dlx", "x-dead-letter-routing-key": "verification.price-samples.failed"}},
+    {"name": "verification.price-samples.dlq", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {"x-queue-type": "classic"}},
+    {"name": "verification.sample-predictions", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {"x-queue-type": "classic", "x-dead-letter-exchange": "feed.dlx", "x-dead-letter-routing-key": "verification.sample-predictions.failed"}},
+    {"name": "verification.sample-predictions.dlq", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {"x-queue-type": "classic"}},
     {
       "name": "market-data.intraday-requests", "vhost": "/", "durable": true,
       "auto_delete": false,
@@ -208,6 +212,10 @@
     }
   ],
   "bindings": [
+    {"source": "feed.events", "vhost": "/", "destination": "verification.price-samples", "destination_type": "queue", "routing_key": "price.sample.observed", "arguments": {}},
+    {"source": "feed.dlx", "vhost": "/", "destination": "verification.price-samples.dlq", "destination_type": "queue", "routing_key": "verification.price-samples.failed", "arguments": {}},
+    {"source": "feed.events", "vhost": "/", "destination": "verification.sample-predictions", "destination_type": "queue", "routing_key": "prediction.made", "arguments": {}},
+    {"source": "feed.dlx", "vhost": "/", "destination": "verification.sample-predictions.dlq", "destination_type": "queue", "routing_key": "verification.sample-predictions.failed", "arguments": {}},
     {"source": "feed.events", "vhost": "/", "destination": "market-data.intraday-requests",
      "destination_type": "queue", "routing_key": "intraday.requested", "arguments": {}},
     {"source": "feed.dlx", "vhost": "/", "destination": "market-data.intraday-requests.dlq",

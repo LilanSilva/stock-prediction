@@ -304,6 +304,10 @@ the POC graduates — see 13.4.
 
 ### 7.1 Routing topology
 
+The additive point-sample route and independent prediction-copy queue are defined in
+[SRS-01](SRS-01-shared-foundation.md#84-rabbitmq-topology). Their SHADOW consumer emits no live scores.
+
+
 All messages flow through one durable topic exchange, `feed.events`. Producers publish by routing
 key; consumers own a queue bound to the keys they need.
 
@@ -441,6 +445,13 @@ The system was designed to be token-efficient, and a controlled experiment made 
   `LLM_ARBITRATED` remains defined in the contract as a deferred experimental path.
 
 ### 7.4 Idempotency: how duplicate work is prevented
+
+An optional Market Data browser worker adds prospective point samples without changing this daily
+pipeline. `price.sample.observed` and an independent copy of `prediction.made` feed a separate SHADOW
+sample evaluator. It publishes no scores or learning events. Worker failure is isolated from existing
+HTTP API readiness; unknown freshness cannot become a valid baseline. Contracts, calendar rules,
+data ownership and rollout gates are specified in [SRS-05](SRS-05-market-data.md#avanza-snapshot-worker)
+and [SRS-06](SRS-06-verification.md#sampled-shadow-flow).
 
 RabbitMQ delivers at least once, so every stage has a durable guard.
 

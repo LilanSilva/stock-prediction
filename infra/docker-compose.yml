@@ -291,6 +291,36 @@ services:
     volumes:
       - ./assets/:/config/:ro
 
+  feed-market-data-snapshots:
+    profiles: ["snapshots"]
+    build:
+      context: ..
+      dockerfile: src/services/market-data/Dockerfile.snapshots
+    image: feed-analyzer/market-data-snapshots:0.1
+    init: true
+    restart: "on-failure:3"
+    cpus: 2
+    mem_limit: 3g
+    shm_size: 1g
+    pids_limit: 512
+    depends_on:
+      feed-postgres:
+        condition: service_healthy
+      feed-rabbitmq:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-feed_user}:${POSTGRES_PASSWORD:?set in .env}@feed-postgres:5432/${POSTGRES_DB:-feed}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-feed_user}:${RABBITMQ_DEFAULT_PASS:?set in .env}@feed-rabbitmq:5672/
+      ASSET_REGISTRY_PATH: /config/assets.json
+      SNAPSHOT_MAPPINGS_PATH: /config/avanza-listings.json
+      SNAPSHOT_ENABLED: ${SNAPSHOT_ENABLED:-false}
+      SNAPSHOT_CONCURRENCY: ${SNAPSHOT_CONCURRENCY:-2}
+      SNAPSHOT_LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ./assets/:/config/:ro
+    networks:
+      - feed-net
+
   feed-verification:
     build:
       context: ..
@@ -307,6 +337,10 @@ services:
       VERIFICATION_INTRADAY_CALENDARS: '${VERIFICATION_INTRADAY_CALENDARS:-{}}'
       VERIFICATION_INTRADAY_TARGET_RETURN: ${VERIFICATION_INTRADAY_TARGET_RETURN:-0.003}
       VERIFICATION_INTRADAY_NEUTRAL_BAND: ${VERIFICATION_INTRADAY_NEUTRAL_BAND:-0.003}
+      VERIFICATION_SAMPLE_MODE: ${VERIFICATION_SAMPLE_MODE:-OFF}
+      VERIFICATION_SAMPLE_CALENDARS: '${VERIFICATION_SAMPLE_CALENDARS:-{}}'
+      VERIFICATION_SAMPLE_TARGET_RETURN: ${VERIFICATION_SAMPLE_TARGET_RETURN:-0.003}
+      VERIFICATION_SAMPLE_NEUTRAL_BAND: ${VERIFICATION_SAMPLE_NEUTRAL_BAND:-0.003}
       # Container-network connection strings (override the host-side values in .env). The service
       # reaches Postgres/RabbitMQ by their compose service names, not localhost.
       DATABASE_URL: postgresql://${POSTGRES_USER:-feed_user}:${POSTGRES_PASSWORD:?set in .env}@feed-postgres:5432/${POSTGRES_DB:-feed}

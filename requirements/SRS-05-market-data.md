@@ -34,9 +34,9 @@
 | Field | Value |
 |---|---|
 | Author | Feed Analyzer project |
-| Version | `1.1.0` |
+| Version | `1.2.0` |
 | Created | 2026-08-05 |
-| Last updated | 2026-08-05 |
+| Last updated | 2026-09-25 |
 | Replaces | `docs/functional-documents/market-data-service-functional-document.md` (deleted 2026-08-06) |
 | Source code | `src/services/market-data/` |
 | Config class | `market_data.config.MarketDataSettings` |
@@ -118,6 +118,18 @@ External providers:
 ---
 
 ## 5. Functional Requirements
+
+### Avanza point observations
+
+| ID | Requirement | Status |
+|---|---|---|
+| MKT-60 | The isolated snapshot worker shall schedule point observations every 900 seconds during each enabled listing's regular exchange session | Implemented |
+| MKT-61 | Each sample shall retain the exact decimal price, listing currency, actual observation time and immutable mapping version | Implemented |
+| MKT-62 | A failed read shall leave a gap after at most one bounded retry | Implemented |
+| MKT-63 | Sample persistence and publication intent shall commit atomically under a fenced job lease | Implemented |
+| MKT-64 | Snapshot collection shall preserve existing daily-close and minute-bar API/message semantics | Implemented |
+| MKT-65 | Unknown provider quote time shall remain explicitly ineligible for strict sampled verification | Implemented |
+| MKT-66 | Close checks shall remain distinct from official daily close observations | Implemented |
 
 ### Intraday collection
 
@@ -246,6 +258,45 @@ External providers:
 ---
 
 ## 7. How It Works
+
+### Avanza snapshot worker
+
+`python -m market_data.snapshots.worker` is a separate process/image owned by Market Data.
+The FastAPI process imports only its read-only router and storage module, not Playwright. Collection
+is disabled by default; no personal Chrome profile is used. A single PostgreSQL advisory-lock leader
+coordinates a reusable browser context with 2 concurrent pages by default, configurable up to 10.
+Only explicitly enabled, verified companion mappings are scheduled; discovery never runs per slot.
+Mapping identity and versioning are defined in [REF-02](REF-02-asset-registry.md#avanza-companion-mappings).
+
+`exchange_calendars` 4.13.1 resolves exchange-local trading dates, holidays, DST and early closes.
+Sessions with a lunch break or a mismatched timezone are unsupported and pause the listing.
+Regular slots start at the exchange open and repeat every 15 minutes, strictly before close.
+Three bounded close checks are scheduled at close, close+2 minutes and close+5 minutes. There are no
+website reads between the final check deadline and the next regular session. The control loop remains
+alive to update heartbeat and relay the outbox. Past slots become `MISSED`; restarting never backfills
+them with a current quote. Every sample keeps both scheduled and actual observed time.
+
+Each read opens a new tab with Chromium's HTTP cache disabled and service-worker
+responses bypassed before navigation; new service workers are also blocked in the browser context.
+This applies to temporary and configured persistent profiles, without clearing shared cookies or
+disrupting concurrent tabs. Browser cache bypass does not remove the provider's reported quote delay
+or prove that an unchanged price is stale. Local browser regression coverage warms a cacheable price
+resource, changes the server value and verifies subsequent reads retrieve the new value.
+
+The reader validates URL/instrument ID, title ticker, company heading, visible exchange, instrument
+type and currency. It reads only Avanza's regular `Senast betalt` price element, excluding the separate
+extended-hours value and chart history. Swedish decimal commas and grouped spaces are parsed into
+`Decimal`; unsupported minor-unit prices fail closed. It opens the market-status text panel and
+matches the current-state heading, never the colored dot or the timetable legend. Status is
+`PRE_OPEN`, `REGULAR_OPEN`, `REGULAR_CLOSED`, `EXTENDED_HOURS`, `HALTED` or `UNKNOWN`.
+A disagreement with the scheduled regular session makes evidence `SESSION_MISMATCH`; it does not
+invent an open or closed state. Exchange scheduling bounds reads even when the page indicator is unknown.
+
+The currently validated DOM supplies a reported quote delay but no precise provider quote timestamp.
+`provider_quote_at` remains null and quality is `FRESHNESS_UNKNOWN`; observation time is not trade time.
+An unchanged price does not establish freshness. Close checks remain `CLOSE_UNCONFIRMED`, even when
+the regular last price appears final. They cannot populate `close_observations` or one-minute OHLC.
+The price-sample event contract belongs to [SRS-01](SRS-01-shared-foundation.md#sampled-price-contract).
 
 ### Intraday collector
 
@@ -419,6 +470,18 @@ content_hash = SHA-256(hash_input.encode("utf-8")).hexdigest()
 
 ## 8. Interfaces
 
+Snapshot endpoints are additive and available independently of the browser worker:
+
+| Endpoint | Response |
+|---|---|
+| `GET /snapshots/status` | `NOT_STARTED` before worker schema initialization; otherwise durable control status/heartbeat, asset pauses/errors, session window including next open, market state/close confirmation, job counts and pending outbox count |
+| `GET /snapshots/recent?asset_id=…&limit=100&before=…` | Newest-first `PriceSampleObserved` objects; decimal prices serialize as strings; limit 1–1000; optional timezone-aware timestamp is an exclusive upper bound; empty before initialization |
+
+`/prices/recent`, `/health`, `/ready`, `PriceObserved` and `IntradayObserved` retain their previous
+meaning and response fields. Collector readiness is visible through `/snapshots/status` rather than
+making legacy API readiness depend on a browser. Currency and market-state metadata are exposed on
+the new snapshot endpoints/event only.
+
 Optional intraday consumer: `market-data.intraday-requests`, bound to `intraday.requested`.
 Producer: `intraday.observed`, consumed only by shadow verification. Contracts and topology are in
 [SRS-01](SRS-01-shared-foundation.md#84-rabbitmq-topology). `/health.intraday_enabled` reports the flag.
@@ -470,6 +533,25 @@ Key fields set by this service:
 ---
 
 ## 9. Data Design
+
+The idempotent DDL in `market_data/snapshots/storage.py` adds the following tables; it alters no
+existing table. All timestamps are `TIMESTAMPTZ`; serialized models retain Decimal strings.
+
+| Table (`market_data` schema) | Columns and constraints |
+|---|---|
+| `snapshot_mappings` | `version` PK, SHA-256 `content_hash`, immutable typed config `payload` |
+| `snapshot_assets` | `asset_id` PK, current `version`, `enabled`, `paused`, consecutive `failures`, `last_error`, `last_success` |
+| `snapshot_control` | singleton `id=1`, durable `cooldown_until`, `paused`, `failure_count`, `status`, `heartbeat` |
+| `snapshot_sessions` | PK `(asset_id,session,version)`, frozen `session_window` JSON text, `market_state`, `state_at`, `status_text`, `final_sample`, `close_status` |
+| `snapshot_jobs` | deterministic UUID `job_id` PK, `asset_id`, `session`, mapping FK `version`, `registry_version`, frozen `listing`/`session_window`, `scheduled_at`, `kind`, `state`, `attempts`, `next_attempt_at`, `lease`, `lease_until`, `last_error`; unique `(asset_id,session,version,scheduled_at,kind)` and pending-due index |
+| `price_samples` | `sample_id` PK/FK to job, `asset_id`, `session`, mapping FK `mapping_version`, `registry_version`, `instrument_id`, `exchange`, positive NUMERIC `price`, `currency`, `quote_unit`, `scheduled_at`, `observed_at`, nullable `provider_quote_at`, `kind`, `quality`, immutable event `payload`; asset/time index |
+| `snapshot_outbox` | `message_id` PK, immutable event `payload`, `delivered`, `attempts`, `next_attempt_at`, `created_at` |
+
+Jobs use `FOR UPDATE SKIP LOCKED` with 90-second UUID leases. Commit requires the current lease and
+an enabled, unpaused mapping of the same version. Price and outbox insert in one transaction.
+Broker publication is at least once; its stable message/sample IDs let consumers deduplicate.
+No retention runs automatically; capacity limits pause reads, preserving evidence for
+[E11 retention design](../backlog/E11-Data-Retention/README.md#snapshot-evidence-retention).
 
 Intraday DDL is idempotently applied at startup:
 
@@ -542,6 +624,53 @@ Note: both `message_id` and `aggregate_id` have UNIQUE constraints. The `aggrega
 
 ## 10. Configuration
 
+### Snapshot process configuration
+
+All keys below apply only to the optional worker. `DATABASE_URL` and `RABBITMQ_URL` are the unprefixed
+shared connection strings. The companion config is mounted read-only with the canonical registry.
+
+| Environment variable | Default | Meaning |
+|---|---|---|
+| `SNAPSHOT_ENABLED` | `false` | Run collection only when true |
+| `SNAPSHOT_MAPPINGS_PATH` | `infra/assets/avanza-listings.json` | Companion file; Compose uses `/config/avanza-listings.json` |
+| `SNAPSHOT_CONCURRENCY` | `2` | Page limit 1–10; raise only after capacity measurement |
+| `SNAPSHOT_INTERVAL_SECONDS` | `900` | v1 accepts only 900 |
+| `SNAPSHOT_TIMEOUT_SECONDS` | `30` | Total read budget, 1–30 seconds |
+| `SNAPSHOT_RETRY_SECONDS` | `10` | Retry delay 0–20, plus 0–3 seconds jitter |
+| `SNAPSHOT_MAX_LATENESS_SECONDS` | `120` | Slot deadline, configurable 30–120 seconds |
+| `SNAPSHOT_MAX_QUOTE_AGE_SECONDS` | `120` | Eligibility threshold when provider timestamp is known; 1–900 seconds |
+| `SNAPSHOT_MAX_PENDING_EVENTS` | `10000` | Stop new reads at this outbox backlog |
+| `SNAPSHOT_MAX_SAMPLES` | `1000000` | Stop new reads at this stored sample count |
+| `SNAPSHOT_BROWSER_CHANNEL` | unset | Bundled Chromium; local `chrome` may be selected |
+| `SNAPSHOT_PROFILE_PATH` | unset | Optional dedicated manually provisioned profile; never personal Chrome data |
+| `SNAPSHOT_LOG_LEVEL` | `INFO` | Worker log level |
+
+### Snapshot deployment and recovery
+
+The optional Compose profile `snapshots` builds `Dockerfile.snapshots` with hash-pinned Playwright
+dependencies and its matching Chromium. It runs as UID 10001 with 2 CPUs, 3 GiB memory, 1 GiB shared
+memory and a 512-process limit. Organizations using a private root CA must install it in the base
+image; the browser downloader uses the system CA bundle and the Dockerfile imports the base image's
+local CAs into Chromium's NSS store. See [Chromium certificate management](https://chromium.googlesource.com/chromium/src/+/HEAD/docs/linux/cert_management.md). TLS verification remains enabled.
+
+After the access/freshness and pilot gates below, enable a small reviewed listing subset in a **new**
+mapping version, set `SNAPSHOT_ENABLED=true` in the local environment, then run:
+
+```bash
+docker compose --env-file infra/.env -f infra/docker-compose.yml --profile snapshots up -d --build feed-market-data-snapshots
+```
+
+Deploy the API image to expose the new read endpoints and the Verification image for optional sampled
+reports. Neither requires enabling the collector. Roll back collection with `docker compose --env-file
+infra/.env -f infra/docker-compose.yml --profile snapshots stop feed-market-data-snapshots`; set the
+sample policy OFF. All prior evidence and legacy operations remain available.
+
+Mappings reload each cycle; changed contents under an existing version are rejected. A corrupt edit
+keeps the last valid mapping and exposes `CONFIG_ERROR`. Repair a paused listing with a reviewed new
+mapping version. After resolving a provider access restriction, stop the worker, run a manual probe,
+then explicitly reset `market_data.snapshot_control` with `paused=false`, `cooldown_until=NULL`,
+`failure_count=0`, `status='STARTING'` for `id=1`, and restart. No automatic login/CAPTCHA bypass occurs.
+
 | Intraday variable | Default | Effect |
 |---|---|---|
 | `INTRADAY_ENABLED` | `false` | Enables only the shadow collector; Compose maps `MARKET_DATA_INTRADAY_ENABLED` |
@@ -573,6 +702,16 @@ No `MARKET_DATA_` prefix; this service uses unprefixed variables directly (`Mark
 
 ## 11. Verification
 
+Snapshot coverage:
+
+| Requirements | Proving checks |
+|---|---|
+| MKT-60, MKT-61, MKT-62, MKT-65, MKT-66 | `tests/test_snapshots.py`: currency parsing, status text, holiday/early close, close-check slots, unknown timestamp, bounded retries, expired deadlines and SQL retry timestamp preservation |
+| MKT-63 | `tests/test_snapshot_storage.py`: real PostgreSQL repeatable DDL, concurrent claims, expired-lease fencing, immutable mapping history, atomic sample/outbox and broker replay |
+| MKT-64 | `tests/test_snapshot_api.py`, existing `tests/test_recent_closes.py`, shared message suites; snapshot control failure does not change legacy responses |
+
+Unit tests use synthetic identities, not assumptions about the production asset registry.
+
 Intraday adapter requirements MKT-57–MKT-58 are proved by `tests/test_intraday_adapter.py`:
 completed bars, null gaps, browser header, identity, split events, OHLC bounds, array lengths and 429.
 MKT-56/MKT-57/MKT-59 are exercised with real PostgreSQL in Verification's
@@ -596,6 +735,30 @@ The database tests require an explicitly configured disposable `INTRADAY_TEST_DA
 
 ## 12. Failure Handling
 
+Snapshot failures are isolated from the daily/minute collectors:
+
+Worker logs identify each attempted job, its scheduled/start times and attempt number. Failed reads
+include the error type and wall-clock/monotonic elapsed seconds to investigate execution gaps;
+saved observations include their observation time, currency and quality. Tick, save and outbox
+errors log exception types without connection strings or provider payloads. A workstation or Docker
+VM suspension can lose collection slots; recovery records gaps rather than backfilling observations.
+
+| Snapshot failure | Action |
+|---|---|
+| Timeout/transport/temporary provider failure | One retry if it fits the slot deadline; terminal failure records a gap and continues other assets |
+| Wrong identity/currency/type, removed listing or unexpected redirect | Pause that mapping; no sample saved |
+| Repeated markup/parse failure | Pause mapping after three terminal failures; require reviewed mapping repair |
+| HTTP 429 | Provider-wide cooldown respecting `Retry-After`, default 15 minutes; single recovery probe |
+| HTTP 401/403 or explicit challenge title | Durable provider pause `ACTION_REQUIRED`; manual access repair |
+| Five consecutive terminal transport/provider failures | Provider-wide 15-minute circuit cooldown |
+| Browser crash | One browser restart per batch; job attempts/deadline still bound work |
+| SQL save failure | Retry the same captured observation once; never reread and assign the earlier timestamp |
+| Broker outage | Persist outbox; retry publication after 30 seconds; collector pauses at backlog cap |
+| Restart after missed slot | Mark missed; no historical fabrication |
+| Mapping disabled or changed during a read | Fenced commit rejects obsolete job |
+| Missing quote timestamp or unknown/closed session | Preserve labeled observation; strict verification excludes it |
+| Last close check unavailable | `CLOSE_UNCONFIRMED`; next website read waits for next regular session |
+
 | Failure scenario | Behaviour |
 |---|---|
 | Duplicate `PriceRequested` (same request_id) | `ON CONFLICT DO NOTHING` at insert; no second schedule, no second observation |
@@ -614,6 +777,16 @@ The database tests require an explicitly configured disposable `INTRADAY_TEST_DA
 ---
 
 ## 13. Assumptions and Limitations
+
+Snapshot rollout remains gated. Anonymous Chrome probes on 2026-09-24 UTC validated 29 disabled
+listing mappings and regular-price parsing across USD/SEK/EUR/DKK. The built Linux image also read
+all 29 listings successfully with the same currency checks and TLS verification enabled. Pages reported
+900-second delay and exposed no exact quote timestamp. Read success therefore does **not** prove
+freshness or improve strict verification accuracy. Current collector output remains observational.
+No official-close promotion is implemented. Confirm unattended access/entitlement for the intended
+deployment and run at least three trading sessions on 2–4 listings before expansion. Measure read
+success separately from freshness eligibility, with a proposed >=95% scheduled-read success gate,
+no wrong identities/currencies, explained gaps and measured memory/latency within the slot budget.
 
 ### 13.1 Accepted design decisions
 
@@ -670,5 +843,6 @@ Update this document whenever any of the following changes:
 
 | Date | Description |
 |---|---|
+| 2026-09-25 | Add isolated Avanza 15-minute snapshots, durable jobs/outbox, additive APIs and disabled rollout; MKT-60–MKT-66 |
 | 2026-09-24 | v1.1.0: optional durable intraday stream collector, strict Yahoo minute evidence, bounded retries and delta outbox |
 | 2026-08-05 | Initial as-built specification for E05 (Market Data Service); MKT-1 through MKT-52 |

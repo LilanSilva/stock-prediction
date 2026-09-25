@@ -34,9 +34,9 @@
 | Field | Value |
 |---|---|
 | Author | Feed Analyzer project |
-| Version | `1.1.0` |
+| Version | `1.2.0` |
 | Created | 2026-08-05 |
-| Last updated | 2026-08-05 |
+| Last updated | 2026-09-25 |
 | Replaces | `docs/functional-documents/verification-service-functional-document.md` (deleted 2026-08-06) |
 | Source code | `src/services/verification/` |
 | Config class | `verification.config.VerificationSettings` |
@@ -124,6 +124,16 @@ Specific responsibilities:
 ---
 
 ## 5. Functional Requirements
+
+### Point-sample shadow policy
+
+| ID | Requirement | Status |
+|---|---|---|
+| VER-46 | Sampled evaluation shall be OFF by default and register only allowlisted assets in SHADOW mode | Implemented |
+| VER-47 | Sampled evaluation shall exclude stale, unknown-time, wrong-currency and pre-decision prices | Implemented |
+| VER-48 | Sampled evaluation shall distinguish observed target hits from unobserved intervals | Implemented |
+| VER-49 | Duplicate evidence shall not duplicate results or publish live scores | Implemented |
+| VER-50 | Sampled evaluation shall freeze its baseline and final result | Implemented |
 
 ### Intraday shadow policy
 
@@ -217,6 +227,37 @@ Daily requirements below remain the live learning contract. The separate shadow 
 ---
 
 ## 7. How It Works
+
+### Sampled shadow flow
+
+The independent `verification.sample-predictions` queue copies `PredictionMade`; it never competes
+with the daily prediction consumer. In SHADOW mode, explicitly allowlisted assets resolve their
+exchange session and freeze the prediction, calendar window, currency, registry version and
+`SAMPLED_TARGET_V1` policy. The independent `verification.price-samples` consumer stores immutable
+`PriceSampleObserved` evidence. A separate 30-second sweep evaluates pending rows, under SQL locks.
+
+Only regular-session, `FRESH` observations with a provider quote timestamp can supply evidence.
+Quote age must be <=120 seconds; observed time must lie in the session, at/after the prediction;
+provider quote time must also be at/after it. Currency and major unit, registry and session must
+match. The scheduled slot must lie on the session's 900-second grid at/after the decision and the
+read must be <=120 seconds late. Unknown-time Avanza quotes remain stored but ineligible.
+
+At least two expected slots must remain. The baseline is the first eligible observed price, within
+1020 seconds of `max(decision_at, opens_at)`; its time, price, delay and mapping version are retained.
+A later revision of that baseline, mixed mapping versions or conflicting observations for one slot
+makes the evaluation unscorable. The policy never substitutes a historical opening or daily close.
+
+For UP/DOWN, the first observed return crossing the configured target produces `OBSERVED_HIT` even
+if a later sample reverses. No hit with all expected slots present means `TARGET_NOT_OBSERVED`;
+missing slots mean `INSUFFICIENT_SAMPLES`. NEUTRAL reports `BAND_BREACH_OBSERVED` or, only with all
+slots, `WITHIN_BAND_AT_SAMPLES`. Neither means the price remained inside the band between samples.
+Reports include expected/observed counts, completeness, maximum observed gap, first-hit time and
+last observed return/time. This last observation is never called an official close.
+
+Finalization occurs after close+600 seconds. Evidence received after that boundary cannot rewrite
+the result. Missing/late baseline becomes UNSCORABLE. A durable tombstone handles out-of-order
+supersession before session open; that evaluation is WITHDRAWN. All results remain in separate
+sample tables: this path emits no `PriceRequested`, `PredictionScored`, learning update or alert.
 
 ### Intraday shadow flow
 
@@ -426,6 +467,11 @@ disappearing — which is why it is logged at WARNING rather than INFO.
 
 ## 8. Interfaces
 
+`GET /verification/sampled/{prediction_id}` returns mode, status, frozen policy/session window and
+sample diagnostics. OFF returns HTTP 503 with `{"mode":"OFF"}`; absent evaluation returns 404.
+Existing daily and intraday endpoints retain their contracts. Sampled messages and independent
+queues/DLQs are specified in [SRS-01](SRS-01-shared-foundation.md#sampled-price-contract).
+
 Intraday consumes `intraday.observed` on `verification.intraday-prices` and publishes
 `intraday.requested`. Wire contracts are owned by [SRS-01](SRS-01-shared-foundation.md#84-rabbitmq-topology).
 `GET /verification/intraday/{prediction_id}` returns the frozen policy, window, timestamps and result
@@ -465,6 +511,17 @@ See SRS-01 sections 5.7, 5.8, 5.9 for full field tables.
 ---
 
 ## 9. Data Design
+
+`verification/sampled.py` applies additive, repeatable DDL only when sample mode is SHADOW:
+
+| Table (`verification` schema) | Columns and constraints |
+|---|---|
+| `sample_evidence` | `sample_id` UUID PK, `asset_id`, `observed_at`, immutable event `payload` text, `received_at`; asset/time index; conflicting same-ID delivery rejected |
+| `sample_evaluations` | `prediction_id` UUID PK, `asset_id`, frozen `prediction`, `session_window`, `policy` JSON text, `currency`, `registry_version`, `status`, nullable `result`, `received_at`, `updated_at` |
+| `sample_withdrawals` | `prediction_id` UUID PK, earliest `superseded_at` |
+
+Sample evaluation statuses are PENDING, FINAL, UNSCORABLE and WITHDRAWN. FINAL alone does not imply
+complete coverage; inspect outcome and diagnostics. The new tables do not modify daily scores.
 
 Additional service-owned tables, applied idempotently at startup by `intraday.DDL`:
 
@@ -555,6 +612,16 @@ Note: `payload` is stored as `TEXT` (not `JSONB`). The `message_type` field is u
 
 ## 10. Configuration
 
+| Sampled environment variable | Default | Meaning |
+|---|---|---|
+| `VERIFICATION_SAMPLE_MODE` | `OFF` | `OFF` or `SHADOW`; no live promotion mode |
+| `VERIFICATION_SAMPLE_CALENDARS` | `{}` | JSON map of canonical asset to exchange calendar; explicit allowlist |
+| `VERIFICATION_SAMPLE_TARGET_RETURN` | `0.003` | UP/DOWN sampled target fraction, >0 and <1 |
+| `VERIFICATION_SAMPLE_NEUTRAL_BAND` | `0.003` | NEUTRAL sampled band fraction, >0 and <1 |
+
+Threshold changes affect new registrations only. Collection is controlled separately by
+[SRS-05](SRS-05-market-data.md#snapshot-process-configuration).
+
 | Intraday variable | Default | Effect |
 |---|---|---|
 | `VERIFICATION_INTRADAY_MODE` | `OFF` | `OFF` or `SHADOW` only; LIVE is deliberately unavailable |
@@ -585,6 +652,13 @@ All variables use the `VERIFICATION_` prefix unless noted.
 ---
 
 ## 11. Verification
+
+VER-47/VER-48/VER-50 are proved by `tests/test_sampled_policy.py` (hit then reversal, coverage gaps,
+sampled neutrality, unknown freshness, currency/time rejection, late baseline, mapping changes).
+VER-46/VER-49/VER-50 are exercised in `tests/test_sampled_storage.py` against disposable PostgreSQL:
+duplicate registration/delivery, immutable evidence, finalization, tombstones and absence of live
+score writes. Live freshness and the multi-session pilot remain gates owned by
+[SRS-05](SRS-05-market-data.md#13-assumptions-and-limitations).
 
 | Intraday requirement | Proving test |
 |---|---|
@@ -683,6 +757,7 @@ Update this document whenever any of the following changes:
 
 | Date | Description |
 |---|---|
+| 2026-09-25 | Add separate OFF/SHADOW sampled-evidence policy and diagnostics, VER-46–VER-50; daily and minute paths unchanged |
 | 2026-09-24 | v1.1.0: isolated intraday shadow policy, real exchange sessions, durable minute evidence and comparison reports; OFF by default |
 | 2026-08-05 | Initial as-built specification for E06 (Verification Service); VER-1 through VER-37 |
 | 2026-08-14 | **Defect fix.** `PriceObserved` for a missing evaluation and `PriceObserved` that contradicts its evaluation both raised `PriceValidationError`, so both were dead-lettered as poison. Orphans can never be resolved by retry or by inspecting the message, so the `verification.prices.dlq` queue filled with unactionable traffic (14 messages, all orphans, zero real defects) while genuine mismatches would have been indistinguishable in it. Split into `OrphanedObservationError`, which is acknowledged, logged at WARNING as `price_observed_orphaned`, and counted in `/health.prices_orphaned`. `PriceValidationError` still dead-letters. VER-38 added; §12 and the scoring section updated |

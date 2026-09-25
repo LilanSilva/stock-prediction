@@ -28,6 +28,10 @@ class VerificationSettings(BaseSettings):
     outbox_interval_seconds: int = Field(default=30, gt=0)
 
     intraday_mode: Literal["OFF", "SHADOW"] = "OFF"
+    sample_mode: Literal["OFF", "SHADOW"] = "OFF"
+    sample_calendars: dict[str, str] = Field(default_factory=dict)
+    sample_target_return: float = Field(default=0.003, gt=0, lt=1)
+    sample_neutral_band: float = Field(default=0.003, gt=0, lt=1)
     # Explicit canonical asset -> exchange calendar mapping doubles as the rollout allowlist.
     intraday_calendars: dict[str, str] = Field(default_factory=dict)
     intraday_prices_queue: str = "verification.intraday-prices"

@@ -207,6 +207,25 @@ Two things this exists to prevent, both of which hid real defects:
   compare the windows either side; a single window covering both mixes old and new behaviour and
   cannot be attributed to either.
 
+## Avanza listing discovery
+
+`avanza-listings.py` creates disabled candidate mappings from the canonical registry. Identity rules
+and review/versioning requirements live in
+[REF-02](../requirements/REF-02-asset-registry.md#avanza-companion-mappings).
+Install the market-data `snapshots` extra and matching browser first; commands below use local Chrome.
+Omit `--channel chrome` for installed Playwright Chromium.
+
+```bash
+python scripts/avanza-listings.py discover --asset TSLA_NASDAQ --channel chrome --version candidate-v2 --output avanza-candidate.json
+python scripts/avanza-listings.py validate avanza-candidate.json
+python scripts/avanza-listings.py probe avanza-candidate.json --channel chrome --output avanza-probe.json
+```
+
+Omitting `--asset` discovers the loaded registry; repeat it to select multiple assets. Discovery emits
+a companion `.report.json` with unresolved identities, never guessed URLs. Probe reports actual
+price/currency, state, delay and timestamp availability. It does not write prices to the database or
+enable mappings. Review reports before publishing a candidate; generated probes are local artifacts.
+
 ## Demo
 
 | Script | Purpose |

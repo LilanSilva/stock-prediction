@@ -59,3 +59,9 @@ flowchart TB
     market --- pxdb
     verify --- outdb
     cred --- credb
+
+    avanza[Avanza regular last-price page] --> snapshot[Optional Market Data snapshot worker]
+    snapshot --- pxdb
+    snapshot -->|price.sample.observed| bus
+    bus -->|independent samples and predictions| sampled[Verification sampled SHADOW]
+    sampled --- outdb

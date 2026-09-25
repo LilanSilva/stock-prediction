@@ -8,7 +8,7 @@
 | Component | Shared Python library (`shared`) and local infrastructure |
 | Requirement ID prefix | `SHR` |
 | Status | `Implemented` |
-| Version | `1.3.1` |
+| Version | `1.4.0` |
 | Source code | [src/shared/shared/](../src/shared/shared/), [infra/](../infra/) |
 | Tests | [src/shared/tests/](../src/shared/tests/) |
 | Last verified against code | `2026-08-12` |
@@ -104,6 +104,11 @@ Two parts:
 | An LLM provider | Ambiguous cleansing only | Ambiguous clusters wait; nothing is fabricated |
 
 ## 5. Functional requirements
+
+| ID | Requirement | Priority | Status |
+|---|---|---|---|
+| SHR-94 | The shared contract shall represent a point-price sample independently of daily closes and minute OHLC | Must | Implemented |
+| SHR-95 | Each sampled-evidence consumer shall own an independent durable queue and dedicated dead-letter route | Must | Implemented |
 
 | ID | Requirement | Priority | Status |
 |---|---|---|---|
@@ -581,7 +586,38 @@ consumer must receive all revisions through FINAL before finalization. No provid
 this boundary. New contract tests: `tests/test_intraday_contracts.py` and Market Data's
 `tests/test_intraday_adapter.py` (malformed evidence rejection).
 
+### Sampled price contract
+
+`PriceSampleObserved`, schema 1.0, uses `price.sample.observed` and the standard immutable envelope.
+
+| Fields beyond envelope | Contract |
+|---|---|
+| `sample_id`, `asset_id` | UUID and canonical registry ID |
+| `mapping_version`, `registry_version`, `session` | Nonempty versions and exchange-local session date |
+| `opens_at`, `closes_at`, `scheduled_at`, `observed_at` | UTC timestamps; ordered window; observation at/after slot |
+| `provider_quote_at`, `quote_delay_seconds` | Nullable aware quote timestamp and nullable nonnegative reported delay; never inferred from observation time |
+| `price`, `currency`, `quote_unit` | Finite positive Decimal (JSON string), three uppercase currency letters, explicit nonempty denomination |
+| `source`, `interval_seconds` | Fixed `avanza`, `900` |
+| `kind` | `REGULAR` or `CLOSE_CHECK`; scheduled slot must lie in the relevant session range |
+| `market_state` | `PRE_OPEN`, `REGULAR_OPEN`, `REGULAR_CLOSED`, `EXTENDED_HOURS`, `HALTED`, `UNKNOWN` |
+| `quality` | `FRESH`, `STALE`, `FRESHNESS_UNKNOWN`, `SESSION_MISMATCH`; FRESH requires a provider timestamp |
+
+Provider timestamps later than observation time are rejected. Samples assert neither OHLC extrema
+nor an official close. Old message fields, routes and meanings do not change.
+
 ### 8.4 RabbitMQ topology
+
+Additive sampled routes (existing routes remain unchanged):
+
+| Exchange | Routing key | Queue | Dead-letter routing key on `feed.dlx` |
+|---|---|---|---|
+| `feed.events` | `price.sample.observed` | `verification.price-samples` | `verification.price-samples.failed` |
+| `feed.events` | `prediction.made` | `verification.sample-predictions` | `verification.sample-predictions.failed` |
+
+Both queues are durable classic queues with corresponding `.dlq` queues, also durable. The unique
+dead-letter keys prevent failed sample registrations from entering another prediction owner's DLQ.
+`ensure_snapshot_topology()` declares these additions idempotently against the existing exchanges;
+it does not restart the broker or mutate legacy queues. The static definitions match this migration.
 
 Declared in [infra/rabbitmq/definitions.json](../infra/rabbitmq/definitions.json).
 
@@ -860,6 +896,10 @@ Current version `multi-market-v2`: 14 groups, 29 assets,
 
 ## 11. Verification
 
+SHR-94: `tests/test_snapshot_contract.py::test_sample_roundtrip_currency_and_timestamp_validation`.
+SHR-95: its static topology check plus `tests/test_snapshot_broker.py`, which tests real delivery,
+DLQ routing and repeatable migration while preserving a legacy queue in a disposable broker.
+
 SHR-92/SHR-93: `tests/test_intraday_contracts.py` proves round-trip serialization, routes and the
 additive declaration set; `tests/test_infrastructure.py` checks the deployed definitions.
 
@@ -967,6 +1007,7 @@ Component-specific notes:
 
 | Date | Version | Change | Driver |
 |---|---|---|---|
+| 2026-09-25 | 1.4.0 | Point-sample contract and independent queues/DLQs, SHR-94/SHR-95 | Avanza snapshots |
 | `2026-09-24` | `1.3.1` | Documented the shared text module; behaviour owned by ING-62–64 and CLN-76 | Unicode-safe cleansing |
 | `2026-09-24` | `1.3.0` | Intraday contracts, isolated queues and additive broker migration; publication-attempt timestamp | Intraday verification |
 | `2026-08-05` | `1.0.0` | Initial specification, written from the implemented code | E01 complete; replaces the E01 epic and task files |

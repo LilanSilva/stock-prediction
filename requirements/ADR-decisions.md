@@ -6,7 +6,7 @@
 |---|---|
 | Document ID | `ADR` |
 | Type | Decision record |
-| Status | `Implemented` (ADR-001 … ADR-009 and ADR-011 Accepted) |
+| Status | `Implemented` (ADR-001 … ADR-011 all Accepted) |
 | Version | `1.4.0` |
 | Diagrams | [docs/architectural-documents/](../docs/architectural-documents/) |
 | Last verified against code | `2026-08-12` |
@@ -35,6 +35,7 @@ An ADR is **never rewritten to match a later decision.** A superseded ADR keeps 
 | ADR-007 | Multi-market coverage via a file-driven asset registry | Accepted | [`SYS-9` … `SYS-14`](SyRS-system.md#52-identity-and-reference-data), [REF-02](REF-02-asset-registry.md) |
 | ADR-008 | Cross-asset `CORRELATES_WITH` propagation with visited-set cycle guard | Accepted | [SRS-04](SRS-04-prediction.md), [SRS-07](SRS-07-credibility.md) |
 | ADR-009 | Separate intraday target-hit evidence from daily close-to-close learning | Accepted | [SRS-06](SRS-06-verification.md), [SRS-05](SRS-05-market-data.md) |
+| ADR-010 | Isolate prospective point samples and sampled verification | Accepted | [SRS-05](SRS-05-market-data.md), [SRS-06](SRS-06-verification.md) |
 | ADR-011 | Capture research evidence independently of official KG publication | Accepted | PRD-64–PRD-69 in [SRS-04](SRS-04-prediction.md#712-research-evidence-capture) |
 
 ## ADR-001: Multi-event context before prediction
@@ -260,6 +261,25 @@ Yahoo minute coverage and thresholds need empirical validation before any live p
 revisions after finalization and exactly-once cross-store learning need a separately reviewed
 promotion design; v1 does not claim either is solved by deduplicating messages alone.
 
+## ADR-010: Isolated live point samples with explicit evidence limits
+
+Historical minute coverage was insufficient for the proposed verification experiment. Avanza's
+displayed current price can build a prospective dataset, but one observation per 15 minutes cannot
+reconstruct OHLC, intraperiod target crossings or an official daily close. Observation time also
+cannot prove the age of a delayed quote.
+
+Keep the existing Market Data APIs/providers intact. Add a separate browser worker with a versioned
+listing companion, exchange calendars, durable jobs and transactional sample outbox. Discover URLs
+once through deterministic identity checks; no LLM or repeated search belongs in the sampling loop.
+Verification receives a separate event/queue and computes an OFF/SHADOW sampled policy. Unknown
+freshness abstains; results never enter daily learning or notifications.
+
+Costs accepted: browser/runtime maintenance, additional evidence storage and conservative abstention.
+Initial anonymous pages report delay without exact quote time, so read success alone does not pass
+the verification gate. A multi-session pilot and deployment access validation remain required.
+Binding requirements: [MKT-60–MKT-66](SRS-05-market-data.md#avanza-point-observations),
+[VER-46–VER-50](SRS-06-verification.md#point-sample-shadow-policy), SHR-94/SHR-95.
+
 ## ADR-011: Research evidence before official publication filtering
 
 The official prediction stream omits abstentions and suppressed stances, while context membership
@@ -299,6 +319,7 @@ messaging-topology change, or the reversal of an earlier ADR.
 | Date | Version | Change | Driver |
 |---|---|---|---|
 | 2026-09-25 | 1.4.0 | ADR-011: separate opt-in research evidence capture from official publication | E15 |
+| 2026-09-25 | 1.3.0 | ADR-010: isolated point observations and sampled SHADOW policy | E14 |
 | `2026-09-24` | `1.2.0` | ADR-009: independent shadow target-hit evaluation | Intraday verification |
 | `2026-08-06` | `1.0.0` | Moved into `requirements/` from `docs/decisions/README.md`. Added ADR-007 to the index (present in the body but missing from the table), requirement-ID cross-references, and update rules | Requirements consolidation |
 | `2026-08-12` | `1.1.0` | Added ADR-008: cross-asset `CORRELATES_WITH` propagation | E10 epic |
