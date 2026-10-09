@@ -1,10 +1,14 @@
+from datetime import UTC, datetime, timedelta
+
 import httpx
 import pytest
-from conftest import FakeAdapter
+from conftest import FakeAdapter, MemoryStore
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 from test_contract import BASE
+
+from llm_browser_gateway.db import Availability
 
 HEADERS = {"Authorization": "Bearer " + "a" * 32}
 
@@ -113,3 +117,33 @@ def test_older_extension_cannot_receive_concurrent_dispatch(app: FastAPI) -> Non
             ws.send_json({"type": "authenticate", "profileId": "default", "token": "b" * 32})
             assert ws.receive_json() == {"type": "connection_error", "code": "update_required"}
             assert app.state.bridge.socket is None
+
+
+def test_connected_browser_with_provider_cooldowns_returns_unavailable(
+    app: FastAPI, store: MemoryStore, adapter: FakeAdapter
+) -> None:
+    for provider in ("chatgpt", "claude"):
+        store.states["default", provider] = Availability(
+            "ui_changed", next_check_at=datetime.now(UTC) + timedelta(minutes=15)
+        )
+    with TestClient(app) as client:
+        with client.websocket_connect(
+            "/bridge", headers={"origin": "chrome-extension://" + "a" * 32}
+        ) as ws:
+            ws.send_json(
+                {
+                    "type": "authenticate",
+                    "profileId": "default",
+                    "token": "b" * 32,
+                    "protocolVersion": 2,
+                }
+            )
+            assert ws.receive_json()["type"] == "authenticated"
+            assert client.get("/status", headers=HEADERS).json()["extension_connected"]
+            response = client.post("/v1/chat/completions", json=BASE, headers=HEADERS)
+            assert response.status_code == 503
+            assert response.json()["error"]["code"] == "temporary_unavailable"
+            assert response.headers["x-request-id"]
+            assert not store.reservations and not adapter.probes
+            ws.send_json({"type": "ping"})
+            assert ws.receive_json() == {"type": "pong"}

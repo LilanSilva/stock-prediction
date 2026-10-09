@@ -13,7 +13,9 @@ from llm_browser_gateway.config import Settings
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--provider", choices=["chatgpt", "claude"])
+    parser.add_argument(
+        "--provider", choices=["chatgpt", "claude", "deepseek", "meta", "kimi", "gemini"]
+    )
     parser.add_argument("--text-only", action="store_true")
     args = parser.parse_args()
     settings = Settings()
@@ -101,6 +103,7 @@ def main() -> None:
         call = message.tool_calls[0]
         assert call.type == "function" and call.function.name == "lookup_demo"
         assert json.loads(call.function.arguments) == {"item": "example"}
+        print("Tool call: validated", flush=True)
         followup = [
             *messages,
             message.model_dump(exclude_none=True),

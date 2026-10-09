@@ -6,7 +6,7 @@ from typing import Any, Protocol
 
 import asyncpg
 
-from .adapters.common.types import Result, Status
+from .adapters.common.types import REQUEST_FAILURES, Result, Status
 
 DDL = """
 CREATE SCHEMA IF NOT EXISTS llm_browser_gateway;
@@ -83,6 +83,10 @@ class PostgresStore:
             "WHERE llm_browser_gateway.availability.reason <> 'rate_limited'"
         )
         await self.pool.execute(
+            "DELETE FROM llm_browser_gateway.availability WHERE reason = ANY($1::text[])",
+            list(REQUEST_FAILURES),
+        )
+        await self.pool.execute(
             "DELETE FROM llm_browser_gateway.attempts WHERE state='finished' "
             "AND updated_at < now() - $1::int * interval '1 day'",
             self.retention_days,
@@ -148,6 +152,9 @@ class PostgresStore:
                 "unknown" if unknown else "finished",
                 result.status,
             )
+            # Schema/format failures belong to this request, not the provider's availability.
+            if result.status in REQUEST_FAILURES:
+                return
             if result.status in {Status.SUCCESS, Status.REFUSED}:
                 await conn.execute(
                     "DELETE FROM llm_browser_gateway.availability "

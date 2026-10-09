@@ -160,3 +160,11 @@ def test_non_json_constants_rejected() -> None:
             BASE | {"response_format": {"type": "json_object"}},
             "chatgpt",
         )
+
+
+def test_nested_json_text_preserves_escapes_and_rejects_unescaped_quotes() -> None:
+    nested = '{"status":"done"}'
+    response = parse(json.dumps({"kind": "final", "content": nested}), BASE, "kimi")
+    assert response.body["choices"][0]["message"]["content"] == nested
+    with pytest.raises(GatewayError):
+        parse('{"kind":"final","content":"{"status":"done"}"}', BASE, "kimi")

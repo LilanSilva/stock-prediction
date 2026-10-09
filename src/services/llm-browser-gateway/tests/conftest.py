@@ -10,6 +10,7 @@ from llm_browser_gateway.adapters.common.contract import CAPABILITIES
 from llm_browser_gateway.adapters.common.formatting import parse
 from llm_browser_gateway.adapters.common.types import (
     JSON,
+    REQUEST_FAILURES,
     BrowserResult,
     Context,
     Result,
@@ -59,6 +60,8 @@ class MemoryStore:
             self.unknown.add(attempt)
         else:
             self.active.pop(attempt, None)
+        if result.status in REQUEST_FAILURES:
+            return
         if result.status in {Status.SUCCESS, Status.REFUSED}:
             if (
                 self.updated.get((profile, provider), self.started[attempt])

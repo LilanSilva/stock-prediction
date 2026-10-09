@@ -2,6 +2,10 @@ export {};
 
 const URLS: Record<Provider, string> = {
   chatgpt: "https://chatgpt.com/", claude: "https://claude.ai/new",
+  deepseek: "https://chat.deepseek.com/",
+  meta: "https://www.meta.ai/",
+  kimi: "https://www.kimi.ai/",
+  gemini: "https://gemini.google.com/app",
 };
 let socket: WebSocket | undefined;
 let authenticated = false;
@@ -49,7 +53,7 @@ async function focusForSend(attemptId: string, job: SavedJob): Promise<{ok: bool
   await predecessor;
   try {
     if (Date.now() >= until || !authenticated || jobs[attemptId] !== job ||
-        job.provider !== "claude" || job.phase !== "preparing" || job.tabId === undefined ||
+        !(["claude", "meta"].includes(job.provider)) || job.phase !== "preparing" || job.tabId === undefined ||
         cancelled.has(attemptId)) return {ok: false};
     const tab = await chrome.tabs.get(job.tabId);
     if (!tab.url || new URL(tab.url).origin !== new URL(URLS[job.provider]).origin) return {ok: false};
@@ -166,6 +170,34 @@ async function messageTab(tabId: number, message: unknown): Promise<any> {
   }
   throw new Error("Page script unavailable");
 }
+async function stopOwnedTab(resource: string, tabId: number): Promise<void> {
+  let tab: chrome.tabs.Tab | undefined;
+  try { tab = await chrome.tabs.get(tabId); } catch { return; }
+  if (!tab) return;
+  const provider = resource.split(":")[0] as Provider;
+  if (!(provider in URLS) || !tab.url || new URL(tab.url).origin !== new URL(URLS[provider]).origin) {
+    throw new Error("A designated tab has navigated away; close it or restore its provider page before reset");
+  }
+  const inspect = {type: "inspect"};
+  try {
+    await chrome.tabs.sendMessage(tabId, inspect);
+  } catch (error) {
+    const reason = error && typeof error === "object" && "message" in error ? String(error.message) : "";
+    if (!/Receiving end does not exist|Extension context invalidated/i.test(reason)) throw error;
+    // Operator-requested reset: reload the same conversation to restore scripts after an update.
+    await navigate(tabId, tab.url, true);
+    await messageTab(tabId, inspect);
+  }
+  await chrome.tabs.sendMessage(tabId, {type: "stop_all"});
+  const until = Date.now() + 5000;
+  do {
+    const check = await chrome.tabs.sendMessage(tabId, inspect);
+    if (check?.busy === false) return;
+    if (check?.busy !== true) throw new Error("Could not verify that the gateway tab is idle");
+    await new Promise(resolve => setTimeout(resolve, 200));
+  } while (Date.now() < until);
+  throw new Error("Generation still active; try again after it stops");
+}
 async function execute(command: Command): Promise<void> {
   if (!(command.provider in URLS) || !command.attemptId || command.timeoutMs <= 0) return;
   if (!Number.isInteger(command.slot) || command.slot < 0 || command.slot >= 4) return;
@@ -189,7 +221,8 @@ async function execute(command: Command): Promise<void> {
     await saveJobs();
     // A harmless probe establishes the content-script connection before sending any work.
     diagnostic = "content_connection";
-    const readiness = await messageTab(job.tabId, {type: "probe"});
+    const readiness = await messageTab(job.tabId, {type: "probe",
+      attemptId: command.attemptId, timeoutMs: command.timeoutMs});
     if (readiness.status !== "success" || command.type === "probe") {
       await terminal({type: "result", attemptId: command.attemptId, provider: command.provider,
         ...readiness, submitted: false});
@@ -369,16 +402,7 @@ chrome.runtime.onMessage.addListener((message: any, sender, respond) => {
       tabSlots[`${provider}:0`] = tab.id;
       await saveTabs();
     } else if (message.type === "reset") {
-      for (const tabId of Object.values(tabSlots)) {
-        try {
-          await chrome.tabs.sendMessage(tabId, {type: "stop_all"});
-          const check = await chrome.tabs.sendMessage(tabId, {type: "inspect"});
-          if (check.busy) throw new Error("Generation still active; try again after it stops");
-        } catch (error) {
-          try { await chrome.tabs.get(tabId); } catch { continue; }
-          throw error;
-        }
-      }
+      for (const [resource, tabId] of Object.entries(tabSlots)) await stopOwnedTab(resource, tabId);
       await acknowledged("reset", {type: "reset"});
       jobs = {}; await saveJobs();
     }

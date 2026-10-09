@@ -20,6 +20,9 @@ class Status(StrEnum):
     REFUSED = "refused"
 
 
+REQUEST_FAILURES = frozenset({Status.INVALID_OUTPUT, Status.INVALID_REQUEST})
+
+
 @dataclass(frozen=True)
 class Context:
     request_id: str

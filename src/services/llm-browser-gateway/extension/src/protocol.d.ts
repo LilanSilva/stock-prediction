@@ -1,4 +1,4 @@
-type Provider = "chatgpt" | "claude";
+type Provider = "chatgpt" | "claude" | "deepseek" | "meta" | "kimi" | "gemini";
 type ExecutionStage = "navigation" | "content_connection" | "readiness" | "fresh_conversation" |
   "editor" | "input_verification" | "send_available" | "send_disabled" | "submission_ack" | "extraction";
 type Outcome = "success" | "rate_limited" | "login_required" | "verification_required" |

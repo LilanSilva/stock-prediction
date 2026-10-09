@@ -20,7 +20,7 @@ field("pair").onclick = () => {
   field("key").value = "";
   void action({type: "pair", key, profileId: field("profile").value.trim()});
 };
-for (const provider of ["chatgpt", "claude"]) {
+for (const provider of ["chatgpt", "claude", "deepseek", "meta", "kimi", "gemini"]) {
   field(provider).onclick = () => void action({type: "designate", provider});
 }
 field("reset").onclick = () => void action({type: "reset"});

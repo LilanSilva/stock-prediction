@@ -19,6 +19,8 @@ function harness(initialJobs = {}, options = {}) {
   const runs = new Map();
   let nextTab = 8;
   let activeTab = 99;
+  let receiverMissing = options.receiverMissing ?? false;
+  let busy = options.busy ?? true;
   const tabs = new Map([[7, {id:7, url:"https://chatgpt.com/", status:"complete", windowId:1}],
     [99, {id:99, url:"https://example.com/", status:"complete", windowId:1}]]);
   const storage = data => ({
@@ -53,6 +55,7 @@ function harness(initialJobs = {}, options = {}) {
         calls.push("navigation_loading");
         for (const fn of updates) fn(id, {status:"loading"});
         setImmediate(() => {
+          receiverMissing = false;
           calls.push("navigation_complete");
           for (const fn of updates) fn(id, {status:"complete"});
         });
@@ -75,9 +78,13 @@ function harness(initialJobs = {}, options = {}) {
       },
       sendMessage: async (id, message) => {
         calls.push(message.type);
+        if (receiverMissing) throw new Error("Could not establish connection. Receiving end does not exist.");
+        if (options.stopCompletes && message.type === "stop_all") busy = false;
         if (message.type === "probe") return {status: "success"};
-        if (message.type === "inspect") return {attemptId: "restored", busy: true};
-        if (message.type === "run") return await new Promise(resolve => {runs.set(message.attemptId, {resolve, tabId:id});});
+        if (message.type === "inspect") return {attemptId: "restored", busy};
+        if (message.type === "run") {
+          return await new Promise(resolve => {runs.set(message.attemptId, {resolve, tabId:id});});
+        }
         return {ok:true};
       },
     },
@@ -93,6 +100,8 @@ function harness(initialJobs = {}, options = {}) {
       {id:chrome.runtime.id, tab:{id:tabId}}, resolve)),
     active: () => activeTab,
     select: id => { activeTab = id; },
+    changeUrl: (id, url) => { tabs.get(id).url = url; },
+    url: id => tabs.get(id).url,
     finish: result => runs.get(result.attemptId).resolve(result)};
 }
 test("reconnect reconciles an existing page job without submitting it again", async () => {
@@ -215,6 +224,43 @@ async function twoClaudeJobs() {
   return h;
 }
 
+test("operator reset recovers a stale tab script without sending a generation", async () => {
+  const h = harness({}, {receiverMissing:true,busy:true,stopCompletes:true});
+  h.changeUrl(7, "https://chatgpt.com/c/existing-test");
+  await waitFor(() => h.sent.some(m => m.type === "authenticate"));
+  h.sockets[0].receive({type:"authenticated"});
+  const reset = h.popup({type:"reset"});
+  await waitFor(() => h.sent.some(m => m.type === "reset"));
+  h.sockets[0].receive({type:"reset_ack"});
+  assert.equal((await reset).ok, true);
+  assert.equal(h.calls.filter(c => c === "navigation_loading").length, 1);
+  assert.ok(h.calls.indexOf("navigation_complete") < h.calls.lastIndexOf("stop_all"));
+  assert.ok(!h.calls.includes("run"));
+  assert.equal(h.url(7), "https://chatgpt.com/c/existing-test");
+});
+
+test("operator reset refuses to reload a designated tab that left its provider", async () => {
+  const h = harness({}, {receiverMissing:true});
+  h.changeUrl(7, "https://example.com/");
+  await waitFor(() => h.sent.some(m => m.type === "authenticate"));
+  h.sockets[0].receive({type:"authenticated"});
+  const result = await h.popup({type:"reset"});
+  assert.equal(result.ok, false);
+  assert.match(result.error, /navigated away/);
+  assert.ok(!h.sent.some(m => m.type === "reset"));
+  assert.ok(!h.calls.includes("navigation_loading"));
+});
+
+test("operator reset cannot clear blocked state without an explicit idle result", async () => {
+  const h = harness({}, {busy:"unrecognised"});
+  await waitFor(() => h.sent.some(m => m.type === "authenticate"));
+  h.sockets[0].receive({type:"authenticated"});
+  const result = await h.popup({type:"reset"});
+  assert.equal(result.ok, false);
+  assert.match(result.error, /verify.*idle/);
+  assert.ok(!h.sent.some(m => m.type === "reset"));
+});
+
 test("Claude activation is serialized and restores the previous tab between submissions", async () => {
   const h = await twoClaudeJobs();
   const first = h.runs.get("claude-0").tabId, second = h.runs.get("claude-1").tabId;
@@ -280,4 +326,95 @@ test("backend disconnect restores the focused tab and rejects a queued activatio
   h.sockets[0].close();
   assert.equal((await waiting).ok, false);
   assert.equal(h.active(), 99);
+});
+
+
+test("DeepSeek uses two isolated owned tabs and the same duplicate protection", async () => {
+  const h = harness();
+  await waitFor(() => h.sent.some(m => m.type === "authenticate"));
+  h.sockets[0].receive({type:"authenticated"});
+  const command = {type:"execute",provider:"deepseek",prompt:"test",timeoutMs:10000};
+  for (const slot of [0,1]) h.sockets[0].receive({...command,slot,attemptId:`ds-${slot}`});
+  await waitFor(() => h.runs.size === 2);
+  const first = h.runs.get("ds-0").tabId, second = h.runs.get("ds-1").tabId;
+  assert.notEqual(first, second);
+  assert.equal(h.url(first), "https://chat.deepseek.com/");
+  assert.equal(h.url(second), "https://chat.deepseek.com/");
+  h.sockets[0].receive({...command,slot:0,attemptId:"ds-0"});
+  await tick();
+  assert.equal(h.calls.filter(c => c === "run").length, 2);
+  for (const attemptId of ["ds-0","ds-1"]) h.finish({type:"result",provider:"deepseek",attemptId,
+    status:"success",submitted:true,text:"ok"});
+  await waitFor(() => h.sent.filter(m => m.type === "result").length === 2);
+});
+
+test("Meta AI uses two isolated owned tabs and the same duplicate protection", async () => {
+  const h = harness();
+  await waitFor(() => h.sent.some(m => m.type === "authenticate"));
+  h.sockets[0].receive({type:"authenticated"});
+  const command = {type:"execute",provider:"meta",prompt:"test",timeoutMs:10000};
+  for (const slot of [0,1]) h.sockets[0].receive({...command,slot,attemptId:`ds-${slot}`});
+  await waitFor(() => h.runs.size === 2);
+  const first = h.runs.get("ds-0").tabId, second = h.runs.get("ds-1").tabId;
+  assert.notEqual(first, second);
+  assert.equal(h.url(first), "https://www.meta.ai/");
+  assert.equal(h.url(second), "https://www.meta.ai/");
+  h.sockets[0].receive({...command,slot:0,attemptId:"ds-0"});
+  await tick();
+  assert.equal(h.calls.filter(c => c === "run").length, 2);
+  for (const attemptId of ["ds-0","ds-1"]) h.finish({type:"result",provider:"meta",attemptId,
+    status:"success",submitted:true,text:"ok"});
+  await waitFor(() => h.sent.filter(m => m.type === "result").length === 2);
+});
+
+test("Kimi uses two isolated owned tabs and the same duplicate protection", async () => {
+  const h = harness();
+  await waitFor(() => h.sent.some(m => m.type === "authenticate"));
+  h.sockets[0].receive({type:"authenticated"});
+  const command = {type:"execute",provider:"kimi",prompt:"test",timeoutMs:10000};
+  for (const slot of [0,1]) h.sockets[0].receive({...command,slot,attemptId:`ds-${slot}`});
+  await waitFor(() => h.runs.size === 2);
+  const first = h.runs.get("ds-0").tabId, second = h.runs.get("ds-1").tabId;
+  assert.notEqual(first, second);
+  assert.equal(h.url(first), "https://www.kimi.ai/");
+  assert.equal(h.url(second), "https://www.kimi.ai/");
+  h.sockets[0].receive({...command,slot:0,attemptId:"ds-0"});
+  await tick();
+  assert.equal(h.calls.filter(c => c === "run").length, 2);
+  for (const attemptId of ["ds-0","ds-1"]) h.finish({type:"result",provider:"kimi",attemptId,
+    status:"success",submitted:true,text:"ok"});
+  await waitFor(() => h.sent.filter(m => m.type === "result").length === 2);
+});
+
+test("Gemini uses two isolated owned tabs and the same duplicate protection", async () => {
+  const h = harness();
+  await waitFor(() => h.sent.some(m => m.type === "authenticate"));
+  h.sockets[0].receive({type:"authenticated"});
+  const command = {type:"execute",provider:"gemini",prompt:"test",timeoutMs:10000};
+  for (const slot of [0,1]) h.sockets[0].receive({...command,slot,attemptId:`ds-${slot}`});
+  await waitFor(() => h.runs.size === 2);
+  const first = h.runs.get("ds-0").tabId, second = h.runs.get("ds-1").tabId;
+  assert.notEqual(first, second);
+  assert.equal(h.url(first), "https://gemini.google.com/app");
+  assert.equal(h.url(second), "https://gemini.google.com/app");
+  h.sockets[0].receive({...command,slot:0,attemptId:"ds-0"});
+  await tick();
+  assert.equal(h.calls.filter(c => c === "run").length, 2);
+  for (const attemptId of ["ds-0","ds-1"]) h.finish({type:"result",provider:"gemini",attemptId,
+    status:"success",submitted:true,text:"ok"});
+  await waitFor(() => h.sent.filter(m => m.type === "result").length === 2);
+});
+
+test("Meta preparation can lease only its owned tab and restores the previous tab", async () => {
+  const h = harness();
+  await waitFor(() => h.sent.some(m => m.type === "authenticate"));
+  h.sockets[0].receive({type:"authenticated"});
+  h.sockets[0].receive({type:"execute",provider:"meta",slot:0,attemptId:"meta-prep",prompt:"test",timeoutMs:60000});
+  await waitFor(() => h.runs.has("meta-prep"));
+  const tab = h.runs.get("meta-prep").tabId;
+  assert.equal((await h.page(99,{type:"focus_for_send",attemptId:"meta-prep"})).ok,false);
+  assert.equal((await h.page(tab,{type:"focus_for_send",attemptId:"meta-prep"})).ok,true);
+  assert.equal(h.active(),tab);
+  await h.page(tab,{type:"release_send_focus",attemptId:"meta-prep"});
+  assert.equal(h.active(),99);
 });

@@ -1,9 +1,345 @@
 # LLM Browser Gateway verification record
 
-Latest verification: 2026-10-09, Europe/Berlin, using the user's existing Chrome profile.
-The Docker backend is deployed and healthy, but its post-deployment eight-request test **fails**
-with six ChatGPT successes and two Claude Send-readiness errors. The earlier 0.1.6 host-mode
-batch passed; the latest recurrence means Claude readiness is still intermittent.
+Latest verification: 2026-10-10, Europe/Berlin, using the user's existing Chrome profile.
+The Docker backend is deployed and healthy with extension **0.1.19** confirmed connected. The earlier
+fix addresses early ChatGPT response extraction and a request-error cooldown that disabled
+ChatGPT for 15 minutes. Claude's genuine quota state is preserved. The latest full eight-request
+acceptance run still fails as recorded below; targeted checks do not replace that acceptance run.
+The 0.1.8 long-output test also failed on a bridge disconnect; that remains unresolved.
+
+## Kimi input repair — 0.1.19 live SDK acceptance passed
+
+The earlier Kimi attempt failed before submission at `input_verification`; inspection showed a
+duplicated prompt in its Lexical editor. The adapter still dispatched a data-bearing synthetic input
+after the editing command's native input, and checked before the editor committed the draft.
+Version 0.1.19 reuses the corrected Meta insertion path for Kimi without changing routing,
+completion checks or OpenAI formatting. The duplicate-input regression failed against 0.1.18,
+then passed after the fix. TypeScript build and all **75 extension tests** passed. Disabled-Send
+coverage allows the single polling interval introduced by commit waiting while still rejecting
+early submission.
+
+After 0.1.19 reload, the first live run passed text, strict JSON schema and required tool call.
+The tool-result follow-up failed `502 invalid_output` after the one permitted repair. Both extracted
+answers were 41 characters and raised `JSONDecodeError`; DOM inspection showed an unfenced answer
+with unescaped nested quotes. The adapter's UI input and completion now worked, but that answer
+was not valid JSON. Log: `.runtime/kimi-019-live.log`. The guarded command restored normal routing;
+no availability block or unknown submission was created for this request failure.
+
+The shared prompt protocol now explicitly explains JSON string escaping with a valid nested-object
+example and reiterates fences for tool-result replies. Validation remains strict, with a regression
+covering valid escaped text and rejection of the malformed equivalent. **84 backend tests** passed
+(two skips, one integration suite deselected), as did Ruff. The Docker rebuild passed. Mypy remains unavailable under the previously recorded Windows
+Application Control restriction.
+
+The repeat suite passed all five live requests in **45.4 seconds**: exact text, strict JSON schema,
+required function call, tool-result follow-up and AsyncOpenAI. Every response identified `kimi-web`;
+SDK retries were disabled. Log: `.runtime/kimi-019-retest.log`. The earlier UI cooldown had already
+expired, so no database adjustment was needed. The guarded run restored normal routing afterward.
+
+Kimi was then enabled after Meta in `infra/.env`: `chatgpt,gemini,claude,deepseek,meta,kimi`.
+Compose validation and gateway-only deployment passed. Final authenticated status confirmed extension
+0.1.19 connected, this six-provider order, zero requests, no active attempts and no availability
+blocks. No further Chrome reload was needed for the backend protocol update. The full mixed-provider
+concurrency acceptance remains separate from this targeted suite.
+
+## Meta readiness and input repair — 0.1.18 live SDK acceptance passed
+
+The 0.1.16 failure occurred before input on execute navigation, after a successful separate probe.
+DOM inspection confirmed both the hidden prehydration textarea and the later Lexical editor. The
+old eight-second preparation window had no Meta background-activation recovery. Version 0.1.17
+adds the bounded preparation behavior in SRS-11 without changing engine routing or OpenAI formatting.
+Four regressions failed against 0.1.16 (background hydration, delayed hydration, shorter deadline,
+and focus failure/cleanup), then passed after the repair. TypeScript build and all **73 extension
+tests** passed, including owned-tab focus validation.
+
+After reload, 0.1.17 passed preparation but failed before submission at `input_verification`:
+attempt `a2c70e8e77b74800b7d6fa3ef18e4bb8`, 22:02:58 UTC. Inspection showed a duplicated draft.
+The insertion command already emits input; the extra data-bearing synthetic event causes Lexical
+to insert again, while the synchronous check can run before its commit. Version 0.1.18 removes that
+extra event for Meta and waits for the native editor commit. A regression failed against 0.1.17 and
+passed after the fix; build and all **74 extension tests** pass. The disabled-Send timing fixture
+now allows one polling interval because commit waiting shifts polling by 50 ms; it still prohibits
+an early click.
+
+For the controlled 0.1.17 retest, only Meta's `ui_changed` next-check time was made due under the
+provider advisory lock, after asserting no reserved/submitted/unknown Meta attempts. No quota or
+unknown-submission block was altered. The guarded test restored `chatgpt,gemini,claude,deepseek`.
+The captured log is `.runtime/meta-017-live.log`.
+
+After 0.1.18 reload, the five live Python SDK checks passed in **47.7 seconds**, ending at
+**22:06:39 UTC**: exact text, strict JSON schema, required function call, tool-result follow-up
+and AsyncOpenAI. All responses identified `meta-web`. The same scoped eligibility check was used
+for the earlier pre-submit UI cooldown; successful execution then cleared Meta availability normally.
+`.runtime/meta-018-live.log` shows five distinct successful attempts and no bridge disconnect.
+The guarded command restored normal routing before deployment.
+
+Meta was then appended to the user's chosen order in `infra/.env`:
+`chatgpt,gemini,claude,deepseek,meta`. Compose validation and gateway-only deployment passed.
+Final status confirmed extension 0.1.18 connected, that order, zero requests, no active attempts and
+no Meta cooldown. Kimi remains disabled with its previous failure unresolved. This targeted suite
+does not replace the outstanding full mixed-provider concurrency acceptance.
+
+
+## Gemini UI adapter — 0.1.16 live SDK acceptance passed
+
+On 2026-10-09, the signed-in `gemini.google.com` UI returned the exact `GEMINI_UI_READY` JSON
+code block. Longer output exposed Canvas content and showed that Redo is not a reliable completion
+control. The adapter therefore reads only response markdown with an explicit `aria-busy` attribute,
+requires its own completed Copy toolbar and absence of Stop, and excludes embedded Canvas markdown.
+The engine and shared formatter are unchanged.
+
+The TypeScript build, **68 extension tests**, **83 backend tests** (two skips, one integration suite
+deselected) and Ruff passed. New fixtures cover a 65-second valid-JSON pause, missing completion/busy
+state, disabled Send, Stop/cancellation, login/verification/quota, separate tab slots and real SDK
+text/JSON/tool conversion using synthetic browser responses. Mypy remains unavailable because of
+the previously recorded Windows Application Control restriction.
+
+The user loaded 0.1.16 and authenticated status confirmed it connected. Docker build and deployment
+passed. The five-request live OpenAI/AsyncOpenAI suite passed in **86.9 seconds**, ending at
+**21:54:03 UTC**: exact text, strict JSON schema, required tool call, tool-result follow-up and async
+text. All five responses reported `gemini-web`, with SDK retries disabled. The first request took
+46.5 seconds; later requests took 9.1–10.8 seconds each. `.runtime/gemini-016-live.log` contains five
+distinct successful attempts with no bridge disconnect during the run. The guarded test restored
+the normal running Docker configuration afterward. This does not replace full batch acceptance.
+
+After acceptance, `infra/.env` was updated to `chatgpt,claude,deepseek,gemini` and only the gateway
+container was recreated. Compose validation and health passed. Final authenticated status confirmed
+that order, extension 0.1.16 connected, two slots per provider, zero requests and no active attempts.
+The disabled Meta/Kimi providers retain their pre-submit UI cooldowns described below.
+
+## Meta AI and Kimi follow-up on 0.1.16 — pre-submit failures
+
+After the combined extension reload, the guarded live SDK checks were attempted for both earlier
+adapters. Meta returned `503 ui_changed`, diagnostic `readiness`, before sending its first prompt
+(attempt `79c92c0739034185b850a9da6ceaaad1`, 21:54:46 UTC). Its probe had passed, but the execute
+navigation's editor did not become ready within the preparation window. Kimi returned `503 ui_changed`,
+diagnostic `input_verification`, also before submission (attempt `c0c110354af74098a44bc3464adcb2f5`,
+21:55:02 UTC). Browser inspection showed the gateway draft duplicated in Kimi's editor; the exact
+editor-event/hydration cause requires a focused repair. Neither suite reached its later JSON/tool
+checks. The guarded command restored normal routing; no submitted or unknown attempts remained.
+
+Both providers remain registered but excluded from normal priority. Their persisted `ui_changed`
+cooldowns are preserved, not cleared manually. Logs are `.runtime/meta-016-live.log` and
+`.runtime/kimi-016-live.log`. The older implementation records below describe fixture verification,
+not successful live acceptance.
+
+## Kimi UI adapter — 0.1.15 built; live SDK acceptance pending
+
+On 2026-10-09, `kimi.ai` redirected to `www.kimi.ai` in the existing signed-in Chrome profile.
+A synthetic UI prompt returned the exact `KIMI_UI_READY` JSON envelope. A longer response confirmed
+loading and Stop controls, absence of the response's Refresh toolbar during generation, and its
+presence after completion. Native `pre code` contained the expected JSON without header text.
+
+The TypeScript build, **60 extension tests**, **80 backend tests** (two skips, one integration suite
+deselected) and Ruff passed. New fixtures cover editor input, CSS-disabled Send, loading/Stop,
+65-second completion pause, missing completion evidence, cancellation, login/verification/quota,
+slot isolation and shared SDK text/JSON/tool formatting with earlier providers unavailable.
+The combined 0.1.15 build retains Meta AI. Its reload replaces the earlier 0.1.14 activation request;
+live SDK acceptance for both new providers remains pending. Python mypy remains blocked by the
+previously observed Windows Application Control restriction. Docker build, Compose validation and
+gateway-only deployment passed; normal routing remains `chatgpt,claude,deepseek` until the new
+adapters pass live SDK acceptance. The last observed connected extension was still 0.1.13.
+
+## Meta AI UI adapter — 0.1.14 built; live SDK acceptance pending
+
+The signed-in website was inspected on 2026-10-09. A synthetic UI request returned valid JSON.
+Observed controls include the hydrated composer, distinct Send/Stop test IDs, assistant-only message
+container and explicit `DONE`/`true` completion attributes. The website initially displayed JSON
+as a collapsible tree; switching its Raw control revealed complete `pre code` text. The adapter
+uses that UI action instead of reading potentially collapsed tree content.
+
+The TypeScript build, **52 extension tests**, **77 backend tests** (two skips, one integration
+suite deselected) and Ruff passed. Fixtures cover completion pauses, Raw conversion, missing
+completion/Raw, disabled Send, Stop/cancellation, login/verification/quota, slot isolation and shared
+SDK text/JSON/tool conversion after earlier provider cooldowns. Python static checking remains
+unavailable because Windows Application Control blocks the installed mypy binary module.
+The engine and shared OpenAI formatter are unchanged. Docker build, Compose validation and
+gateway-only deployment passed; existing `chatgpt,claude,deepseek` routing is preserved.
+Live SDK acceptance awaits extension reload from 0.1.13 to 0.1.14 before enabling `meta`.
+
+## DeepSeek UI adapter — 0.1.13 live SDK acceptance passed
+
+The signed-in DeepSeek page was inspected on 2026-10-09. Direct UI checks verified the textarea,
+CSS-disabled Send state, arrow/square glyph controls, a loading spinner, final-answer container and
+its completed-turn Read aloud toolbar. The existing UI execution, shared OpenAI formatter and
+engine are reused; the backend registers `deepseek` without engine changes.
+
+The first live SDK run on 0.1.12 failed with `502 invalid_output`. The browser had returned valid
+JSON, but DeepSeek renders code inside `<pre><span>` and the common `pre code` selector included
+`jsonCopyDownload` banner text. A regression reproduced that exact prefix before the fix. Version
+0.1.13 selects `.md-code-block pre` for DeepSeek only. **45 extension tests**, **74 backend tests**
+(one optional SDK skip, two integration/live tests deselected), TypeScript build and Ruff passed.
+The guarded live-test command restored normal provider priority after the failure.
+
+DeepSeek fixture coverage includes a 65-second valid-JSON pause before completion, missing completion,
+Stop, CSS-disabled Send, login/verification/quota, cancellation, code-block extraction, duplicate
+protection and two independent slots. Real SDK/engine/bridge fixtures prove selection after earlier
+provider cooldowns and shared text/JSON/tool formatting, using synthetic browser replies. These do
+not replace the live SDK checks.
+
+After the user activated 0.1.13, the live OpenAI SDK run passed exact text, structured JSON and
+the required tool call, all reporting `deepseek-web`. The tool-result follow-up failed with
+`503 submission_unknown`: attempt `18aa3e94b9e64c70a5ba047242cc89ff` started at 21:08:02 UTC and
+became unknown at 21:08:05 UTC, well before the deadline. Browser inspection showed the completed
+correct final answer containing `value=42`. The asynchronous fifth request was not reached.
+Subsequent backend logs show repeated WebSocket reconnects through 21:08:53 UTC; the exact cause
+of the original interruption is not established. The guarded test restored `chatgpt,claude`
+priority automatically. DeepSeek was kept disabled in normal routing pending another test.
+
+After the user completed the extension's operator reset, authenticated status confirmed no active
+attempts or availability blocks. The retry at **21:12:06–21:12:27 UTC** passed all five live requests
+in **21.7 seconds**: exact text, strict JSON schema, required tool call, tool-result follow-up and
+AsyncOpenAI. Each SDK response reported `deepseek-web`; SDK retries were disabled. The captured
+`.runtime/deepseek-013-retry.log` shows successful extraction for all five distinct attempts and no
+bridge disconnect during the run. This success does not establish the earlier disconnect's cause.
+
+The ignored `infra/.env` now explicitly sets `BROWSER_GATEWAY_PRIORITY=chatgpt,claude,deepseek`.
+Only the gateway container was recreated; Compose validation and health passed. Final authenticated
+status confirmed extension 0.1.13 connected, that priority order, two slots per provider, zero requests,
+no active attempts and no availability blocks. No extension reload was needed for this configuration
+change. This single-provider SDK acceptance does not replace the outstanding full batch acceptance.
+
+## UI-only rollback — extension 0.1.11 deployed and live smoke passed
+
+At the user's request, the unsuccessful HTTP/SSE experiment was removed from source, configuration,
+status fields, extension packaging and its dedicated tests/examples. The earlier live experiment
+returned HTTP 403. ChatGPT and Claude now use only the existing UI adapters. Reset receiver recovery
+and earlier UI completion fixes are retained. The backend was rebuilt and deployed using `infra/.env`;
+Chrome reported 0.1.11 connected. The packaged extension contains only the background, UI content and
+popup scripts. No provider HTTP/SSE scripts or transport switch remain.
+
+The TypeScript build, **36 extension tests**, **71 backend tests** (one optional SDK skip, two
+integration/live tests deselected), Ruff and Compose validation passed. All 21 relative documentation
+links/anchors resolved. Windows Application Control blocked importing mypy's binary module, so the
+type check could not run in this verification.
+
+One real OpenAI SDK request through the restored ChatGPT UI adapter returned the exact unique test
+marker in **16.5 seconds**, model `chatgpt-web`, request `7d5a79196f7e4b31bf1c715f5671a1ed`, with SDK
+retries disabled. Final status showed extension 0.1.11 connected, zero requests, no active attempts
+and no availability blocks. This targeted smoke does not replace the unresolved full batch acceptance.
+
+## Extension 0.1.10 operator-reset recovery — block cleared, acknowledgement unresolved
+
+The user reported `Connected; 0 pending jobs (v0.1.9)` followed by
+`Could not establish connection. Receiving end does not exist.` when invoking reset. The backend
+still held the earlier unknown attempt. The reset implementation contacted saved tabs without
+recovering scripts invalidated by an extension update. A fixture reproduced the failure before the fix.
+
+The corrected reset restores the script by reloading the same owned conversation, sends the
+UI stop command, and requires idle confirmation before requesting backend reset.
+No generation is sent. Foreign-origin tabs are not reloaded. The user activated 0.1.10 and reported
+`Gateway did not acknowledge; no submission allowed`. Authenticated backend status subsequently
+confirmed 0.1.10 connected, zero requests, no active attempts and no availability rows: the old block
+was cleared. Logs show repeated WebSocket reconnects around 22:31 Europe/Berlin, but do not establish
+why the reset acknowledgement was missed. The popup confirmation failure remains unresolved.
+The TypeScript build and all **45 extension tests** passed, including missing-receiver recovery,
+foreign-origin rejection, and rejection of an unverified idle state.
+
+## Extension 0.1.8 completion and request-error recovery — 18:06 deployment
+
+The 0.1.7 service logs showed successful ChatGPT requests, including one taking **50.803 seconds**,
+followed by request `ae48d7e0f07746279e5ff69eac111266` ending in `invalid_output` after one
+same-provider repair at **17:52:11 Europe/Berlin**. PostgreSQL then blocked ChatGPT for 15 minutes.
+With Claude already quota-limited, later requests returned `503 temporary_unavailable` without
+dispatch. An invalid response is a request failure and should not disable the provider.
+
+The old browser reader could accept text that paused for 1.5 seconds when no recognised Stop
+control was visible. A regression fixture reproduces this with a 65-second generation pause.
+The completed ChatGPT page inspected in the user's profile contained valid JSON and an explicit
+`data-talvt-turn-state="complete"` ancestor. Logs did not retain the rejected output, so they do not
+establish its exact parsing failure. The new reader requires completion evidence before returning
+stable text, within the existing overall 180-second deadline. It also supports an observed Stop
+control disappearing on older pages, and conservatively reports unknown submission if no completion
+evidence arrives before the deadline.
+
+The backend now records `invalid_output`/`invalid_request` on the attempt and releases its slot
+without changing provider availability. Startup removes legacy cooldowns with these reasons after
+recovering unfinished work. Validation failures log only provider, attempt ID, repair flag, character
+count and exception class; prompts, answers and validation messages are not logged.
+
+Only `feed-llm-browser-gateway` was rebuilt and recreated using `infra/.env`, while idle. The new
+container started at **18:06:53 Europe/Berlin**, image ID
+`sha256:392e37c711c750cb10437404428e148ce8f1f42f47f939b436550275922a7722`.
+Health passed and extension 0.1.8 reconnected automatically. Authenticated status confirmed the
+legacy ChatGPT `invalid_output` block was removed and Claude's `rate_limited` row was unchanged.
+
+Regression checks passed: **71 gateway tests, 217 shared tests, 33 extension tests**, TypeScript
+build, Ruff and strict mypy (23 Python files). One optional gateway SDK test skipped; the standard
+run excluded the two opt-in suites. The separate real PostgreSQL integration test passed against
+the dedicated disposable `llm_browser_gateway_test` database, including request-error slot reuse,
+legacy cleanup, and preservation of concurrent quota and unknown-submission blocks. The new
+generation-pause and provider-availability regressions were observed failing before their fixes.
+
+The live run `60444f61c05e` at **18:07:56–18:09:27 Europe/Berlin** used two normal-routing SDK
+requests with retries disabled. The named tool call passed in **15.813 seconds**. The 60-item
+structured-output request failed after **90.922 seconds** with `503 submission_unknown`, correlated
+with a bridge `WebSocketDisconnect` at 18:09:27, before the 180-second deadline. The extension
+reconnected automatically at 18:09:28. Both requests stayed on ChatGPT; its failed attempt
+`bf50a2066da24466b28f95df282442e9` remained unknown. This is not evidence that rendering caused the
+disconnect. The saved `.runtime/extension-018-verification.json` records the failure. Investigation
+was interrupted while checking connection recovery, and the user then requested the separate
+network experiment. The existing UI implementation was retained.
+
+## Extension 0.1.7 live activation and quota verification — 17:48
+
+After the user reloaded the extension, the backend confirmed **0.1.7** connected at
+**17:46:55 Europe/Berlin**. A three-request normal-routing SDK check ran at **17:48:23–17:48:47**,
+with two slots per provider, unchanged priority, and SDK retries disabled. Claude's previous
+cooldown had expired naturally; no provider state was cleared or advanced.
+
+| Provider | Requests | Observed result | Duration |
+|---|---:|---|---:|
+| ChatGPT | 2 concurrent | Both HTTP 200 with their distinct exact expected answers | 23.719 s / 23.734 s |
+| Claude | 1 | HTTP 429 `rate_limited` during readiness, before submission | 7.688 s |
+
+The Claude result proves the updated detector recognises the live quota notice. It does not prove
+Claude generation while the account is limited. Its persisted reason changed from `ui_changed`
+to `rate_limited`, with `reset_at` unknown and next eligible check **18:03:30 Europe/Berlin**.
+Each of the three request IDs was observed on exactly one provider, without observer errors.
+Final state: extension 0.1.7 connected, zero active requests/attempts, and ChatGPT available.
+The full batch took **24.25 seconds**; the local `.runtime/extension-017-verification.json`
+preserves run `44dab6884c29`. This targeted check does not replace the full eight-request
+acceptance test recorded below.
+
+## Misleading disconnect error and Claude quota detection — 16:21
+
+The reported `503 browser_disconnected` was reproduced while `/status` showed extension 0.1.6
+connected. The container had no connection-close event since its 10:20 startup. Both providers
+had persisted `ui_changed` cooldowns: Claude after a 16:02 readiness failure and ChatGPT after a
+16:04 pre-submit Send failure. The engine's no-eligible-provider branch incorrectly labelled
+that state as a browser disconnect.
+
+The corrected backend was deployed at **16:16:41 Europe/Berlin** using the existing `infra/.env`;
+only `feed-llm-browser-gateway` was recreated. Image ID:
+`sha256:9e9ade12e589045dde538fadbe3d5f385bd0689caf9ce7e5f904f5508f609e93`.
+Container health passed, and the saved extension pairing reconnected automatically at 16:16:46.
+At 16:17:00 the same cooldown state returned `503 temporary_unavailable`, request
+`144b2a0615b047e48cc9e2497ef76c09`, with both provider reasons recorded in the new routing log.
+
+Normal OpenAI SDK samples used unchanged provider priority and disabled SDK retries:
+
+| Time, Europe/Berlin | Result | Duration |
+|---|---|---:|
+| 16:17:25 | Claude selected after its check became due; 503 `ui_changed` at readiness, before submission | 13.188 s |
+| 16:20:39 | ChatGPT selected after its cooldown expired; HTTP 200 with the exact unique expected answer | 21.359 s |
+
+ChatGPT request `1b727b9b2e7e448e984d8ee62ad75080` completed with the extension connected and
+zero active work. No cooldown was cleared or advanced. Claude's next recorded check remained
+16:32:38; these are local probe times, not provider quota reset times.
+
+Read-only inspection of the failed Claude tab found **“Your free messages return at 8:00 PM.”**
+inside `section[data-composer-stand-in]`, replacing the editor. This explains the current Claude
+readiness failure; it does not establish the cause of earlier Send-readiness failures. Extension
+**0.1.7** now recognises this notice as `rate_limited`. Its clock-only text does not establish a
+timezone-aware reset, so the existing bounded probe schedule remains. Activation and live detector
+verification subsequently passed as recorded above.
+
+Validation: five Python regressions failed before the router fix and pass afterward; the quota
+fixture likewise failed before the selector fix and passes afterward. The full targeted checks pass
+**68 gateway tests, 217 shared tests, 29 extension tests**, TypeScript build, Ruff and strict mypy
+(23 Python files). One optional SDK test skipped; live/disposable-database suites were not enabled.
+The local `.runtime/cooldown-error-fix.json` preserves the HTTP results and state snapshots.
+The behavioral contract is in [SRS-11](../requirements/SRS-11-llm-browser-gateway.md).
 
 ## Docker Desktop deployment and verification
 
@@ -348,7 +684,7 @@ The focused Python suite passed 37 checks, with the root-environment LangChain t
 Postgres deselected. Separate earlier SDK-matrix and disposable-Postgres runs passed. The TypeScript
 build and seven extension recovery tests passed, as did Ruff, strict mypy and 210 shared tests.
 
-This proves the listed live samples. Named-tool and negative/refusal live scenarios remain in the
-[remaining backlog](../backlog/E16-LLM-Browser-Gateway/README.md). Quota fallback is tested with simulated limits; real account
+This proves the listed live samples. Named-tool and negative/refusal live scenarios remain
+unverified. Quota fallback is tested with simulated limits; real account
 allowances were not deliberately exhausted. Complete stock-prediction or TradingAgents integration
 is outside this service's scope.

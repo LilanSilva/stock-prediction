@@ -31,6 +31,13 @@ def render(body: JSON, *, repair: bool = False) -> str:
         "request another allowed tool. Output token budgets are best-effort instructions. "
         "Do not include an invented tool result."
     )
+    protocol += (
+        " JSON string values must escape embedded quotes and backslashes. "
+        "For example, a JSON object reported as text must be encoded like this: "
+        + json.dumps({"kind": "final", "content": '{"status":"done"}'})
+        + ". Keep the outer json code fence even when replying after a tool result. "
+        "Check that the complete envelope is valid JSON before returning it."
+    )
     if repair:
         protocol += " A prior answer failed validation. Regenerate carefully from REQUEST."
     return protocol + "\nREQUEST:\n" + json.dumps(body, ensure_ascii=False, separators=(",", ":"))

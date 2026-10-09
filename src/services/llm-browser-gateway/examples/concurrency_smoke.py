@@ -86,7 +86,10 @@ async def check(provider: str, count: int) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--provider", required=True, choices=["chatgpt", "claude"])
+    parser.add_argument(
+        "--provider", required=True,
+        choices=["chatgpt", "claude", "deepseek", "meta", "kimi", "gemini"]
+    )
     parser.add_argument("--requests", type=int, default=2, choices=range(2, 7))
     args = parser.parse_args()
     asyncio.run(check(args.provider, args.requests))

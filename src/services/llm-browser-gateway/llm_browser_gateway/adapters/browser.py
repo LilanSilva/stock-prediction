@@ -1,9 +1,13 @@
 import uuid
 
+from shared.logging import get_logger
+
 from .base import BrowserTransport, remaining
 from .common.contract import CAPABILITIES
 from .common.formatting import parse, render
 from .common.types import JSON, BrowserResult, Context, GatewayError, Result, Status, failure
+
+LOG = get_logger(__name__)
 
 
 class BrowserAdapter:
@@ -38,11 +42,22 @@ class BrowserAdapter:
                 )
             try:
                 return parse(result.text, body, self.name, result.observed_model)
-            except GatewayError:
+            except GatewayError as exc:
+                LOG.warning(
+                    "browser_output_rejected",
+                    provider=self.name,
+                    attempt_id=attempt_id,
+                    repair=repair,
+                    output_chars=len(result.text),
+                    cause=type(exc.__cause__).__name__,
+                )
                 if repair:
                     return failure(Status.INVALID_OUTPUT, submitted=True)
         raise AssertionError("Unreachable")
 
 
 def registry(transport: BrowserTransport) -> dict[str, BrowserAdapter]:
-    return {name: BrowserAdapter(name, transport) for name in ("chatgpt", "claude")}
+    return {
+        name: BrowserAdapter(name, transport)
+        for name in ("chatgpt", "claude", "deepseek", "meta", "kimi", "gemini")
+    }

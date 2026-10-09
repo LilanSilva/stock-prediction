@@ -44,9 +44,11 @@ class Engine:
         while remaining(context) > 0:
             busy = False
             limited = True
+            blocked: dict[str, str] = {}
             for adapter in eligible:
                 availability = await self.store.availability(context.profile_id, adapter.name)
                 if availability is not None and not availability.eligible:
+                    blocked[adapter.name] = availability.reason
                     limited = limited and availability.reason == Status.RATE_LIMITED
                     continue
                 limited = False
@@ -108,8 +110,13 @@ class Engine:
                 # Persist availability for later requests, but never redispatch this one.
                 return last
             if not busy:
-                if limited:
-                    return failure(Status.RATE_LIMITED)
-                return failure(Status.DISCONNECTED)
+                outcome = Status.RATE_LIMITED if limited else Status.TEMPORARY
+                LOG.warning(
+                    "browser_providers_unavailable",
+                    request_id=context.request_id,
+                    reasons=blocked,
+                    outcome=outcome.value,
+                )
+                return failure(outcome)
             await asyncio.sleep(min(0.1, remaining(context)))
         raise GatewayError("Gateway request deadline expired", 504, "deadline_exceeded")

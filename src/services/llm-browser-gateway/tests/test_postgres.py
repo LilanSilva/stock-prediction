@@ -36,6 +36,25 @@ async def test_persistent_cooldown_restart_and_uncertain_reservation() -> None:
     store = PostgresStore(url, 30, 7)
     await store.start()
     try:
+        for status in (Status.INVALID_OUTPUT, Status.INVALID_REQUEST):
+            attempt = "request-" + status.value
+            assert await store.reserve("request-errors", "chatgpt", attempt, "req")
+            await store.finish(
+                "request-errors", "chatgpt", attempt, failure(status, submitted=True)
+            )
+            assert await store.availability("request-errors", "chatgpt") is None
+            assert await store.reserve("request-errors", "chatgpt", attempt + "-next", "next")
+            await store.finish(
+                "request-errors", "chatgpt", attempt + "-next", Result({}, 200, Status.SUCCESS)
+            )
+        assert await store.reserve("uncertain", "chatgpt", "unknown", "unknown")
+        assert await store.reserve("uncertain", "chatgpt", "bad-output", "bad-output", 1)
+        await store.finish(
+            "uncertain", "chatgpt", "unknown", failure(Status.UNKNOWN, submitted=None)
+        )
+        await store.finish("uncertain", "chatgpt", "bad-output", failure(Status.INVALID_OUTPUT))
+        protected = await store.availability("uncertain", "chatgpt")
+        assert protected and protected.reason == Status.UNKNOWN
         assert await store.reserve("test", "chatgpt", "limit", "req")
         snapshot = await store.snapshot("test")
         assert snapshot["active"] == [
@@ -50,21 +69,31 @@ async def test_persistent_cooldown_restart_and_uncertain_reservation() -> None:
         assert not await store.reserve("test", "chatgpt", "overlap", "req")
         assert await store.reserve("test", "chatgpt", "in_flight", "req", 1)
         assert not await store.reserve("test", "chatgpt", "same_slot", "req", 1)
+        assert await store.reserve("test", "chatgpt", "bad-concurrent", "req", 2)
         reset = datetime.now(UTC) + timedelta(hours=1)
         error = failure(Status.RATE_LIMITED, submitted=True)
         limited = Result(error.body, 429, error.status, True, True, reset)
         await store.finish("test", "chatgpt", "limit", limited)
+        await store.finish("test", "chatgpt", "bad-concurrent", failure(Status.INVALID_OUTPUT))
         await store.finish("test", "chatgpt", "in_flight", Result({}, 200, Status.SUCCESS, True))
         remaining_limit = await store.availability("test", "chatgpt")
         assert remaining_limit and remaining_limit.reason == Status.RATE_LIMITED
         assert not await store.reserve("test", "chatgpt", "after_limit", "req", 1)
         assert await store.reserve("test", "claude", "interrupted", "req")
         await store.submitted("interrupted")
+        await store.pool.execute(
+            "INSERT INTO llm_browser_gateway.availability "
+            "(profile_id,provider,reason,next_check_at) "
+            "VALUES('legacy','chatgpt','invalid_output',now()+interval '1 hour'),"
+            "('legacy','claude','invalid_request',now()+interval '1 hour')"
+        )
     finally:
         await store.close()
     restarted = PostgresStore(url, 30, 7)
     await restarted.start()
     try:
+        assert await restarted.availability("legacy", "chatgpt") is None
+        assert await restarted.availability("legacy", "claude") is None
         availability = await restarted.availability("test", "chatgpt")
         assert availability and availability.reset_at == reset and not availability.eligible
         unknown = await restarted.availability("test", "claude")

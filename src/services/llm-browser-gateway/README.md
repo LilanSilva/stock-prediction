@@ -1,9 +1,9 @@
 # LLM Browser Gateway
 
-Standalone service for existing Windows Chrome ChatGPT and Claude sessions. Implementation,
+Standalone service for existing Windows Chrome ChatGPT, Claude, DeepSeek, Meta AI, Kimi and Gemini sessions. Implementation,
 supported request fields, configuration, setup and recovery are documented in
 [SRS-11](../../../requirements/SRS-11-llm-browser-gateway.md). Live acceptance is tracked in
-[E16](../../../backlog/E16-LLM-Browser-Gateway/README.md).
+the [verification record](../../../docs/llm-browser-gateway-verification.md).
 
 | Path | Responsibility |
 |---|---|
@@ -15,7 +15,7 @@ supported request fields, configuration, setup and recovery are documented in
 | `llm_browser_gateway/adapters/browser.py` | Registered browser adapters |
 | `llm_browser_gateway/adapters/common/` | Shared OpenAI validation, prompt protocol, response formatting and statuses |
 | `extension/src/background.ts` | Chrome bridge, tab ownership, reconnect and recovery |
-| `extension/src/content.ts` | Website-specific UI execution for ChatGPT and Claude |
+| `extension/src/content.ts` | Website-specific UI execution for ChatGPT, Claude, DeepSeek, Meta AI, Kimi and Gemini |
 | `extension/src/popup.ts` | Pairing and operator controls |
 | `examples/sdk_smoke.py` | OpenAI/AsyncOpenAI JSON and tool-round-trip checks |
 | `examples/concurrency_smoke.py` | Live sequential/concurrent timing and response-isolation checks |

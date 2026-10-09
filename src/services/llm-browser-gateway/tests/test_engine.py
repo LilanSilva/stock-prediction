@@ -170,6 +170,45 @@ async def test_all_limited_and_queue_bounds(settings: Settings, store: MemorySto
         await engine.complete(BASE, context())
 
 
+@pytest.mark.parametrize(
+    "reasons",
+    [
+        (Status.UI_CHANGED, Status.UI_CHANGED),
+        (Status.LOGIN_REQUIRED, Status.VERIFICATION_REQUIRED),
+        (Status.RATE_LIMITED, Status.UI_CHANGED),
+        (Status.DISCONNECTED, Status.UNKNOWN),
+    ],
+)
+async def test_blocked_providers_are_unavailable_not_disconnected(
+    settings: Settings, store: MemoryStore, reasons: tuple[Status, Status]
+) -> None:
+    first, second = FakeAdapter(), FakeAdapter("claude")
+    for name, reason in zip(settings.providers, reasons, strict=True):
+        store.states["default", name] = Availability(
+            reason,
+            next_check_at=None
+            if reason == Status.UNKNOWN
+            else datetime.now(UTC) + timedelta(minutes=15),
+        )
+    original = dict(store.states)
+    engine = Engine(settings, store, {"chatgpt": first, "claude": second})
+    reply = await engine.complete(BASE, context())
+    assert reply.http_status == 503
+    assert reply.status == Status.TEMPORARY
+    assert reply.body["error"]["code"] == "temporary_unavailable"
+    assert not first.probes and not second.probes
+    assert not store.reservations and store.states == original
+
+    # Only a due provider becomes eligible; other cooldowns remain intact.
+    store.states["default", "chatgpt"] = replace(
+        original["default", "chatgpt"], next_check_at=datetime.now(UTC) - timedelta(seconds=1)
+    )
+    recovered = await engine.complete(BASE, replace(context(), request_id="after-cooldown"))
+    assert recovered.status == Status.SUCCESS
+    assert len(first.probes) == 1 and not second.probes
+    assert store.states["default", "claude"] == original["default", "claude"]
+
+
 async def test_adapter_repairs_once_with_same_history() -> None:
     class Transport:
         def __init__(self) -> None:
@@ -192,6 +231,46 @@ async def test_adapter_repairs_once_with_same_history() -> None:
     assert (
         transport.prompts[0].split("REQUEST:\n")[1] == transport.prompts[1].split("REQUEST:\n")[1]
     )
+
+
+@pytest.mark.parametrize("status", [Status.INVALID_OUTPUT, Status.INVALID_REQUEST])
+async def test_request_error_does_not_disable_provider(
+    settings: Settings, store: MemoryStore, status: Status
+) -> None:
+    store.states["default", "claude"] = Availability(
+        Status.RATE_LIMITED, next_check_at=datetime.now(UTC) + timedelta(hours=1)
+    )
+    first = FakeAdapter(result=failure(status, submitted=True))
+    second = FakeAdapter("claude")
+    engine = Engine(settings, store, {"chatgpt": first, "claude": second})
+    failed = await engine.complete(BASE, context())
+    assert failed.status == status and failed.http_status in {400, 502}
+    assert not second.probes and not store.active
+    assert ("default", "chatgpt") not in store.states
+    first.result = None
+    reply = await engine.complete(BASE, replace(context(), request_id="next-request"))
+    assert reply.status == Status.SUCCESS and reply.body["model"] == "chatgpt-web"
+    assert not second.probes
+    assert store.states["default", "claude"].reason == Status.RATE_LIMITED
+
+
+async def test_output_rejection_logs_metadata_without_response_text(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    private_output = "private response must not appear in service logs"
+
+    class Transport:
+        async def command(
+            self, provider: str, ctx: Context, attempt: str, prompt: str | None
+        ) -> BrowserResult:
+            return BrowserResult(Status.SUCCESS, private_output, True)
+
+    response = await BrowserAdapter("chatgpt", Transport()).execute(BASE, context(), "diagnostic")
+    assert response.status == Status.INVALID_OUTPUT and response.http_status == 502
+    captured = capsys.readouterr().out
+    assert "browser_output_rejected" in captured and "JSONDecodeError" in captured
+    assert "diagnostic" in captured and "output_chars" in captured
+    assert private_output not in captured
 
 
 @pytest.mark.parametrize("status", [Status.REFUSED, Status.INVALID_OUTPUT])

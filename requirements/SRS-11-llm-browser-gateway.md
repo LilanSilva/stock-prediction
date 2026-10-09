@@ -8,10 +8,10 @@
 | Component | Standalone LLM Browser Gateway |
 | Requirement ID prefix | `BGW` |
 | Status | Implemented and Docker-deployed; latest live batch fails on intermittent Claude readiness; see the [verification record](../docs/llm-browser-gateway-verification.md) |
-| Version | `1.3.0` |
+| Version | `1.10.3` |
 | Source code | [llm-browser-gateway](../src/services/llm-browser-gateway/) |
 | Tests | [tests](../src/services/llm-browser-gateway/tests/) |
-| Last verified against code | `2026-10-09` |
+| Last verified against code | `2026-10-10` |
 
 ## 2. Purpose and scope
 
@@ -19,7 +19,7 @@
 
 Accept a focused OpenAI Chat Completions HTTP contract, route each request to an available browser
 adapter, and return its validated response. A custom Chrome extension uses the user's existing
-logged-in ChatGPT or Claude profile. The backend runs on Windows or in Docker Desktop; Chrome and
+logged-in ChatGPT, Claude, DeepSeek, Meta AI, Kimi or Gemini profile. The backend runs on Windows or in Docker Desktop; Chrome and
 its extension stay in the Windows profile. PostgreSQL runs in Docker Desktop in both deployments.
 
 ### 2.2 In scope
@@ -66,7 +66,7 @@ belongs to the service-local `adapters/common` package.
 |---|---|---|
 | PostgreSQL | Availability and durable attempt ownership | Startup fails or requests return unavailable |
 | Selected Chrome profile and unpacked extension | Website execution | Unavailable/unknown status depending on submission |
-| ChatGPT / Claude website | Generate answers | Provider-specific failure or cooldown |
+| ChatGPT / Claude / DeepSeek / Meta AI / Kimi / Gemini website | Generate answers | Provider-specific failure or cooldown |
 | Root `.venv` and editable `shared` | Python runtime and logging | Service cannot start |
 
 ## 5. Functional requirements
@@ -85,6 +85,15 @@ belongs to the service-local `adapters/common` package.
 | `BGW-10` | The Claude adapter **shall** complete the same real browser acceptance cases. | Must | Implemented |
 | `BGW-11` | The gateway **shall** return a terminal refusal without provider cycling. | Must | Implemented |
 | `BGW-18` | Each HTTP request **shall** be assigned to at most one provider; readiness or execution failure **shall** return to that caller without dispatching the same request to another provider. | Must | Implemented |
+| `BGW-20` | When all capable providers are blocked by persisted availability, the gateway **shall** return `429 rate_limited` if all reasons are quota limits, otherwise `503 temporary_unavailable`, without reporting a browser disconnect or dispatching work. | Must | Implemented |
+| `BGW-21` | The Claude adapter **shall** identify the visible composer replacement notice “Your free messages return at” as a quota limit without inferring a timezone from its clock-only reset text. | Must | Implemented |
+| `BGW-22` | A request's `invalid_output` or `invalid_request` result **shall** release its slot without creating or changing provider availability; startup **shall** remove legacy cooldowns with those reasons while preserving real availability blocks. | Must | Implemented |
+| `BGW-23` | The ChatGPT reader **shall** wait for its answer's explicit turn-completion marker, or an observed Stop-control transition on older pages, within the request deadline before returning stable text. | Must | Implemented |
+| `BGW-26` | An operator reset **shall** recover a missing content-script receiver by reloading only the owned provider tab's current URL, request Stop, and require explicit idle confirmation before clearing backend blocks. | Must | Implemented; fixture-verified |
+| `BGW-27` | The DeepSeek UI adapter **shall** reuse shared OpenAI text/JSON/tool formatting, provider priority, cooldowns and slot isolation, and require completed final-answer evidence before returning a response. | Must | Implemented; fixtures and five-request live SDK acceptance passed |
+| `BGW-28` | The Meta AI UI adapter **shall** reuse shared OpenAI formatting and routing, wait for explicit streaming completion, and extract complete JSON from Raw view instead of a collapsible tree. | Must | Implemented; fixtures passed, five-request live SDK acceptance passed on 0.1.18 |
+| `BGW-29` | The Kimi UI adapter **shall** use existing OpenAI formatting and slot routing, distinguish Send/loading/Stop, and require its own completed-answer toolbar before returning stable text. | Must | Implemented; fixtures passed, five-request live SDK acceptance passed on 0.1.19 |
+| `BGW-30` | The Gemini UI adapter **shall** reuse shared OpenAI formatting and slot routing, require explicit completion and its own response toolbar, and exclude Canvas content from answer extraction. | Must | Implemented; fixtures and five-request live SDK acceptance passed |
 
 ## 6. Non-functional requirements
 
@@ -117,6 +126,10 @@ allowed inside the same deadline. Invalid output after repair and refusals are t
 
 Browser output is requested as one fenced JSON code block so website typography cannot replace
 JSON delimiters with curly quotes. The adapter extracts the literal code content before validation.
+The shared protocol also explains escaping quotes/backslashes inside string values, gives a valid
+nested-JSON example, and reiterates the code fence for tool-result replies. Parsing remains strict.
+Validation rejections log provider, attempt ID, repair flag, output character count and exception
+class under `browser_output_rejected`, without prompt text, response text or validation messages.
 
 ### 7.2 Routing and recovery
 
@@ -129,6 +142,13 @@ requests can select another eligible provider when one is busy or on cooldown. A
 does not trigger another attempt against that account immediately. One bounded output repair, when
 needed, remains inside the already-selected provider.
 
+If all capable providers are blocked, the engine returns `429 rate_limited` when every reason is a
+quota limit, otherwise `503 temporary_unavailable`. Persisted UI, login or unknown-submission blocks
+do not establish that the extension is disconnected. The rejection logs `browser_providers_unavailable`
+with the request ID and provider reasons; authenticated `/status` exposes their next-check times.
+Existing cooldowns are preserved, and the next request probes a provider once its check is due.
+An actual readiness/transport disconnect still returns `browser_disconnected` for that attempt.
+
 Each provider has a configurable pool of tab slots (default two). Requests reserve the first free
 slot in provider-priority order; if all eligible slots are busy they wait inside the existing deadline
 and queue bound. Each slot has a distinct persistent Chrome tab assignment and one active attempt.
@@ -137,11 +157,20 @@ serialized in PostgreSQL, and a concurrent success cannot erase a newer cooldown
 submission conservatively blocks new work for that provider until reconciled; other in-flight
 requests retain their own slots. Public OpenAI payloads are unchanged.
 
+`invalid_output` and `invalid_request` are request failures, not provider outages. They are recorded
+on the finished attempt without changing provider availability. Startup removes legacy cooldowns
+whose reason is one of those request failures after recovering unfinished attempts as unknown.
+Quota, login, UI and unknown-submission blocks remain governed by the existing recovery rules.
+
 The extension reports `submitting` and waits for a durable backend acknowledgment **before** clicking
 Send. Disconnects and timeouts after dispatch are conservatively unknown. Such attempts retain
 their reservation. Reconnect inventories existing page work or replays its cached terminal result;
 it never submits the generation again. Restart converts unfinished reservations to unknown.
 Operator reset first requests Stop and checks that owned tabs are idle, then clears the block.
+Extension 0.1.10 recovers missing receivers after extension updates by reloading the same conversation
+URL in an owned provider tab. It refuses to reload tabs that navigated outside their provider origin.
+Reset then uses the UI cancellation path and waits up to five seconds for explicit idle
+confirmation. Failure to inspect or stop a tab leaves backend state unchanged; no generation is sent.
 Independent HTTP retries are independent requests; clients should disable automatic retries during
 browser execution.
 
@@ -170,6 +199,11 @@ were inspected in the selected profile on 2026-10-09; generation acceptance rema
 Visible quota detection currently covers English notices and explicit offset-aware `datetime`
 values. An unknown reset stays unknown; a default 15-minute probe cooldown is used instead.
 
+Extension 0.1.7 also checks Claude's `[data-composer-stand-in]` notice, which replaces the editor
+when the free allowance is exhausted. “Your free messages return at” reports `rate_limited` before
+draft insertion or submission. A clock-only value such as “8:00 PM” leaves `reset_at` unknown.
+Hidden notices and quota wording inside a user draft are not treated as provider limit signals.
+
 ChatGPT response extraction supports both `data-message-author-role=assistant` and the newer
 `data-markdown-text-style=assistant-message` content. Both providers wait for composer hydration;
 Send readiness has a maximum 45-second budget for Claude and 15 seconds for ChatGPT, bounded by
@@ -180,6 +214,14 @@ editor payload and enabled Send control are checked again after the submission a
 before clicking once. A Send control that remains disabled returns `temporary_unavailable`,
 `submitted=false`, with diagnostic `send_disabled`; a missing control remains `ui_changed`.
 These selectors and waits require live acceptance after website changes.
+
+Extension 0.1.8 checks the ChatGPT answer's enclosing `[data-talvt-turn-state]` for `complete`.
+A short pause or even valid interim JSON is insufficient while the turn is still generating. If
+that marker is absent, the reader requires an observed Stop control to disappear; missing completion
+evidence runs to the existing overall deadline and returns `submission_unknown`. A 60-second response
+fits within the default 180-second budget, including navigation and queueing. The reader retains its
+short final-text stability check after completion and never resubmits merely because generation pauses.
+Claude's extraction logic is unchanged by this repair.
 
 Extension 0.1.6 adds recovery for a background Claude page whose Send control has not become ready
 after two seconds. The content script requests a temporary activation of its own reserved tab;
@@ -199,6 +241,92 @@ each active attempt, allowing the live batch test to detect cross-provider dispa
 include a bounded execution-stage code (navigation, connection, readiness, editor, insertion, Send,
 submission acknowledgment or extraction) without prompt/response content. These diagnostics do not
 change public OpenAI responses.
+
+### 7.4 DeepSeek UI adapter
+
+Extension 0.1.13 includes `https://chat.deepseek.com/*` in its host permissions and content-script
+matches, the `deepseek` tab resource and a popup designation button. The adapter uses the same
+`BrowserAdapter`, shared compatibility library and UI execution pipeline. Engine logic is unchanged.
+Registering it does not alter the default priority; add `deepseek` to `BROWSER_GATEWAY_PRIORITY` in
+`infra/.env` to enable it. The suggested order is `chatgpt,claude,deepseek`. An older extension must
+be reloaded before enabling DeepSeek. Website credentials remain in the selected Chrome profile.
+
+The observed English composer is `textarea[placeholder='Message DeepSeek']`. Send and Stop are
+unlabelled role-buttons: the reader distinguishes their observed arrow/square SVG glyphs within
+`.ds-button--primary.ds-button--circle`, respects `ds-button--disabled`, and treats the loading
+spinner as busy. Changed glyphs fail closed instead of guessing which button to click. Readiness
+recognizes `/sign_in`, verification challenges and shared visible English quota notices. Quota
+reset times are not guessed; unseen website notice variants still require live verification.
+
+Only `.ds-assistant-message-main-content` is extracted, excluding DeepThink reasoning. A single
+`.md-code-block pre` supplies raw JSON without its language/Copy/Download banner. The reader
+requires a visible Read aloud control within that answer's `[data-virtual-list-item-key]` turn,
+no Stop/loading control, and the existing final-text stability interval. Missing completion evidence
+or cancellation after submission remains `submission_unknown`; no duplicate or cross-provider retry
+is introduced. Text, JSON and tools use the same prompt/envelope protocol and `deepseek-web` identity.
+
+### 7.5 Meta AI UI adapter
+
+Extension 0.1.14 adds `https://www.meta.ai/*`, the `meta` provider and its popup tab designation.
+The same browser adapter, shared formatter, cooldowns, exclusive slots and one-provider-per-request
+rules apply without engine changes. Enable it by appending `meta` to `BROWSER_GATEWAY_PRIORITY`
+after loading the extension and signing in. Suggested order: `chatgpt,gemini,claude,deepseek,meta`.
+Credentials remain in Chrome; the adapter does not read tokens or make provider HTTP requests.
+
+The hydrated editor is `[data-testid='composer-input'][contenteditable='true']`; the prehydration
+textarea is deliberately ignored. Send and Stop use `composer-send-button` and `composer-stop-button`.
+Extension 0.1.17 allows up to 30 seconds for Meta hydration, bounded by the supplied execution
+budget. If its editor is still missing after two seconds in a hidden tab, the probe or execute
+preparation requests the existing serialized ten-second activation lease for its owned tab.
+It releases that lease on completion/failure, restoring the previous tab unless the user switched.
+Probes carry their attempt ID so ownership and cancellation checks apply before activation. They
+never insert or submit text. Other providers retain their existing hydration behavior.
+Extension 0.1.18 uses the native input event emitted by the editing command for Meta, without
+sending a second data-bearing event. It waits up to one second for the editor to commit the draft,
+within the execution budget, before verifying the serialized payload and proceeding to Send.
+The reader selects `assistant-message` only inside the `Meta AI response` article and requires both
+`data-streaming-state="DONE"` and `data-streaming-complete="true"`, no Stop, and stable text.
+For JSON tree output it clicks the answer's Raw control and reads `pre code`, preserving fields
+hidden by tree collapse. Missing Raw or completion evidence never returns a partial answer.
+Shared visible quota/verification notices and login routes retain existing failure semantics;
+unobserved Meta-specific notice variants still require live verification. Responses identify
+`meta-web`; structured JSON and client-executed tools use the existing shared prompt protocol.
+
+### 7.6 Kimi UI adapter
+
+Extension 0.1.15 adds `https://www.kimi.ai/*` (the observed redirect destination of `kimi.ai`),
+the `kimi` provider and popup designation. It retains Meta AI support from 0.1.14. The existing
+engine and shared OpenAI formatter are unchanged. Load the extension and sign in before appending
+`kimi` to `BROWSER_GATEWAY_PRIORITY`; responses identify `kimi-web`.
+
+Extension 0.1.19 shares Meta's native-input insertion path for Kimi's Lexical editor: the browser
+editing command emits input once, and the adapter waits up to one second for the committed draft
+within the execution budget before payload verification. It does not dispatch a duplicate event.
+
+The observed editor is `.chat-input-editor[contenteditable='true']`. Send uses the `Send` SVG in
+`.send-button-container`, excluding `.stop` and `.loading`, and respects CSS `.disabled`.
+Stop uses the same container with `.stop` and the lowercase `stop` SVG; loading is busy.
+The reader extracts the last assistant `.markdown`, with `pre code` for a single code block,
+and requires a visible `Refresh` SVG in that answer's own `.segment-assistant-actions` toolbar,
+no Stop/loading and stable text. The toolbar was absent during generation and present afterward.
+Missing evidence remains unknown; cancellation requests Stop without sending another generation.
+Shared login/verification/quota detection applies; unseen Kimi-specific notices need live verification.
+
+### 7.7 Gemini UI adapter
+
+Extension 0.1.16 adds `https://gemini.google.com/*`, the `gemini` provider and popup designation.
+Fresh conversations use `/app`. The shared formatter, engine, cooldowns and exclusive slots remain
+unchanged. After loading the extension and signing in, append `gemini` to `BROWSER_GATEWAY_PRIORITY`
+to enable it. Responses identify `gemini-web`.
+
+The editor is the contenteditable textbox labelled `Enter a prompt for Gemini`; Send and Stop use
+`Send message` and `Stop response`. The reader selects `model-response message-content .markdown`
+with an explicit `aria-busy` attribute, excluding embedded Canvas content. Completion requires
+`aria-busy="false"`, a visible Copy button in that response's `message-actions`, no Stop, and stable
+text. Redo is not reliable across response types. Single `pre code` blocks preserve literal JSON.
+Missing completion evidence remains unknown, and cancellation requests Stop without resubmission.
+Shared visible login/verification/quota detection applies; unseen Gemini-specific notices and
+non-English selectors need live verification. Canvas-generated documents are outside this contract.
 
 ## 8. Interfaces
 
@@ -247,7 +375,7 @@ and 5000 visited nodes, with resolvable local JSON Pointer references; remote re
 anchors and dynamic references are unsupported. Non-standard JSON constants are rejected.
 
 Success includes `id`, `object="chat.completion"`, `created`, `model`, `choices[0]` and `usage=null`.
-Model is the honest provider identity (`chatgpt-web` or `claude-web`), optionally with an observed
+Model is the honest provider identity (`chatgpt-web`, `claude-web`, `deepseek-web`, `meta-web`, `kimi-web` or `gemini-web`), optionally with an observed
 website model. Text/schema answers use `finish_reason="stop"`; tools use `"tool_calls"` and opaque
 `call_...` IDs. Refusals populate `message.refusal`. Token counts are unavailable.
 
@@ -289,7 +417,7 @@ Settings read ignored `infra/.env`; environment variables override it. Prefix: `
 | `DATABASE_URL` | Required | PostgreSQL DSN reachable from the backend; Compose supplies its service-network DSN |
 | `EXTENSION_ID` | Required | Exact 32-character Chrome extension ID |
 | `PROFILE_ID` | `default` | Must match popup profile name |
-| `PRIORITY` | `chatgpt,claude` | Distinct registered providers in preference order |
+| `PRIORITY` | `chatgpt,claude` | Distinct registered providers in preference order; registered names are `chatgpt`, `claude`, `deepseek`, `meta`, `kimi`, `gemini` |
 | `TABS_PER_PROVIDER` | `2` | Concurrent tab slots per provider, 1–4; tabs are created on demand |
 | `MODEL_ALIAS` | `browser-auto` | Accepted client model name |
 | `DEPLOYMENT` | `host` | `host` enforces loopback binding; `container` requires `0.0.0.0` internally and loopback-only port publication |
@@ -386,6 +514,15 @@ Docker deployment does not configure either consuming application.
 | `BGW-16` | Test | `test_socket_sdk.py`: real ChatOpenAI text, JSON-schema and function structured-output HTTP with fake adapters |
 | `BGW-17` | Test | `test_engine.py`, `test_postgres.py`, extension tests: concurrent slot isolation, queueing and provider cooldown preservation; single-provider timing through `examples/concurrency_smoke.py`, full-gateway capacity and routing through opt-in `tests/test_live_batch.py` |
 | `BGW-19` | Test and live deployment | `test_config.py`: host loopback remains enforced, container binding requires explicit mode; Docker Compose validation, image build, container health and extension/SDK checks |
+| `BGW-20` | Test | `test_engine.py::test_blocked_providers_are_unavailable_not_disconnected`: blocked reasons, no dispatch, preserved cooldowns and due-provider recovery; `test_http.py::test_connected_browser_with_provider_cooldowns_returns_unavailable`: authenticated WebSocket stays connected while the completion returns the correct error; `test_engine.py::test_all_limited_and_queue_bounds`: quota-only blocks remain 429 |
+| `BGW-21` | Test and live DOM inspection | `extension/tests/content.test.mjs`: composer quota placeholder returns `rate_limited`, no inferred reset time or submission, hidden/unrelated notices and quoted draft text do not trigger quota detection; notice observed in the paired Claude profile on 2026-10-09 |
+| `BGW-22` | Test | `test_engine.py::test_request_error_does_not_disable_provider`; `test_postgres.py::test_persistent_cooldown_restart_and_uncertain_reservation`: real SQL slot release, next-request admission, legacy cleanup and quota/unknown preservation |
+| `BGW-23` | Test and DOM inspection | `extension/tests/content.test.mjs`: 65-second partial/valid-JSON pauses, missing completion evidence and legacy Stop transition; explicit completed-turn marker observed in the paired ChatGPT page |
+| `BGW-26` | Test | `extension/tests/background.test.mjs`: missing-receiver recovery, unchanged conversation URL, foreign-origin rejection, and no backend reset without an explicit idle result |
+| `BGW-27` | Test and live SDK/DOM verification | `test_deepseek.py`: SDK/engine/bridge/shared text, JSON and tool conversion with synthetic browser replies; extension tests: textarea entry, disabled Send, Stop, 65-second completion pause, missing completion, login/verification/quota, cancellation and isolated slots; 0.1.13 live exact text, JSON schema, required tool, tool-result and AsyncOpenAI checks passed in 21.7 seconds on 2026-10-09 |
+| `BGW-28` | Test and live DOM inspection | `test_meta.py`: SDK/engine/bridge text, JSON and tool formatting after earlier provider cooldowns; extension fixtures: delayed completion, Raw tree extraction, missing evidence, disabled Send, Stop/cancellation, login/verification/quota and isolated slots; five-request live SDK acceptance passed on 0.1.18 |
+| `BGW-29` | Test and live DOM inspection | `test_kimi.py`: SDK/engine/bridge formatting after earlier provider cooldowns; extension fixtures: 65-second pause, missing completion, disabled Send, Stop/cancellation, loading, login/verification/quota and isolated slots; five-request live SDK acceptance passed on 0.1.19 |
+| `BGW-30` | Test and live DOM inspection | `test_gemini.py`: SDK/engine/bridge formatting after earlier provider cooldowns; extension fixtures: 65-second pause, missing completion/busy state, disabled Send, Stop/cancellation, login/verification/quota and isolated slots; five-request live SDK acceptance passed |
 
 Repeatable verification commands are indexed in the service README. PostgreSQL tests require a
 dedicated disposable database named **`llm_browser_gateway_test`**, using the credentials and
@@ -406,17 +543,17 @@ Live synthetic checks, after pairing:
 .venv/Scripts/python.exe src/services/llm-browser-gateway/examples/sdk_smoke.py
 ```
 
-Set provider priority to `chatgpt` or `claude` and restart to prove each separately. Simulate quotas
+Set provider priority to `chatgpt`, `claude`, `deepseek`, `meta`, `kimi` or `gemini` and restart to prove each separately. Simulate quotas
 in routing tests; do not deliberately exhaust real account allowances. Test network disconnect and
 manual recovery separately from ordinary completion. No live compatibility claim is made by a
 fake-adapter test alone.
 
-Pass `--provider chatgpt` (or `claude`) to the smoke script to assert single-provider routing and
+Pass `--provider chatgpt` (or `claude` / `deepseek` / `meta` / `kimi` / `gemini`) to the smoke script to assert single-provider routing and
 the provider on every response. Add `--text-only` for the first diagnostic request. The full script
 asserts exact text, structured JSON, function arguments, tool-result handling and async completion.
 
 For queue throughput, set a single provider and run `examples/concurrency_smoke.py --provider
-chatgpt` (or `claude`). It compares two sequential requests with two concurrent requests, validates
+chatgpt` (or `claude` / `deepseek` / `meta` / `kimi` / `gemini`). It compares two sequential requests with two concurrent requests, validates
 distinct expected answers and observes overlapping submissions on separate slots. Increase
 `--requests` only for a deliberate larger batch. With extension 0.1.5, Claude passed in 12.6 seconds
 sequentially versus 8.6 seconds concurrently (two requests; 1.47x measured batch speedup).
@@ -470,9 +607,10 @@ successful batch does not establish ongoing adapter reliability.
 | Login/verification/UI changed | Persist unavailability and return the error to this caller; never redispatch this request | User restores session or selectors are updated; next probe |
 | Disconnect before readiness | Safe unavailable result | Automatic reconnect using saved pairing |
 | Submission uncertain/cancellation | Request Stop, preserve attempt ownership, no blind fallback | Late terminal reconciliation or explicit popup reset |
-| Invalid JSON/tools | One bounded same-provider repair; then 502 | Client can inspect error; no success with malformed output |
+| Invalid JSON/tools | One bounded same-provider repair; then 502 for this request without disabling the provider | Later requests may use the same available provider; validation metadata is logged |
 | Refusal | OpenAI refusal message, no fallback | Caller handles refusal |
 | All providers on quota cooldown | 429 | Wait for next eligible check |
+| All providers blocked, with any non-quota reason | 503 `temporary_unavailable`; log request ID and provider reasons without dispatch | Inspect `/status`; next request probes when a cooldown is due, while unknown submissions remain blocked |
 | Queue full | 503 | Caller retries later as a new request |
 | PostgreSQL unavailable | Fail closed | Restore database and restart if startup failed |
 
@@ -515,3 +653,14 @@ Implemented only after their real-provider cases pass; record outstanding accept
 | `2026-10-09` | `1.2.0` | Bind each HTTP request to one provider; remove configurable cross-provider retries; add failure regressions, real HTTP SDK proof and request-ID correlation in the live batch test | User routing correction |
 | `2026-10-09` | `1.2.1` | Extension 0.1.6: bounded, serialized activation recovery for Claude Send preparation, automatic tab restoration and failure/cancellation tests; eight-request live acceptance passes | Claude background-tab readiness failure |
 | `2026-10-09` | `1.3.0` | Docker Desktop backend deployment using infra/.env, explicit container binding, loopback publication, healthcheck and automatic restart | User deployment request |
+| `2026-10-09` | `1.4.0` | Distinguish aggregate provider cooldowns from an actual browser disconnect and log routing rejections; extension 0.1.7 detects Claude's quota composer replacement | Misleading `503 browser_disconnected` while the extension was connected |
+| `2026-10-09` | `1.5.0` | Extension 0.1.8 waits for ChatGPT completion; request validation failures no longer disable a provider; remove legacy invalid-output cooldowns and log bounded validation diagnostics | Completed browser answers followed by gateway 502/503 errors |
+| `2026-10-09` | `1.6.1` | Extension 0.1.10 recovers stale content-script receivers during operator reset and waits for idle confirmation | Popup reported receiving end does not exist after extension reload |
+| `2026-10-09` | `1.6.2` | Remove the unsuccessful HTTP/SSE experiment; extension 0.1.11 and backend use only the original UI adapters, preserving reset recovery | User requested UI-only rollback |
+| `2026-10-09` | `1.7.0` | Add the DeepSeek UI adapter and Chrome host permission using existing shared formatting, routing and status contracts | User requested DeepSeek following the existing adapter style |
+| `2026-10-09` | `1.8.0` | Add Meta AI UI adapter with explicit completion and Raw JSON extraction, reusing shared formatting and routing | User requested Meta AI adapter |
+| `2026-10-09` | `1.9.0` | Add Kimi UI adapter with Send/Stop/loading and completed-turn detection, retaining Meta AI support | User requested Kimi adapter |
+| `2026-10-09` | `1.10.0` | Add Gemini UI adapter with explicit busy-state and response-toolbar completion, excluding Canvas content | User requested Gemini adapter |
+| `2026-10-09` | `1.10.1` | Extension 0.1.17: bounded Meta editor hydration and owned-tab activation recovery during readiness, with regression tests | Meta readiness failure before submission |
+| `2026-10-09` | `1.10.2` | Extension 0.1.18: remove duplicate Meta input event and await native editor commit before verification | Live retest exposed duplicated Lexical draft |
+| `2026-10-10` | `1.10.3` | Extension 0.1.19: use native input and await committed Kimi draft; clarify shared JSON string escaping; regression and five-request live SDK suite passed | Kimi failed input verification before submission |
