@@ -36,7 +36,10 @@ def test_sample_roundtrip_currency_and_timestamp_validation(
         quality="FRESHNESS_UNKNOWN",
     )
     sample = PriceSampleObserved.model_validate(data)
+    assert sample.interval_seconds == 900  # Historical payloads remain readable.
     assert PriceSampleObserved.from_amqp_body(sample.to_amqp_body()) == sample
+    ten_minute_sample = PriceSampleObserved.model_validate({**data, "interval_seconds": 600})
+    assert ten_minute_sample.interval_seconds == 600
     assert ROUTING_KEY_BY_MESSAGE[type(sample)] == RoutingKey.PRICE_SAMPLE_OBSERVED
     assert json.loads(sample.model_dump_json())["price"] == "123.45"
     invalid: list[dict[str, object]] = [

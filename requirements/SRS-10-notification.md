@@ -8,11 +8,11 @@
 | Component | Notification Service |
 | Requirement ID prefix | `NTF` |
 | Status | `Approved` |
-| Version | `1.0.0` |
+| Version | `1.3.0` |
 | Source code | [`src/services/notification/notification/`](../src/services/notification/notification/) |
-| Tests | None — `src/services/notification/tests/` does not exist yet, which is why this document is `Approved` rather than `Implemented` |
+| Tests | [`src/services/notification/tests/`](../src/services/notification/tests/) — WhatsApp and TLS coverage; remaining requirements retain `Approved` status |
 | Owned schema | None — no database tables; recipient lists are file-based |
-| Last verified against code | `—` |
+| Last verified against code | `2026-09-26` — WhatsApp templates, acceptance, failure propagation and TLS trust |
 
 ## 2. Purpose and scope
 
@@ -24,9 +24,9 @@ them through all configured channels concurrently. Each channel formats the mess
 natural to its medium and delivers it to its own list of recipients.
 
 It is deliberately unintelligent about predictions. It does not re-evaluate whether a prediction is
-good, filter by asset, or correlate with market data — it only guarantees that **a qualifying
-prediction or verification result is announced exactly once to every configured channel, with
-failure in one channel never blocking the others.**
+good, filter by asset, or correlate with market data. It attempts each configured channel for a
+qualifying prediction or enabled verification alert, with failure in one channel never blocking
+the others. Delivery is best-effort; retries can duplicate previously accepted messages.
 
 ### 2.2 In scope
 
@@ -190,9 +190,12 @@ failure in one channel never blocking the others.**
 | ID | Requirement | Priority | Status |
 |---|---|---|---|
 | `NTF-27` | The WhatsApp channel **shall** send one message per recipient via the Meta Cloud API. | Must | Approved |
-| `NTF-28` | The WhatsApp channel **shall** format the notification as a short plain-text message containing: company name, exchange and ticker, direction, signal strength, confidence (as a percentage), and decision time. | Must | Approved |
+| `NTF-28` | The WhatsApp channel **shall** populate a prediction template containing: company name, exchange and ticker, direction, signal strength, confidence (as a percentage), and decision time in UTC. | Must | Implemented |
 | `NTF-29` | The WhatsApp channel **shall** authenticate via a Meta access token and phone number ID, both supplied via environment variables. | Must | Approved |
 | `NTF-30` | The WhatsApp channel **shall not** include the access token in any log. | Must | Approved |
+| `NTF-46` | Both WhatsApp send methods **shall** attempt all recipients and raise a delivery error if any request fails or lacks a non-empty Meta message ID. | Must | Implemented |
+| `NTF-47` | The notification service and WhatsApp integration tests **shall** verify HTTPS certificates using system trust, including Windows trusted roots and OpenSSL CA environment overrides. | Must | Implemented |
+| `NTF-48` | Both WhatsApp send methods **shall** use configurable Meta template names and language with the ordered body parameters in §7.5 and §7.5a, and **shall not** fall back to free-form text when Meta rejects a template. | Must | Implemented |
 
 ### 5.9 Operations
 
@@ -315,24 +318,37 @@ failure in one channel never blocking the others.**
 **Steps** → `WhatsAppChannel.send`
 
 1. Read the pre-loaded recipient list.
-2. Format the message text:
+2. Populate `feed_prediction_alert_v1` (configurable), language `en_US`, with these positional
+   body parameters, each represented as `{"type": "text", "text": value}`:
 
-   ```
-   📈 Feed Analyzer Alert
-   {company_name} ({exchange}: {ticker})
-   Direction : {direction}
-   Signal    : {signal_strength}
-   Confidence: {confidence_pct}%
-   Decided   : {decided_at} UTC
-   ```
+   | Position | Value | Example |
+   |---|---|---|
+   | 1 | Company, exchange and ticker | `Ericsson (NASDAQ: ERIC)` |
+   | 2 | Predicted direction | `UP` |
+   | 3 | Signal strength | `HIGH` |
+   | 4 | Confidence × 100, one decimal and `%` | `87.0%` |
+   | 5 | Decision time converted to UTC, `YYYY-MM-DD HH:MM:SS` | `2026-09-26 14:30:00` |
 
 3. For each recipient, POST to the Meta Cloud API
    `/{phone_number_id}/messages` endpoint with the Bearer token in the `Authorization` header,
-   sending a `type: text` message.
+   sending `type: template` and `template: {name, language: {code}, components: [{type: body,
+   parameters: [...]}]}`. The static header and body text are managed in Meta; no header parameters
+   are needed. Headlines are not included because the submitted template has no headline field.
 4. Log success or failure per recipient; do not abort the remaining recipients on a single failure.
 
 **Rules:**
 
+- Both templates must be approved and available in the sender's WhatsApp Business Account with
+  the configured language and matching parameter layout. Template sending supports initiating
+  messages outside the 24-hour service window; recipient eligibility and Meta delivery restrictions
+  still apply. Rejected template requests fail the channel without falling back to free-form text.
+- A successful request requires a non-empty message ID in Meta's response. After attempting all
+  recipients, raise `WhatsAppDeliveryError` if any request failed. The engine then records channel
+  failure and retries the event when every channel failed. Log recipient indices and HTTP/Meta
+  error codes rather than contact details, credentials or raw response bodies.
+- The shared notification HTTP client uses `ssl.create_default_context()` with certificate and
+  hostname verification enabled. It loads system trust, including Windows roots; OpenSSL honors
+  `SSL_CERT_FILE` and `SSL_CERT_DIR` for locally configured CA bundles.
 - Phone numbers in `whatsapp_recipients.json` must be in E.164 format (e.g. `+94771234567`). The
   channel validates the format at startup and rejects malformed entries with a warning.
 
@@ -365,20 +381,21 @@ failure in one channel never blocking the others.**
 **Steps** → `WhatsAppChannel.send_scored`
 
 1. Read the pre-loaded recipient list.
-2. Format the message text:
+2. Populate `feed_verification_alert_v1` (configurable), language `en_US`, with these positional
+   text body parameters:
 
-   ```
-   Feed Analyzer — Verification Alert
-   {company_name} ({exchange}: {ticker})
-   Outcome    : CORRECT / WRONG
-   Predicted  : {predicted_direction} / {predicted_magnitude}
-   Actual     : {actual_direction} / {actual_magnitude}
-   Return     : {actual_return_pct}%
-   Confidence : {confidence_pct}%
-   Scored     : {scored_at} UTC
-   ```
+   | Position | Value | Example |
+   |---|---|---|
+   | 1 | Company, exchange and ticker | `Ericsson (NASDAQ: ERIC)` |
+   | 2 | Evaluation result | `CORRECT` or `WRONG` |
+   | 3 | Predicted direction / magnitude | `UP / LARGE` |
+   | 4 | Actual direction / magnitude | `UP / LARGE` |
+   | 5 | Actual return × 100, signed with two decimals and `%` | `+3.12%` |
+   | 6 | Confidence × 100, one decimal and `%` | `87.0%` |
+   | 7 | Scored time converted to UTC, `YYYY-MM-DD HH:MM:SS` | `2026-09-26 16:00:00` |
 
-3. POST to the Meta Cloud API per recipient.
+3. POST a template message to the Meta Cloud API per recipient, with the same acceptance checks,
+   TLS trust and failure propagation as prediction alerts (§7.5).
 
 ### 7.6 Recipient file loading
 
@@ -466,7 +483,7 @@ Not applicable — this service is entirely event-driven with no scheduled jobs.
 | API endpoint | `POST https://graph.facebook.com/v18.0/{META_PHONE_NUMBER_ID}/messages` |
 | Authentication | `Authorization: Bearer {META_ACCESS_TOKEN}` header |
 | Free tier limit | 1 000 conversations/month |
-| Error handling | Non-2xx response → log error, continue to next recipient |
+| Error handling | Non-2xx, transport failure or missing message ID → log failure, attempt remaining recipients, then raise `WhatsAppDeliveryError` |
 
 ## 9. Data design
 
@@ -530,13 +547,27 @@ Read from the environment. Connection strings use their conventional unprefixed 
 | `META_ACCESS_TOKEN` | empty | **Secret.** Empty disables the WhatsApp channel entirely |
 | `META_PHONE_NUMBER_ID` | empty | The Meta Business phone number ID; required when the access token is set |
 | `META_API_VERSION` | `v18.0` | Graph API version segment in the request URL |
+| `META_PREDICTION_TEMPLATE` | `feed_prediction_alert_v1` | Approved prediction template name; must match the five-parameter layout in §7.5 |
+| `META_VERIFICATION_TEMPLATE` | `feed_verification_alert_v1` | Approved verification template name; must match the seven-parameter layout in §7.5a |
+| `META_TEMPLATE_LANGUAGE` | `en_US` | Exact approved template language code used for both alert types |
+
+Docker Compose forwards these settings. Template names and language must be non-empty and valid
+identifiers; invalid configuration fails startup. Both templates were submitted as Marketing in
+English (US) on 2026-09-26 and were in review at submission. Confirm approval in Meta before rebuilding
+and restarting the notification service or running live sends. Verification dispatch remains governed
+by `NOTIFICATION_VERIFICATION_ALERTS_ENABLED` (default `false`).
 
 ## 11. Verification
 
-> **None of these tests exist yet.** `src/services/notification/tests/` has not been created, so every
-> row below states the test that *must* be written, not one that passes today. This is why the document
-> status is `Approved`. Create the tests, then change the status to `Implemented` and set
-> *Last verified against code* in section 1.
+The WhatsApp and TLS tests below exist. Other entries describe planned evidence unless their
+requirement is marked `Implemented`; overall document status remains `Approved`.
+
+Run offline checks with `python -m pytest src/services/notification/tests -m "not integration"`.
+The explicit `scripts/run-whatsapp-integration-test.ps1` sends two real template alerts and uses the same
+verified HTTP client as the service. Tests fail on rejected requests or missing message IDs.
+The configured templates must be approved before running this script.
+A pass proves Meta accepted each request, not that the handset received it; confirm receipt
+separately. Missing credentials or recipients skip the tests.
 
 | Requirement | Method | Evidence |
 |---|---|---|
@@ -560,6 +591,9 @@ Read from the environment. Connection strings use their conventional unprefixed 
 | `NTF-35`, `NTF-36` | Inspection | No contact details or secrets logged anywhere in the service |
 | `NTF-37` | Demonstration | `ruff check` and `mypy --strict` pass |
 | `NTF-38` | Test | `test_engine.py` — slow channel hits timeout, other channel still succeeds |
+| `NTF-46` | Test | `test_whatsapp_channel.py` — `test_send_raises_on_api_error`, `test_partial_failure_attempts_remaining_recipients`, `test_transport_failure_is_not_success`, `test_success_requires_meta_message_id`, `test_failed_whatsapp_dispatch_reaches_engine_retry_path` |
+| `NTF-47` | Test | `test_http_client.py` — `test_client_uses_system_roots_with_verification_enabled`, `test_client_loads_ca_override` |
+| `NTF-28`, `NTF-48` | Test | `test_whatsapp_channel.py` — exact prediction and verification payloads, UTC conversion, signed returns, environment wiring, invalid empty settings and rejection without text fallback |
 
 ## 12. Failure handling
 
@@ -571,7 +605,7 @@ Read from the environment. Connection strings use their conventional unprefixed 
 | Prediction confidence below threshold | Message acked silently; no channel called | Not applicable — this is correct behaviour |
 | `PredictionScored` received (any `is_correct` value) | Verification alert dispatched without a confidence gate | Not applicable — all scored predictions alert |
 | Brevo returns non-2xx | Error logged for that recipient; remaining recipients still sent | No automatic retry per recipient; next message unaffected |
-| Meta Cloud API returns non-2xx | Error logged for that recipient; remaining recipients still sent | No automatic retry per recipient; next message unaffected |
+| Meta rejects a request, TLS/transport fails, or response lacks a message ID | Failure logged; remaining recipients attempted; WhatsApp channel raises | If every channel fails, broker retries the event; otherwise the event is acknowledged |
 | All channels fail for a message | `MessageProcessingError` raised; message follows retry path | Retried up to max retries; then dead-lettered |
 | One channel times out | That channel's send raises; error logged; other channels unaffected | Next dispatch starts fresh |
 | Recipient file absent at startup | Warning logged; that channel registered with empty list and skipped | Requires a file fix and restart |
@@ -606,9 +640,12 @@ Read from the environment. Connection strings use their conventional unprefixed 
 |---|---|
 | Recipient lists are read at startup only | Adding a recipient requires a service restart |
 | No per-recipient delivery tracking | There is no record of which recipients were successfully reached |
+| Meta acceptance is not a delivery receipt | No delivery webhook is implemented; a returned message ID alone does not prove handset delivery |
+| Retrying an event resends to all recipients | Partial success followed by an all-channel failure can duplicate accepted messages; another successful channel prevents event retry |
 | Free tier caps on both channels | High prediction volumes could exhaust the daily/monthly limits; the service continues processing but later messages may not reach recipients |
 | No deduplication of notifications | A superseded prediction (`supersedes_prediction_id` set) triggers its own notification; callers are not informed that an earlier prediction was revised |
-| WhatsApp messages are plain text only | Meta Cloud API template messages require approval; free-form text is used for simplicity in this POC |
+| WhatsApp uses approved templates only | Pending, rejected, paused, or mismatched templates cannot be used; the service does not track approval status or the recipient's 24-hour window |
+| Template content is fixed in Meta | Headlines are omitted; changing names or locale requires an approved template with the same parameter layout |
 
 ## 14. How to update this document
 
@@ -632,3 +669,5 @@ Component-specific notes:
 |---|---|---|---|
 | `2026-08-05` | `1.0.0` | Initial specification | Notification service grooming session |
 | `2026-08-06` | `1.1.0` | Added verification result alerts: `notification.scored` queue, `VerificationMessage`, `send_scored` protocol method, `NTF-39`–`NTF-45` | Verification alert feature |
+| `2026-09-26` | `1.2.0` | Added `NTF-46`–`NTF-47`: system TLS trust and observable WhatsApp failures; integration tests require Meta acceptance | SSL failures and false-positive send tests |
+| `2026-09-26` | `1.3.0` | Updated `NTF-28`, added `NTF-48`: prediction and verification templates, configurable names and locale, ordered fields and offline tests | Meta 131047 delivery failure outside the service window |

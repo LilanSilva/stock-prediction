@@ -30,6 +30,7 @@ from notification.channels.whatsapp_channel import WhatsAppChannel
 from notification.config import NotificationSettings
 from notification.db import create_pool
 from notification.engine import NotificationEngine
+from notification.http_client import create_http_client
 
 logger = structlog.get_logger(__name__)
 
@@ -88,6 +89,9 @@ def _build_channels(
                     api_version=settings.meta_api_version,
                     recipients=recipients,
                     http_client=http_client,
+                    prediction_template=settings.meta_prediction_template,
+                    verification_template=settings.meta_verification_template,
+                    template_language=settings.meta_template_language,
                 )
             )
             logger.info("whatsapp_channel_registered", recipient_count=len(recipients))
@@ -141,7 +145,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     rabbit = RabbitMQClient(settings.rabbitmq_url)
     await rabbit.connect()
 
-    http_client = AsyncClient(timeout=settings.channel_timeout_seconds)
+    http_client = create_http_client(timeout=settings.channel_timeout_seconds)
 
     db_pool: asyncpg.Pool | None = None
     if settings.database_url:

@@ -2,14 +2,25 @@
 
 from __future__ import annotations
 
-import structlog
-from httpx import AsyncClient
+from datetime import UTC
 
+import structlog
+from httpx import AsyncClient, HTTPStatusError
+
+from notification.config import (
+    DEFAULT_PREDICTION_TEMPLATE,
+    DEFAULT_TEMPLATE_LANGUAGE,
+    DEFAULT_VERIFICATION_TEMPLATE,
+)
 from notification.models import NotificationMessage, VerificationMessage
 
 logger = structlog.get_logger(__name__)
 
 _META_API_BASE = "https://graph.facebook.com"
+
+
+class WhatsAppDeliveryError(RuntimeError):
+    """Meta did not accept a message for every configured recipient."""
 
 
 class WhatsAppChannel:
@@ -24,49 +35,64 @@ class WhatsAppChannel:
         api_version: str,
         recipients: list[str],
         http_client: AsyncClient,
+        *,
+        prediction_template: str = DEFAULT_PREDICTION_TEMPLATE,
+        verification_template: str = DEFAULT_VERIFICATION_TEMPLATE,
+        template_language: str = DEFAULT_TEMPLATE_LANGUAGE,
     ) -> None:
         self._access_token = access_token
         self._phone_number_id = phone_number_id
         self._api_version = api_version
         self._recipients = recipients
         self._http = http_client
+        self._prediction_template = prediction_template
+        self._verification_template = verification_template
+        self._template_language = template_language
         self._url = f"{_META_API_BASE}/{api_version}/{phone_number_id}/messages"
 
     async def send(self, message: NotificationMessage) -> None:
-        text = _build_text(message)
-        successes = 0
-        for phone in self._recipients:
-            payload = {
-                "messaging_product": "whatsapp",
-                "to": phone,
-                "type": "text",
-                "text": {"body": text},
-            }
-            try:
-                response = await self._http.post(
-                    self._url,
-                    json=payload,
-                    headers={
-                        "Authorization": f"Bearer {self._access_token}",
-                        "Content-Type": "application/json",
-                    },
-                )
-                response.raise_for_status()
-                successes += 1
-            except Exception as exc:  # noqa: BLE001
-                logger.error("whatsapp_send_failed", recipient=phone, error=str(exc))
-        logger.info("whatsapp_channel_done", total=len(self._recipients), successes=successes)
-
+        await self._send_template(
+            self._prediction_template,
+            [
+                f"{message.company_name} ({message.exchange}: {message.ticker})",
+                message.direction,
+                message.signal_strength,
+                f"{message.confidence * 100:.1f}%",
+                message.decided_at.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S"),
+            ],
+        )
 
     async def send_scored(self, message: VerificationMessage) -> None:
-        text = _build_scored_text(message)
+        await self._send_template(
+            self._verification_template,
+            [
+                f"{message.company_name} ({message.exchange}: {message.ticker})",
+                "CORRECT" if message.is_correct else "WRONG",
+                f"{message.predicted_direction} / {message.predicted_magnitude}",
+                f"{message.actual_direction} / {message.actual_magnitude}",
+                f"{message.actual_return * 100:+.2f}%",
+                f"{message.confidence * 100:.1f}%",
+                message.scored_at.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S"),
+            ],
+        )
+
+    async def _send_template(self, name: str, parameters: list[str]) -> None:
         successes = 0
-        for phone in self._recipients:
+        for recipient_index, phone in enumerate(self._recipients):
             payload = {
                 "messaging_product": "whatsapp",
                 "to": phone,
-                "type": "text",
-                "text": {"body": text},
+                "type": "template",
+                "template": {
+                    "name": name,
+                    "language": {"code": self._template_language},
+                    "components": [
+                        {
+                            "type": "body",
+                            "parameters": [{"type": "text", "text": value} for value in parameters],
+                        }
+                    ],
+                },
             }
             try:
                 response = await self._http.post(
@@ -78,41 +104,40 @@ class WhatsAppChannel:
                     },
                 )
                 response.raise_for_status()
+                data = response.json()
+                messages = data.get("messages") if isinstance(data, dict) else None
+                if (
+                    not isinstance(messages, list)
+                    or not messages
+                    or not isinstance(messages[0], dict)
+                    or not isinstance(messages[0].get("id"), str)
+                    or not messages[0]["id"].strip()
+                ):
+                    raise WhatsAppDeliveryError("Meta response contains no message ID")
                 successes += 1
+            except HTTPStatusError as exc:
+                error = {}
+                try:
+                    body = exc.response.json()
+                    if isinstance(body, dict) and isinstance(body.get("error"), dict):
+                        error = body["error"]
+                except ValueError:
+                    pass
+                logger.error(
+                    "whatsapp_send_failed",
+                    recipient_index=recipient_index,
+                    status_code=exc.response.status_code,
+                    error_code=error.get("code"),
+                    error_subcode=error.get("error_subcode"),
+                )
             except Exception as exc:  # noqa: BLE001
-                logger.error("whatsapp_send_failed", recipient=phone, error=str(exc))
+                logger.error(
+                    "whatsapp_send_failed",
+                    recipient_index=recipient_index,
+                    error_type=type(exc).__name__,
+                )
         logger.info("whatsapp_channel_done", total=len(self._recipients), successes=successes)
-
-
-def _build_text(msg: NotificationMessage) -> str:
-    confidence_pct = round(msg.confidence * 100, 1)
-    decided_str = msg.decided_at.strftime("%Y-%m-%d %H:%M:%S")
-    text = (
-        "Feed Analyzer Alert\n"
-        f"{msg.company_name} ({msg.exchange}: {msg.ticker})\n"
-        f"Direction : {msg.direction}\n"
-        f"Signal    : {msg.signal_strength}\n"
-        f"Confidence: {confidence_pct}%\n"
-        f"Decided   : {decided_str} UTC"
-    )
-    if msg.headlines:
-        lines = "\n".join(f"• {h.title} [{h.source_id}]" for h in msg.headlines)
-        text += f"\n\nTop News:\n{lines}"
-    return text
-
-
-def _build_scored_text(msg: VerificationMessage) -> str:
-    confidence_pct = round(msg.confidence * 100, 1)
-    scored_str = msg.scored_at.strftime("%Y-%m-%d %H:%M:%S")
-    actual_return_pct = round(msg.actual_return * 100, 2)
-    outcome = "CORRECT" if msg.is_correct else "WRONG"
-    return (
-        f"Feed Analyzer — Verification Alert\n"
-        f"{msg.company_name} ({msg.exchange}: {msg.ticker})\n"
-        f"Outcome    : {outcome}\n"
-        f"Predicted  : {msg.predicted_direction} / {msg.predicted_magnitude}\n"
-        f"Actual     : {msg.actual_direction} / {msg.actual_magnitude}\n"
-        f"Return     : {actual_return_pct:+.2f}%\n"
-        f"Confidence : {confidence_pct}%\n"
-        f"Scored     : {scored_str} UTC"
-    )
+        if successes < len(self._recipients):
+            raise WhatsAppDeliveryError(
+                f"WhatsApp accepted {successes}/{len(self._recipients)} messages"
+            )

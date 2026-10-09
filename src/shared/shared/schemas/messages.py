@@ -137,6 +137,7 @@ class DecisionMethod(StrEnum):
 class PriceKind(StrEnum):
     PROVIDER_DAILY_CLOSE = "PROVIDER_DAILY_CLOSE"
     OFFICIAL_SETTLEMENT = "OFFICIAL_SETTLEMENT"
+    AVANZA_SAMPLED_CLOSE = "AVANZA_SAMPLED_CLOSE"
 
 
 class LlmStatus(StrEnum):
@@ -251,6 +252,36 @@ class PropagationHop(BaseModel):
     edge_weight: float                # expert weight of the fired edge
 
 
+class SampleProvenance(BaseModel):
+    """Original observation behind a derived value; quote time is never inferred."""
+
+    model_config = ConfigDict(frozen=True)
+    sample_id: uuid.UUID
+    scheduled_at: UtcDatetime
+    observed_at: UtcDatetime
+    expires_at: UtcDatetime
+    interval_seconds: Literal[600, 900] = 600
+    mapping_version: NonEmptyStr
+    currency: Annotated[str, Field(pattern=r"^[A-Z]{3}$")]
+    provider_quote_at: AwareDatetime | None = None
+    quote_delay_seconds: Annotated[int, Field(ge=0)] | None = None
+    quality: Literal["FRESH", "FRESHNESS_UNKNOWN"]
+
+    @model_validator(mode="after")
+    def valid_availability(self) -> SampleProvenance:
+        if not self.scheduled_at <= self.observed_at < self.expires_at:
+            raise ValueError("invalid original observation window")
+        if (self.observed_at - self.scheduled_at).total_seconds() > 120:
+            raise ValueError("observation exceeded its collection deadline")
+        if (self.expires_at - self.scheduled_at).total_seconds() > self.interval_seconds:
+            raise ValueError("carry-forward cannot exceed collection interval")
+        if self.provider_quote_at and self.provider_quote_at > self.observed_at:
+            raise ValueError("provider quote cannot be in the future")
+        if self.quality == "FRESH" and self.provider_quote_at is None:
+            raise ValueError("freshness requires provider quote time")
+        return self
+
+
 class CloseObservation(BaseModel):
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True)
 
@@ -263,6 +294,19 @@ class CloseObservation(BaseModel):
     price_kind: PriceKind
     is_adjusted: bool
     registry_version: NonEmptyStr
+    sample: SampleProvenance | None = None
+    fallback_reason: str | None = None
+
+    @model_validator(mode="after")
+    def valid_sampled_close(self) -> CloseObservation:
+        if self.price_kind == PriceKind.AVANZA_SAMPLED_CLOSE:
+            if self.source != "avanza" or self.sample is None or self.is_adjusted:
+                raise ValueError("sampled close requires unadjusted Avanza provenance")
+            if self.provider_bar_time is not None or self.sample.observed_at > self.fetched_at:
+                raise ValueError("sampled close has an invented or future timestamp")
+        elif self.sample is not None:
+            raise ValueError("provider close cannot contain sampled provenance")
+        return self
 
 
 # --- Envelope base ---
@@ -383,6 +427,20 @@ class PriceObserved(FeedMessage):
     baseline: CloseObservation
     settlement: CloseObservation
 
+    @model_validator(mode="after")
+    def consistent_sampled_pair(self) -> PriceObserved:
+        if PriceKind.AVANZA_SAMPLED_CLOSE in (
+            self.baseline.price_kind, self.settlement.price_kind
+        ):
+            if self.baseline.price_kind != self.settlement.price_kind:
+                raise ValueError("cannot mix sampled and provider closes")
+            if (self.baseline.sample is None or self.settlement.sample is None
+                    or self.baseline.sample.currency != self.settlement.sample.currency
+                    or self.baseline.sample.mapping_version
+                    != self.settlement.sample.mapping_version):
+                raise ValueError("sampled pair currency/mapping mismatch")
+        return self
+
 
 class PredictionScored(FeedMessage):
     """Routing key: prediction.scored. Producer: Verification."""
@@ -403,13 +461,14 @@ class PredictionScored(FeedMessage):
     baseline: CloseObservation
     settlement: CloseObservation
     scored_at: UtcDatetime
+    price_policy: Literal["DAILY_CLOSE_V1", "AVANZA_SAMPLED_CLOSE_V1"] = "DAILY_CLOSE_V1"
     # Propagation fields forwarded from PredictionMade (backward-compatible defaults).
     propagation_chain: list[PropagationHop] = Field(default_factory=list)
 
 
 # Map each message model to the routing key it is published with.
 class IntradayBar(BaseModel):
-    """One completed, unadjusted, UTC minute bar. Timestamp denotes its opening."""
+    """Completed minute OHLC, or an explicitly tagged last-known sample minute."""
 
     model_config = ConfigDict(frozen=True)
     start: UtcDatetime
@@ -417,6 +476,8 @@ class IntradayBar(BaseModel):
     high: Annotated[Decimal, Field(gt=0, allow_inf_nan=False)]
     low: Annotated[Decimal, Field(gt=0, allow_inf_nan=False)]
     close: Annotated[Decimal, Field(gt=0, allow_inf_nan=False)]
+    sample: SampleProvenance | None = None
+    carried_forward: bool = False
 
     @model_validator(mode="after")
     def coherent_bar(self) -> IntradayBar:
@@ -424,6 +485,16 @@ class IntradayBar(BaseModel):
             raise ValueError("minute bar timestamp must be minute aligned")
         if not self.low <= min(self.open, self.close) <= max(self.open, self.close) <= self.high:
             raise ValueError("inconsistent OHLC bounds")
+        if self.carried_forward and self.sample is None:
+            raise ValueError("carry-forward requires original sample provenance")
+        if self.sample:
+            if not self.open == self.high == self.low == self.close:
+                raise ValueError("last-known minute must contain a single observed price")
+            minute = self.sample.observed_at.replace(second=0, microsecond=0)
+            if not minute <= self.start < self.sample.expires_at:
+                raise ValueError("sample minute outside its availability window")
+            if self.carried_forward != (self.start > minute):
+                raise ValueError("incorrect carry-forward flag")
         return self
 
 
@@ -436,6 +507,7 @@ class IntradayRequested(FeedMessage):
     calendar_id: NonEmptyStr
     opens_at: UtcDatetime
     closes_at: UtcDatetime
+    price_policy: Literal["PROVIDER_MINUTE_V1", "LAST_KNOWN_PRICE_V1"] = "PROVIDER_MINUTE_V1"
 
     @model_validator(mode="after")
     def valid_session(self) -> IntradayRequested:
@@ -457,6 +529,10 @@ class IntradayObserved(FeedMessage):
     bars: Annotated[list[IntradayBar], Field(max_length=1500)]
     final: bool = False
     failure: str | None = None
+    # Whole-session finance fallback replaces earlier Avanza revisions atomically.
+    replaces_previous: bool = False
+    source: str = "yahoo"
+    fallback_reason: str | None = None
 
 
 class PriceSampleObserved(FeedMessage):
@@ -477,7 +553,8 @@ class PriceSampleObserved(FeedMessage):
     currency: Annotated[str, Field(pattern=r"^[A-Z]{3}$")]
     quote_unit: NonEmptyStr
     source: Literal["avanza"] = "avanza"
-    interval_seconds: Literal[900] = 900
+    # Keep 900-second historical samples readable after the collector moves to 600.
+    interval_seconds: Literal[600, 900] = 900
     kind: Literal["REGULAR", "CLOSE_CHECK"]
     market_state: Literal[
         "PRE_OPEN", "REGULAR_OPEN", "REGULAR_CLOSED", "EXTENDED_HOURS", "HALTED", "UNKNOWN"

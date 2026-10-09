@@ -5,6 +5,10 @@ from __future__ import annotations
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+DEFAULT_PREDICTION_TEMPLATE = "feed_prediction_alert_v1"
+DEFAULT_VERIFICATION_TEMPLATE = "feed_verification_alert_v1"
+DEFAULT_TEMPLATE_LANGUAGE = "en_US"
+
 
 class NotificationSettings(BaseSettings):
     """Settings read from ``NOTIFICATION_*`` plus the shared infra variables."""
@@ -31,6 +35,21 @@ class NotificationSettings(BaseSettings):
     meta_access_token: str = Field(default="", validation_alias="META_ACCESS_TOKEN")
     meta_phone_number_id: str = Field(default="", validation_alias="META_PHONE_NUMBER_ID")
     meta_api_version: str = Field(default="v18.0", validation_alias="META_API_VERSION")
+    meta_prediction_template: str = Field(
+        default=DEFAULT_PREDICTION_TEMPLATE,
+        validation_alias="META_PREDICTION_TEMPLATE",
+        pattern=r"^[a-z0-9_]+$",
+    )
+    meta_verification_template: str = Field(
+        default=DEFAULT_VERIFICATION_TEMPLATE,
+        validation_alias="META_VERIFICATION_TEMPLATE",
+        pattern=r"^[a-z0-9_]+$",
+    )
+    meta_template_language: str = Field(
+        default=DEFAULT_TEMPLATE_LANGUAGE,
+        validation_alias="META_TEMPLATE_LANGUAGE",
+        pattern=r"^[a-z]{2,3}(?:_[A-Z]{2})?$",
+    )
 
     # Set to false to suppress verification (scored-prediction) alerts entirely.
     verification_alerts_enabled: bool = Field(default=False)

@@ -68,7 +68,7 @@ per-service virtual environments and do not install project packages into a mach
 interpreter.
 
 Dependencies are pinned and checksum-verified in [requirements.txt](requirements.txt), which is
-compiled from [src/shared/pyproject.toml](src/shared/pyproject.toml) (including the `dev` and `llm`
+compiled from the shared and service `pyproject.toml` files (including the `dev` and `llm`
 extras) with `pip-compile --generate-hashes`. Installing with `--require-hashes` aborts if any
 downloaded package does not match its recorded SHA256 hash.
 
@@ -118,13 +118,19 @@ python3 -m venv .venv
 
 ### Regenerating the lockfile
 
-After changing dependencies in [src/shared/pyproject.toml](src/shared/pyproject.toml), recompile the
-pinned, hashed lockfile:
+After changing dependencies in a shared or service manifest, recompile the pinned, hashed lockfile
+using the root environment. PowerShell:
+
+```powershell
+$dependencyManifests = @('src/shared/pyproject.toml') + @(Get-ChildItem src/services/*/pyproject.toml | ForEach-Object FullName)
+.venv/Scripts/python.exe -m piptools compile --reuse-hashes --generate-hashes --extra dev --extra llm --output-file requirements.txt @dependencyManifests
+```
+
+Bash:
 
 ```bash
-python -m pip install pip-tools
-python -m piptools compile --generate-hashes --extra dev --extra llm \
-  --output-file requirements.txt src/shared/pyproject.toml
+./.venv/bin/python -m piptools compile --reuse-hashes --generate-hashes --extra dev --extra llm \
+  --output-file requirements.txt src/shared/pyproject.toml src/services/*/pyproject.toml
 ```
 
 Validation commands for the shared package are in [src/README.md](src/README.md#working-here).

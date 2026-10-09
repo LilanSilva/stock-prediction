@@ -11,6 +11,7 @@ venv/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
+.pnpm-store/
 
 # Local environment / secrets
 infra/.env
