@@ -28,6 +28,9 @@ class VerificationSettings(BaseSettings):
     outbox_interval_seconds: int = Field(default=30, gt=0)
 
     intraday_mode: Literal["OFF", "SHADOW"] = "OFF"
+    intraday_price_policy: Literal["PROVIDER_MINUTE_V1", "LAST_KNOWN_PRICE_V1"] = (
+        "LAST_KNOWN_PRICE_V1"
+    )
     sample_mode: Literal["OFF", "SHADOW"] = "OFF"
     sample_calendars: dict[str, str] = Field(default_factory=dict)
     sample_target_return: float = Field(default=0.003, gt=0, lt=1)

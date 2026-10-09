@@ -57,6 +57,9 @@ class IntradayVerification:
         series = resolve(prediction.asset_id)
         calendar = self.settings.intraday_calendars.get(str(prediction.asset_id))
         policy = IntradayPolicy(
+            version=("LAST_KNOWN_PRICE_V1"
+                     if self.settings.intraday_price_policy == "LAST_KNOWN_PRICE_V1"
+                     else "INTRADAY_TARGET_V1"),
             target_return=Decimal(str(self.settings.intraday_target_return)),
             neutral_band=Decimal(str(self.settings.intraday_neutral_band)),
             min_minutes=self.settings.intraday_min_minutes,
@@ -73,7 +76,7 @@ class IntradayVerification:
         now = datetime.now(UTC)
         if window:
             identity = (
-                f"intraday-v1|{prediction.asset_id}|{series.registry_version}|{calendar}|"
+                f"{policy.version}|{prediction.asset_id}|{series.registry_version}|{calendar}|"
                 f"{window.opens_at.isoformat()}|{window.closes_at.isoformat()}"
             )
             stream = IntradayRequested(
@@ -86,6 +89,7 @@ class IntradayVerification:
                 calendar_id=window.calendar_id,
                 opens_at=window.opens_at,
                 closes_at=window.closes_at,
+                price_policy=self.settings.intraday_price_policy,
             )
         async with self.pool.acquire() as conn:
             async with conn.transaction():
@@ -170,6 +174,25 @@ class IntradayVerification:
             raise ValueError("intraday stream identity mismatch")
         if any(not stream.opens_at <= b.start < stream.closes_at for b in message.bars):
             raise ValueError("intraday bar outside requested session")
+        for bar in message.bars:
+            if bar.sample:
+                if stream.price_policy != "LAST_KNOWN_PRICE_V1" or message.source != "avanza":
+                    raise ValueError("sampled minutes require last-known policy and Avanza source")
+                if (not stream.opens_at <= bar.sample.observed_at < stream.closes_at
+                        or not stream.opens_at <= bar.sample.scheduled_at < stream.closes_at
+                        or (bar.sample.scheduled_at - stream.opens_at).total_seconds()
+                        % bar.sample.interval_seconds
+                        or bar.sample.observed_at > message.occurred_at
+                        or bar.sample.currency != resolve(stream.asset_id).currency
+                        or bar.sample.expires_at > stream.closes_at):
+                    raise ValueError("sampled minute provenance mismatch")
+            elif message.source == "avanza":
+                raise ValueError("Avanza minute missing sample provenance")
+        if message.replaces_previous and (
+            stream.price_policy != "LAST_KNOWN_PRICE_V1" or message.source == "avanza"
+            or not message.fallback_reason
+        ):
+            raise ValueError("invalid source replacement")
         if any(b.start + timedelta(minutes=1) > message.occurred_at for b in message.bars):
             raise ValueError("intraday bar not yet complete at observation time")
         if message.final and not message.failure and message.occurred_at < stream.closes_at:
@@ -192,10 +215,10 @@ class IntradayVerification:
                     message.revision,
                 )
             )
-            if (prior.bars, prior.final, prior.failure) != (
-                message.bars,
-                message.final,
-                message.failure,
+            if (prior.bars, prior.final, prior.failure, prior.replaces_previous,
+                prior.source, prior.fallback_reason) != (
+                message.bars, message.final, message.failure, message.replaces_previous,
+                message.source, message.fallback_reason,
             ):
                 raise ValueError("conflicting intraday revision")
 
@@ -238,18 +261,28 @@ class IntradayVerification:
                     final = False
                     failure = None
                     expected_revision = 1
+                    replaced = False
+                    fallback_reason = None
                     for batch in batches:
                         observation = IntradayObserved.model_validate_json(batch["payload"])
                         if observation.revision != expected_revision:
                             # FINAL can arrive before a missing durable delta.
                             break
                         expected_revision += 1
+                        if observation.replaces_previous:
+                            bars.clear()
+                            replaced = True
+                        fallback_reason = observation.fallback_reason
                         bars.update({b.start: b for b in observation.bars})
                         if observation.final:
                             final, failure = True, observation.failure
                             break
                     if datetime.now(UTC) > window.closes_at + timedelta(hours=50) and not final:
                         final, failure = True, "OBSERVATION_DEADLINE_EXPIRED"
+                    previous = (IntradayResult.model_validate_json(row["result"])
+                                if row["result"] else None)
+                    if replaced and previous and previous.price_basis == "LAST_KNOWN_PRICE_V1":
+                        previous = None
                     result = evaluate(
                         decision_at=prediction.decision_at,
                         window=window,
@@ -258,10 +291,9 @@ class IntradayVerification:
                         bars=list(bars.values()),
                         final=final,
                         failure=failure,
-                        previous=IntradayResult.model_validate_json(row["result"])
-                        if row["result"]
-                        else None,
+                        previous=previous,
                     )
+                    result = result.model_copy(update={"fallback_reason": fallback_reason})
                 await conn.execute(
                     "UPDATE verification.intraday_evaluations SET status=$2, result=$3, "
                     "updated_at=now() WHERE prediction_id=$1",

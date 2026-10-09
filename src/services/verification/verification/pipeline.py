@@ -141,7 +141,10 @@ class VerificationPipeline:
         for observation in (message.baseline, message.settlement):
             if observation.registry_version != evaluation.registry_version:
                 raise PriceValidationError("registry version mismatch")
-            if observation.price_kind != series.price_kind:
+            if observation.price_kind.value == "AVANZA_SAMPLED_CLOSE":
+                if observation.sample is None or observation.sample.currency != series.currency:
+                    raise PriceValidationError("sampled currency/provenance mismatch")
+            elif observation.price_kind != series.price_kind:
                 raise PriceValidationError("price kind mismatch")
             if observation.is_adjusted != series.is_adjusted:
                 raise PriceValidationError("adjustment flag mismatch")
@@ -195,6 +198,8 @@ class VerificationPipeline:
             baseline=message.baseline,
             settlement=message.settlement,
             scored_at=now,
+            price_policy=("AVANZA_SAMPLED_CLOSE_V1"
+                          if message.baseline.sample is not None else "DAILY_CLOSE_V1"),
             propagation_chain=list(evaluation.propagation_chain),
         )
         produced = await self._repo.store_score_with_outbox(scored)

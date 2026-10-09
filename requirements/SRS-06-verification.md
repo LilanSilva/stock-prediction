@@ -125,6 +125,12 @@ Specific responsibilities:
 
 ## 5. Functional Requirements
 
+| ID | Requirement | Status |
+|---|---|---|
+| VER-51 | Daily sampled-close evaluations shall retain `AVANZA_SAMPLED_CLOSE_V1` policy and original observation provenance | Implemented |
+| VER-52 | Last-known-price evaluation shall count original observations rather than carried-forward minute rows | Implemented |
+| VER-53 | An authorized whole-stream finance replacement shall reset sampled working evidence without mixing price bases | Implemented |
+
 ### Point-sample shadow policy
 
 | ID | Requirement | Status |
@@ -142,7 +148,7 @@ Daily requirements below remain the live learning contract. The separate shadow 
 | ID | Requirement | Status |
 |---|---|---|
 | VER-39 | Intraday evaluation shall be disabled by default and register only explicitly allowed assets in SHADOW mode | Implemented |
-| VER-40 | Intraday evaluation shall exclude prices before the decision and use only complete minute bars | Implemented |
+| VER-40 | Intraday evaluation shall use completed provider minutes or explicitly tagged observations at/after the decision under the frozen price policy | Implemented |
 | VER-41 | The service shall record target-hit and closing-direction outcomes separately | Implemented |
 | VER-42 | Incomplete observations shall be unscorable; a proven hit may remain diagnostic evidence | Implemented |
 | VER-43 | The service shall freeze the policy and starting price per prediction | Implemented |
@@ -228,6 +234,38 @@ Daily requirements below remain the live learning contract. The separate shadow 
 
 ## 7. How It Works
 
+### Avanza-derived verification
+
+The live daily path accepts a consistent pair of `AVANZA_SAMPLED_CLOSE` observations with matching
+registry, currency and adjustment semantics. It preserves the baseline/settlement session horizon
+and return formula, publishing `PredictionScored.price_policy=AVANZA_SAMPLED_CLOSE_V1`. Finance
+fallback pairs retain `DAILY_CLOSE_V1`. Raw observations and outbox payloads retain source/sample
+provenance for audit. Finalized scores retain their existing idempotency and are not re-scored.
+
+New intraday registrations select `VERIFICATION_INTRADAY_PRICE_POLICY=LAST_KNOWN_PRICE_V1` by
+default. `PROVIDER_MINUTE_V1` selects the prior `INTRADAY_TARGET_V1` behavior. Include policy in the
+stream identity so a new policy cannot attach to an old stream. This change does not enable an
+OFF stream or turn SHADOW reports into live learning; the existing OFF/SHADOW settings still apply.
+
+The last-known policy accepts original delayed observations, including unknown quote times, as an
+explicit **observed-price** basis. Deduplicate generated minutes by original sample ID. The first
+actual observation at/after the decision supplies the baseline, with at most one collection interval
+plus 120 seconds of baseline delay. Prior observations carried through the decision do not supply
+new evidence. Require the configured minimum remaining time and every expected sample slot after
+the baseline for final coverage. Count represented minutes separately from observed/expected samples.
+No hit means no *observed* hit; it does not prove the target was never crossed between readings.
+
+The strict provider-minute policy rejects tagged sampled minutes, and the separate strict
+`SAMPLED_TARGET_V1` policy remains unchanged. Source, quality and reported delay are not upgraded
+by carry-forward. Last-known evidence does not establish exact market event times or detect
+unreported corporate actions. Keep result `price_basis` visible in reports.
+
+On finance fallback, a tagged replacement revision clears the sampled working series and resets
+its sampled baseline. Subsequent provider revisions retain normal baseline-revision protection.
+Consumer validation rejects untagged Avanza minutes, wrong currency/window, duplicated timestamps,
+and unauthorized replacements. Replacement events retain their safe fallback reason; prior
+revisions remain stored. Reordered delivery is reconciled in contiguous revision order.
+
 ### Sampled shadow flow
 
 The independent `verification.sample-predictions` queue copies `PredictionMade`; it never competes
@@ -241,6 +279,8 @@ Quote age must be <=120 seconds; observed time must lie in the session, at/after
 provider quote time must also be at/after it. Currency and major unit, registry and session must
 match. The scheduled slot must lie on the session's 900-second grid at/after the decision and the
 read must be <=120 seconds late. Unknown-time Avanza quotes remain stored but ineligible.
+`SAMPLED_TARGET_V1` remains a 900-second policy while the collector now emits 600-second samples;
+keep sampled verification OFF until a separately versioned 600-second policy is specified and tested.
 
 At least two expected slots must remain. The baseline is the first eligible observed price, within
 1020 seconds of `max(decision_at, opens_at)`; its time, price, delay and mapping version are retained.
@@ -420,8 +460,8 @@ The service validates each `PriceObserved` against the stored evaluation:
 | `message.settlement.session == evaluation.settlement_session` | Correct settlement date |
 | `message.baseline.registry_version == evaluation.registry_version` | Asset mapping unchanged since the prediction |
 | `message.settlement.registry_version == evaluation.registry_version` | Same for settlement |
-| `message.baseline.price_kind == series.price_kind` | Correct close type |
-| `message.settlement.price_kind == series.price_kind` | Same for settlement |
+| Both close types match registry, or both are validated `AVANZA_SAMPLED_CLOSE` | No sampled/provider pair mixing |
+| Sampled provenance currency matches registry | Correct currency and explicit observation basis |
 | `message.baseline.is_adjusted == series.is_adjusted` | No adjusted/unadjusted mismatch |
 | `message.settlement.is_adjusted == series.is_adjusted` | Same for settlement |
 
@@ -625,6 +665,7 @@ Threshold changes affect new registrations only. Collection is controlled separa
 | Intraday variable | Default | Effect |
 |---|---|---|
 | `VERIFICATION_INTRADAY_MODE` | `OFF` | `OFF` or `SHADOW` only; LIVE is deliberately unavailable |
+| `VERIFICATION_INTRADAY_PRICE_POLICY` | `LAST_KNOWN_PRICE_V1` | New stream price policy; `PROVIDER_MINUTE_V1` retains strict finance minutes |
 | `VERIFICATION_INTRADAY_CALENDARS` | `{}` | JSON map of canonical asset ID to calendar name; empty enables no assets |
 | `VERIFICATION_INTRADAY_PRICES_QUEUE` | `verification.intraday-prices` | Owned delta queue; default topology name |
 | `VERIFICATION_INTRADAY_POLL_SECONDS` | `60` | Local evaluation interval, minimum 10 seconds |
@@ -652,6 +693,12 @@ All variables use the `VERIFICATION_` prefix unless noted.
 ---
 
 ## 11. Verification
+
+VER-51–VER-53: `tests/test_avanza_scoring.py`, `test_last_known_policy.py` and disposable-PostgreSQL
+`test_last_known_persistence.py` prove sampled score provenance, mixed-basis rejection, original
+observation counts, pre-decision exclusion, missing-slot behavior, strict-policy isolation and
+durable finance replacement with a different baseline. Existing provider-minute and daily suites
+continue to protect legacy behavior.
 
 VER-47/VER-48/VER-50 are proved by `tests/test_sampled_policy.py` (hit then reversal, coverage gaps,
 sampled neutrality, unknown freshness, currency/time rejection, late baseline, mapping changes).

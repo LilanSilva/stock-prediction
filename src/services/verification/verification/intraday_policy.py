@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 from shared.schemas.messages import Direction, IntradayBar
@@ -44,7 +45,7 @@ def resolve_window(decision_at: datetime, calendar_id: str, timezone: str) -> Se
 
 class IntradayPolicy(BaseModel):
     model_config = ConfigDict(frozen=True)
-    version: Literal["INTRADAY_TARGET_V1"] = "INTRADAY_TARGET_V1"
+    version: Literal["INTRADAY_TARGET_V1", "LAST_KNOWN_PRICE_V1"] = "INTRADAY_TARGET_V1"
     target_return: Decimal
     neutral_band: Decimal
     min_minutes: int
@@ -67,6 +68,12 @@ class IntradayResult(BaseModel):
     expected_bars: int = 0
     observed_bars: int = 0
     complete: bool = False
+    price_basis: str = "PROVIDER_MINUTE_V1"
+    represented_minutes: int = 0
+    expected_samples: int = 0
+    observed_samples: int = 0
+    first_hit_observed_at: datetime | None = None
+    fallback_reason: str | None = None
 
 
 def evaluate(
@@ -80,7 +87,15 @@ def evaluate(
     previous: IntradayResult | None = None,
     failure: str | None = None,
 ) -> IntradayResult:
+    if any(b.sample is not None for b in bars):
+        if policy.version != "LAST_KNOWN_PRICE_V1" or any(b.sample is None for b in bars):
+            return IntradayResult(status="UNSCORABLE", reason="UNEXPECTED_PRICE_BASIS")
+        return evaluate_last_known(
+            decision_at=decision_at, window=window, direction=direction, policy=policy,
+            bars=bars, final=final, previous=previous, failure=failure,
+        )
     start = max(decision_at, window.opens_at)
+
     first_minute = start.replace(second=0, microsecond=0)
     if first_minute < start:
         first_minute += MINUTE
@@ -158,4 +173,82 @@ def evaluate(
         expected_bars=expected,
         observed_bars=len(stamps),
         complete=complete,
+    )
+
+
+def evaluate_last_known(
+    *, decision_at: datetime, window: SessionWindow, direction: Direction,
+    policy: IntradayPolicy, bars: list[IntradayBar], final: bool,
+    previous: IntradayResult | None, failure: str | None,
+) -> IntradayResult:
+    """Score observed page-price changes; repeated minutes add no independent evidence."""
+    start = max(decision_at, window.opens_at)
+    unique: dict[UUID, IntradayBar] = {}
+    for bar in bars:
+        sample = bar.sample
+        if sample and start <= sample.observed_at < window.closes_at:
+            prior = unique.get(sample.sample_id)
+            if prior and (prior.close != bar.close or prior.sample != sample):
+                return IntradayResult(status="UNSCORABLE", reason="CONFLICTING_SAMPLE")
+            unique[sample.sample_id] = bar
+    observations = sorted(
+        unique.values(), key=lambda b: b.sample.observed_at if b.sample else b.start
+    )
+    common: dict[str, Any] = {
+        "price_basis": "LAST_KNOWN_PRICE_V1", "represented_minutes": len(bars),
+        "observed_samples": len(observations), "observed_bars": len(observations),
+    }
+    if not observations:
+        return IntradayResult(status="UNSCORABLE" if final else "PENDING",
+                              reason=(failure or "NO_BASELINE") if final else None, **common)
+    first, last = observations[0], observations[-1]
+    assert first.sample is not None and last.sample is not None
+    baseline_at = first.sample.observed_at
+    delay = (baseline_at - start).total_seconds()
+    interval = first.sample.interval_seconds
+    if delay > interval + 120:
+        return IntradayResult(status="UNSCORABLE", reason="BASELINE_TOO_LATE", **common)
+    if (window.closes_at - baseline_at).total_seconds() < policy.min_minutes * 60:
+        return IntradayResult(status="UNSCORABLE", reason="INSUFFICIENT_WINDOW", **common)
+    if previous and previous.price_basis == "LAST_KNOWN_PRICE_V1" and previous.baseline_at:
+        if previous.baseline_at != baseline_at or previous.baseline_price != first.close:
+            return IntradayResult(status="UNSCORABLE", reason="BASELINE_REVISED", **common)
+    identities = {(b.sample.mapping_version, b.sample.currency, b.sample.interval_seconds)
+                  for b in observations if b.sample}
+    stamps = {b.sample.scheduled_at for b in observations if b.sample}
+    if len(identities) != 1 or len(stamps) != len(observations):
+        return IntradayResult(status="UNSCORABLE", reason="MIXED_SAMPLE_IDENTITY", **common)
+    expected = set()
+    at = first.sample.scheduled_at
+    while at < window.closes_at:
+        expected.add(at)
+        at += timedelta(seconds=interval)
+    complete = stamps == expected and not failure
+    price = first.close
+    up = max(b.close / price - 1 for b in observations)
+    down = min(b.close / price - 1 for b in observations)
+    hit = next((b for b in observations if
+                (direction == Direction.UP and b.close >= price * (1 + policy.target_return))
+                or (direction == Direction.DOWN and b.close <= price * (1 - policy.target_return))),
+               None)
+    reached = True if hit else (False if final and complete else None)
+    if direction == Direction.NEUTRAL:
+        breached = up > policy.neutral_band or down < -policy.neutral_band
+        reached = False if breached else (True if final and complete else None)
+    closing = last.close / price - 1 if final and complete else None
+    correct = None
+    if closing is not None:
+        actual = (Direction.UP if closing > policy.neutral_band else
+                  Direction.DOWN if closing < -policy.neutral_band else Direction.NEUTRAL)
+        correct = actual == direction
+    return IntradayResult(
+        status=("SCORED" if complete else "UNSCORABLE") if final else "PENDING",
+        reason=(failure or "MISSING_SAMPLES") if final and not complete else None,
+        baseline_at=baseline_at, baseline_price=price, baseline_delay_seconds=delay,
+        target_reached=reached,
+        first_hit_bar_at=hit.sample.observed_at.replace(second=0, microsecond=0)
+        if hit and hit.sample else None,
+        first_hit_observed_at=hit.sample.observed_at if hit and hit.sample else None,
+        closing_return=closing, closing_correct=correct, max_up_return=up, max_down_return=down,
+        expected_bars=len(expected), expected_samples=len(expected), complete=complete, **common,
     )
