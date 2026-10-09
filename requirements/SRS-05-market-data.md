@@ -123,13 +123,18 @@ External providers:
 
 | ID | Requirement | Status |
 |---|---|---|
-| MKT-60 | The isolated snapshot worker shall schedule point observations every 900 seconds during each enabled listing's regular exchange session | Implemented |
+| MKT-60 | The Market Data service's Avanza collector shall schedule point observations every 600 seconds during each enabled listing's regular exchange session | Implemented |
 | MKT-61 | Each sample shall retain the exact decimal price, listing currency, actual observation time and immutable mapping version | Implemented |
 | MKT-62 | A failed read shall leave a gap after at most one bounded retry | Implemented |
 | MKT-63 | Sample persistence and publication intent shall commit atomically under a fenced job lease | Implemented |
-| MKT-64 | Snapshot collection shall preserve existing daily-close and minute-bar API/message semantics | Implemented |
+| MKT-64 | Snapshot collection shall preserve raw history; derived sampled prices shall expose their distinct basis and provenance | Implemented |
 | MKT-65 | Unknown provider quote time shall remain explicitly ineligible for strict sampled verification | Implemented |
 | MKT-66 | Close checks shall remain distinct from official daily close observations | Implemented |
+| MKT-67 | Avanza-first daily requests shall fall back as a complete baseline/settlement pair on unavailable or invalid Avanza evidence | Implemented |
+| MKT-68 | An open or finalizing session shall remain pending without triggering finance fallback solely for its absent final close | Implemented |
+| MKT-69 | Derived minute values shall carry original sample provenance and expire at the next scheduled slot or session close | Implemented |
+| MKT-70 | A minute stream's finance fallback shall replace earlier sampled revisions and persist across restart | Implemented |
+| MKT-71 | Sampled session OHLC shall report coverage and provisional status separately from provider closing prices | Implemented |
 
 ### Intraday collection
 
@@ -172,7 +177,7 @@ External providers:
 
 | ID | Requirement | Status |
 |---|---|---|
-| MKT-14 | The service shall route each request to the provider declared in the asset registry's `provider` field | Implemented |
+| MKT-14 | Finance mode and finance fallback shall use the asset registry's provider; Avanza-first mode shall prefer validated stored samples | Implemented |
 | MKT-15 | An unknown asset ID shall raise `InvalidObservationError` (terminal); the request shall be dead-lettered | Implemented |
 | MKT-16 | A valid asset whose declared provider has no configured adapter shall raise `InvalidObservationError` (terminal) | Implemented |
 | MKT-17 | Adding a new asset requires only an asset registry edit (registry `provider` field); no code change is needed if the provider already has an adapter | Implemented |
@@ -259,18 +264,60 @@ External providers:
 
 ## 7. How It Works
 
+### Avanza-first price reads
+
+`MARKET_DATA_SOURCE=avanza_first` is the default. `finance` retains the previous request processing
+and recent-close query for rollback. Both finance adapters remain available. `avanza.py` reads the
+existing immutable samples; API requests do not open browser tabs.
+
+For each session, first/maximum/minimum/last valid regular readings form **sampled** OHLC. Exclude
+close checks and extended-hours prices. Validate listing ID/exchange, currency/major unit, registry,
+calendar window, grid, mapping/cadence consistency and the 120-second read deadline. A completed
+session needs all expected regular slots; missing slots remain explicit. During trading, OHLC is
+provisional; finalization waits until the exchange close plus 120 seconds. Unknown provider quote
+time and the displayed delay remain unchanged. These values do not establish official exchange
+extrema or closes, and do not detect corporate actions absent from the stored evidence.
+
+`PriceRequested` resolves both sessions from Avanza together. Unsupported mappings, missing history,
+invalid evidence or reader exceptions trigger finance reads for **both** sessions. A still-open
+settlement waits, even if baseline history is absent. If finance also fails, normal retry/abandon
+handling applies. A shared database outage still prevents durable completion. Cancellation is never
+converted into fallback. Finance results retain a safe `fallback_reason`; exception text containing
+connection details is not exposed. Completed requests/outboxes retain their existing idempotency.
+Unfinished legacy requests can be recomputed as a full pair; finalized scores are not re-evaluated.
+
+Sampled closes use `AVANZA_SAMPLED_CLOSE` and the additive `market_data.sampled_closes` table, keyed by
+asset/session/registry/mapping, with full observation payload. They never overwrite finance rows in
+`close_observations`. Wire contracts belong to [SRS-01](SRS-01-shared-foundation.md#derived-price-provenance).
+
+Recent history prefers a complete Avanza result per session and uses finance for unavailable dates.
+The response retains `asset_id`, `closes`, `session` and decimal-string `close`, adding source, basis,
+currency, observation time, reported delay and fallback reason. Finance history is read from storage
+first; at most one provider window is fetched per recent-history call, not one call per missing day.
+Only available history is returned. Prediction compares a contiguous cohort of the same source/basis.
+
+For a new `LAST_KNOWN_PRICE_V1` minute stream, represent the sample in its actual observation's minute
+bucket and carry it through subsequent completed minute buckets, stopping before its next scheduled
+slot or session close. The first bucket is only published after that minute completes; original
+observation time remains attached. Do not backdate a late observation to the scheduled bucket, extend
+a sample over a failed collection, or infer a provider quote time. Missing due samples after the
+120-second grace cause whole-stream finance fallback. A durable `source_mode` and `fallback_reason`
+on `intraday_streams` preserve that choice. A `replaces_previous` revision removes earlier sampled
+minutes from the consumer's working series; the original events remain in the audit history.
+Existing streams and `PROVIDER_MINUTE_V1` requests retain finance-minute behavior.
+
 ### Avanza snapshot worker
 
-`python -m market_data.snapshots.worker` is a separate process/image owned by Market Data.
-The FastAPI process imports only its read-only router and storage module, not Playwright. Collection
-is disabled by default; no personal Chrome profile is used. A single PostgreSQL advisory-lock leader
+The FastAPI lifespan supervises the Avanza collector inside `feed-market-data`. It retains a
+separate database pool, broker connection and browser context; it no longer needs a second container.
+Collection is disabled by default; no personal Chrome profile is used. A single PostgreSQL advisory-lock leader
 coordinates a reusable browser context with 2 concurrent pages by default, configurable up to 10.
 Only explicitly enabled, verified companion mappings are scheduled; discovery never runs per slot.
 Mapping identity and versioning are defined in [REF-02](REF-02-asset-registry.md#avanza-companion-mappings).
 
 `exchange_calendars` 4.13.1 resolves exchange-local trading dates, holidays, DST and early closes.
 Sessions with a lunch break or a mismatched timezone are unsupported and pause the listing.
-Regular slots start at the exchange open and repeat every 15 minutes, strictly before close.
+Regular slots start at the exchange open and repeat every 10 minutes, strictly before close.
 Three bounded close checks are scheduled at close, close+2 minutes and close+5 minutes. There are no
 website reads between the final check deadline and the next regular session. The control loop remains
 alive to update heartbeat and relay the outbox. Past slots become `MISSED`; restarting never backfills
@@ -289,16 +336,22 @@ extended-hours value and chart history. Swedish decimal commas and grouped space
 `Decimal`; unsupported minor-unit prices fail closed. It opens the market-status text panel and
 matches the current-state heading, never the colored dot or the timetable legend. Status is
 `PRE_OPEN`, `REGULAR_OPEN`, `REGULAR_CLOSED`, `EXTENDED_HOURS`, `HALTED` or `UNKNOWN`.
+The observed heading `Marknaden är i efterhandel` maps to `EXTENDED_HOURS`; the timetable alone
+cannot establish a current state. The reader still samples the regular last-price element.
 A disagreement with the scheduled regular session makes evidence `SESSION_MISMATCH`; it does not
 invent an open or closed state. Exchange scheduling bounds reads even when the page indicator is unknown.
 
 The currently validated DOM supplies a reported quote delay but no precise provider quote timestamp.
 `provider_quote_at` remains null and quality is `FRESHNESS_UNKNOWN`; observation time is not trade time.
 An unchanged price does not establish freshness. Close checks remain `CLOSE_UNCONFIRMED`, even when
-the regular last price appears final. They cannot populate `close_observations` or one-minute OHLC.
+the regular last price appears final. Close checks cannot populate `close_observations` or derived
+regular-session OHLC. Regular samples support the explicitly tagged derived values described above.
 The price-sample event contract belongs to [SRS-01](SRS-01-shared-foundation.md#sampled-price-contract).
 
 ### Intraday collector
+
+The following provider-bar rules apply to `PROVIDER_MINUTE_V1` and finance fallback. The Avanza
+last-known branch is specified in [Avanza-first price reads](#avanza-first-price-reads).
 
 `IntradayRequested` starts a durable stream when `INTRADAY_ENABLED=true`. Its regular exchange
 session boundaries come from Verification. A scheduler polls due streams every 60 seconds. The
@@ -476,11 +529,14 @@ Snapshot endpoints are additive and available independently of the browser worke
 |---|---|
 | `GET /snapshots/status` | `NOT_STARTED` before worker schema initialization; otherwise durable control status/heartbeat, asset pauses/errors, session window including next open, market state/close confirmation, job counts and pending outbox count |
 | `GET /snapshots/recent?asset_id=…&limit=100&before=…` | Newest-first `PriceSampleObserved` objects; decimal prices serialize as strings; limit 1–1000; optional timezone-aware timestamp is an exclusive upper bound; empty before initialization |
+| `GET /snapshots/ohlc?asset_id=…&session=YYYY-MM-DD` | Sampled OHLC, currency, first/last provenance, expected/observed sample counts, missing due slots, complete and provisional flags |
+| `GET /snapshots/minutes?asset_id=…&session=YYYY-MM-DD` | Completed last-known-price minute buckets with `sample` provenance and `carried_forward`; expired gaps are not filled |
 
-`/prices/recent`, `/health`, `/ready`, `PriceObserved` and `IntradayObserved` retain their previous
-meaning and response fields. Collector readiness is visible through `/snapshots/status` rather than
-making legacy API readiness depend on a browser. Currency and market-state metadata are exposed on
-the new snapshot endpoints/event only.
+The raw `/snapshots/*` routes describe Avanza evidence only; they never relabel finance data as
+Avanza. Derived routes return HTTP 409 for a not-yet-due reading and 503 for unavailable evidence.
+`/prices/recent` is the source-selecting compatibility route described above, with HTTP 503 when
+neither source can provide a result. `/health.price_source` reports configured source mode.
+`/ready` still checks service dependencies; collector readiness remains in `/snapshots/status`.
 
 Optional intraday consumer: `market-data.intraday-requests`, bound to `intraday.requested`.
 Producer: `intraday.observed`, consumed only by shadow verification. Contracts and topology are in
@@ -626,6 +682,9 @@ Note: both `message_id` and `aggregate_id` have UNIQUE constraints. The `aggrega
 
 ### Snapshot process configuration
 
+`MARKET_DATA_SOURCE` accepts `avanza_first` (default) or `finance` (manual rollback). Collection
+settings below remain independent of read-source selection.
+
 All keys below apply only to the optional worker. `DATABASE_URL` and `RABBITMQ_URL` are the unprefixed
 shared connection strings. The companion config is mounted read-only with the canonical registry.
 
@@ -634,7 +693,7 @@ shared connection strings. The companion config is mounted read-only with the ca
 | `SNAPSHOT_ENABLED` | `false` | Run collection only when true |
 | `SNAPSHOT_MAPPINGS_PATH` | `infra/assets/avanza-listings.json` | Companion file; Compose uses `/config/avanza-listings.json` |
 | `SNAPSHOT_CONCURRENCY` | `2` | Page limit 1–10; raise only after capacity measurement |
-| `SNAPSHOT_INTERVAL_SECONDS` | `900` | v1 accepts only 900 |
+| `SNAPSHOT_INTERVAL_SECONDS` | `600` | Current collector accepts only 600; historical 900-second samples remain readable |
 | `SNAPSHOT_TIMEOUT_SECONDS` | `30` | Total read budget, 1–30 seconds |
 | `SNAPSHOT_RETRY_SECONDS` | `10` | Retry delay 0–20, plus 0–3 seconds jitter |
 | `SNAPSHOT_MAX_LATENESS_SECONDS` | `120` | Slot deadline, configurable 30–120 seconds |
@@ -647,29 +706,38 @@ shared connection strings. The companion config is mounted read-only with the ca
 
 ### Snapshot deployment and recovery
 
-The optional Compose profile `snapshots` builds `Dockerfile.snapshots` with hash-pinned Playwright
-dependencies and its matching Chromium. It runs as UID 10001 with 2 CPUs, 3 GiB memory, 1 GiB shared
-memory and a 512-process limit. Organizations using a private root CA must install it in the base
-image; the browser downloader uses the system CA bundle and the Dockerfile imports the base image's
+`feed-market-data` builds with hash-pinned Playwright dependencies and matching Chromium. It runs
+as UID 10001 with 3 CPUs, 4 GiB memory, 1 GiB shared memory and a 512-process limit. The API
+lifespan supervises the collector task and retries unexpected exits; Compose uses uncapped
+`restart: on-failure` for process-level failures. Operators must inspect the collector heartbeat
+and API container state, not just the persisted RUNNING label.
+Organizations using a private root CA must install it in the base image; the browser downloader uses the system CA bundle and the Dockerfile imports the base image's
 local CAs into Chromium's NSS store. See [Chromium certificate management](https://chromium.googlesource.com/chromium/src/+/HEAD/docs/linux/cert_management.md). TLS verification remains enabled.
 
 After the access/freshness and pilot gates below, enable a small reviewed listing subset in a **new**
 mapping version, set `SNAPSHOT_ENABLED=true` in the local environment, then run:
 
 ```bash
-docker compose --env-file infra/.env -f infra/docker-compose.yml --profile snapshots up -d --build feed-market-data-snapshots
+docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build feed-market-data
 ```
 
-Deploy the API image to expose the new read endpoints and the Verification image for optional sampled
-reports. Neither requires enabling the collector. Roll back collection with `docker compose --env-file
-infra/.env -f infra/docker-compose.yml --profile snapshots stop feed-market-data-snapshots`; set the
-sample policy OFF. All prior evidence and legacy operations remain available.
+The API and collector are deployed together. For the Avanza-first cutover, rebuild all affected shared
+contract consumers (Verification, Prediction, Credibility and Notification) before activating the
+new Market Data producer. Older consumers cannot interpret the new sampled close enum or replacement
+minute semantics. Use `infra/.env`; no scheduled monitoring is created by this change. Roll back by
+setting `MARKET_DATA_SOURCE=finance` and recreating Market Data, retaining the compatible consumers
+and all stored history. Existing last-known streams retain their frozen policy; rollback replaces
+any still-active Avanza stream with finance using reason `FINANCE_MODE`.
+To stop collection while retaining the API, set `SNAPSHOT_ENABLED=false` in `infra/.env`
+and recreate `feed-market-data`; keep the sample policy OFF. All prior evidence and legacy operations
+remain available.
 
 Mappings reload each cycle; changed contents under an existing version are rejected. A corrupt edit
 keeps the last valid mapping and exposes `CONFIG_ERROR`. Repair a paused listing with a reviewed new
 mapping version. After resolving a provider access restriction, stop the worker, run a manual probe,
 then explicitly reset `market_data.snapshot_control` with `paused=false`, `cooldown_until=NULL`,
-`failure_count=0`, `status='STARTING'` for `id=1`, and restart. No automatic login/CAPTCHA bypass occurs.
+`failure_count=0`, `status='STARTING'` for `id=1`, and restart `feed-market-data`. No automatic
+login/CAPTCHA bypass occurs.
 
 | Intraday variable | Default | Effect |
 |---|---|---|
@@ -702,12 +770,17 @@ No `MARKET_DATA_` prefix; this service uses unprefixed variables directly (`Mark
 
 ## 11. Verification
 
+MKT-67–MKT-71 are covered by `tests/test_avanza_primary.py`, `test_avanza_api.py` and the disposable
+PostgreSQL `test_avanza_persistence.py`: session OHLC, opening/closing pending states, coverage gaps,
+currency/identity rejection, bounded carry-forward, finance fallback, cancellation, complete pair
+selection, immutable finance history, outbox replay and durable stream replacement after restart.
+
 Snapshot coverage:
 
 | Requirements | Proving checks |
 |---|---|
 | MKT-60, MKT-61, MKT-62, MKT-65, MKT-66 | `tests/test_snapshots.py`: currency parsing, status text, holiday/early close, close-check slots, unknown timestamp, bounded retries, expired deadlines and SQL retry timestamp preservation |
-| MKT-63 | `tests/test_snapshot_storage.py`: real PostgreSQL repeatable DDL, concurrent claims, expired-lease fencing, immutable mapping history, atomic sample/outbox and broker replay |
+| MKT-63 | `tests/test_snapshot_storage.py`: real PostgreSQL repeatable DDL, concurrent claims, expired-lease fencing, immutable mapping history, atomic sample/outbox, broker replay and five-failure cooldown timestamp handling |
 | MKT-64 | `tests/test_snapshot_api.py`, existing `tests/test_recent_closes.py`, shared message suites; snapshot control failure does not change legacy responses |
 
 Unit tests use synthetic identities, not assumptions about the production asset registry.
@@ -778,15 +851,48 @@ VM suspension can lose collection slots; recovery records gaps rather than backf
 
 ## 13. Assumptions and Limitations
 
-Snapshot rollout remains gated. Anonymous Chrome probes on 2026-09-24 UTC validated 29 disabled
+Anonymous Chrome probes on 2026-09-24 UTC validated 29 initially disabled
 listing mappings and regular-price parsing across USD/SEK/EUR/DKK. The built Linux image also read
 all 29 listings successfully with the same currency checks and TLS verification enabled. Pages reported
 900-second delay and exposed no exact quote timestamp. Read success therefore does **not** prove
 freshness or improve strict verification accuracy. Current collector output remains observational.
-No official-close promotion is implemented. Confirm unattended access/entitlement for the intended
-deployment and run at least three trading sessions on 2–4 listings before expansion. Measure read
-success separately from freshness eligibility, with a proposed >=95% scheduled-read success gate,
-no wrong identities/currencies, explained gaps and measured memory/latency within the slot budget.
+No official-close promotion is implemented. The user accepted collection results, enabled all 29
+listings and waived the proposed extended pilot. That waiver is not evidence of passing a
+three-session or >=95% reliability gate. Access restrictions and identity/currency checks still
+apply; read success and strict freshness eligibility remain distinct.
+
+### Avanza-first deployment evidence — 2026-10-09
+
+E14 was completed with the following bounded evidence, without scheduling further monitoring:
+
+- Local validation passed 406 unit/API and 16 PostgreSQL integration tests, plus lint, targeted
+  strict typing and Compose validation. Deployment exposed an ambiguous SQL interval parameter in
+  provider-failure cooldown handling. An explicit `timestamptz` cast fixed it; all three snapshot
+  storage integration tests, including the new fifth-failure cooldown case, passed on a disposable
+  database. The corrected query also prepared successfully against the live database without execution.
+- Built and deployed Verification, Prediction, Credibility and Notification before Market Data,
+  using `infra/.env`. All five became healthy and passed readiness; their shared-contract source
+  hashes matched. PostgreSQL, RabbitMQ and Neo4j container identities/start times were unchanged.
+  Final Market Data image digest: `sha256:787374d0a935de8162912f4909531d388d3772b6bf1bfc8532e36672afd0f0e4`.
+- Finance-only mode started successfully and served existing history before switching to
+  `MARKET_DATA_SOURCE=avanza_first`. Collection remained enabled at 600 seconds with two tabs inside
+  `feed-market-data`. An invalid local `SNAPSHOT_CONCURRENCY` value was corrected to `2`.
+- Actual October 5–6 Tesla pairs returned Avanza sampled closes of 379.49 and 380.45 USD.
+  UAL pairs and recent history successfully fell back to Yahoo with `NO_AVANZA_HISTORY`.
+  UAL's pre-existing `IDENTITY_MISMATCH` pause remains; the cutover does not bypass that safeguard.
+  Open-session Saab requests stayed pending rather than triggering fallback.
+- Saab's October 6 sampled OHLC endpoint returned complete 51/51 coverage. Its minute endpoint
+  returned 509 explicitly tagged buckets with original observation times and 900-second reported
+  provider delay; a late observation minute was not backdated to invent the missing minute.
+- The October 9 10:30 UTC batch saved and published 14 of 15 European readings during the rollout.
+  AstraZeneca timed out; a separate diagnostic succeeded at 10:33:50 UTC with 1586.50 SEK but was
+  not persisted as a replacement. The missing scheduled observation remains missing.
+- At 10:34 UTC the final image was healthy, the collector heartbeat was current and both Market
+  Data outboxes were empty. Work-queue DLQs were empty and active consumers were attached. Existing
+  OFF-mode sample queues retain messages by design; strict sampled and minute scoring remain OFF.
+  All 136 finance-history rows retained the same content fingerprint. Thirteen real daily requests
+  were waiting for October 9 close; no synthetic prediction or completed live score was generated
+  to claim an end-to-end result before settlement was due.
 
 ### 13.1 Accepted design decisions
 
@@ -843,6 +949,10 @@ Update this document whenever any of the following changes:
 
 | Date | Description |
 |---|---|
+| 2026-10-09 | Deploy Avanza-first reads with finance fallback, sampled OHLC and last-known minutes (MKT-67–MKT-71); record rollback/runtime evidence, fix cooldown timestamp typing and close E14 after the user waived extended monitoring |
+| 2026-09-28 | Recognize the observed after-hours heading; regression coverage rejects timetable-only state inference |
 | 2026-09-25 | Add isolated Avanza 15-minute snapshots, durable jobs/outbox, additive APIs and disabled rollout; MKT-60–MKT-66 |
+| 2026-10-01 | Change regular Avanza slots to 600 seconds; preserve 900-second historical sample decoding and keep reported quote delay independent of collection cadence |
+| 2026-10-02 | Run the Avanza collector as a supervised task in `feed-market-data`; remove the dedicated snapshot container while preserving durable jobs, APIs and data |
 | 2026-09-24 | v1.1.0: optional durable intraday stream collector, strict Yahoo minute evidence, bounded retries and delta outbox |
 | 2026-08-05 | Initial as-built specification for E05 (Market Data Service); MKT-1 through MKT-52 |

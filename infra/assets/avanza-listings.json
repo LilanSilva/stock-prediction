@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "mapping_version": "avanza-v2-pilot-20260925",
+  "mapping_version": "avanza-v5-10min-20261001",
   "listings": [
     {
       "asset_id": "LMT_NYSE",
@@ -21,7 +21,7 @@
       "quote_unit": "USD",
       "calendar_id": "XNYS",
       "timezone": "America/New_York",
-      "enabled": false,
+      "enabled": true,
       "validation_status": "VERIFIED",
       "validated_at": "2026-09-24T22:17:06.560606Z",
       "evidence_url": "https://www.avanza.se/aktier/om-aktien.html/3937/lockheed-martin"
@@ -69,7 +69,7 @@
       "quote_unit": "USD",
       "calendar_id": "XNYS",
       "timezone": "America/New_York",
-      "enabled": false,
+      "enabled": true,
       "validation_status": "VERIFIED",
       "validated_at": "2026-09-24T22:17:11.406140Z",
       "evidence_url": "https://www.avanza.se/aktier/om-aktien.html/4167/boeing"
@@ -93,7 +93,7 @@
       "quote_unit": "USD",
       "calendar_id": "XNYS",
       "timezone": "America/New_York",
-      "enabled": false,
+      "enabled": true,
       "validation_status": "VERIFIED",
       "validated_at": "2026-09-24T22:17:14.012106Z",
       "evidence_url": "https://www.avanza.se/aktier/om-aktien.html/299556/united-airlines"
@@ -141,7 +141,7 @@
       "quote_unit": "USD",
       "calendar_id": "XNYS",
       "timezone": "America/New_York",
-      "enabled": false,
+      "enabled": true,
       "validation_status": "VERIFIED",
       "validated_at": "2026-09-24T22:17:22.450917Z",
       "evidence_url": "https://www.avanza.se/aktier/om-aktien.html/910173/moderna"
@@ -165,7 +165,7 @@
       "quote_unit": "USD",
       "calendar_id": "XNYS",
       "timezone": "America/New_York",
-      "enabled": false,
+      "enabled": true,
       "validation_status": "VERIFIED",
       "validated_at": "2026-09-24T22:17:24.735458Z",
       "evidence_url": "https://www.avanza.se/aktier/om-aktien.html/4478/nvidia"
@@ -189,7 +189,7 @@
       "quote_unit": "EUR",
       "calendar_id": "XAMS",
       "timezone": "Europe/Amsterdam",
-      "enabled": false,
+      "enabled": true,
       "validation_status": "VERIFIED",
       "validated_at": "2026-09-24T22:17:26.930657Z",
       "evidence_url": "https://www.avanza.se/aktier/om-aktien.html/732279/asml-holding"
@@ -213,7 +213,7 @@
       "quote_unit": "SEK",
       "calendar_id": "XSTO",
       "timezone": "Europe/Stockholm",
-      "enabled": false,
+      "enabled": true,
       "validation_status": "VERIFIED",
       "validated_at": "2026-09-24T22:17:29.535601Z",
       "evidence_url": "https://www.avanza.se/aktier/om-aktien.html/804998/sivers-semiconductors"
@@ -237,7 +237,7 @@
       "quote_unit": "USD",
       "calendar_id": "XNYS",
       "timezone": "America/New_York",
-      "enabled": false,
+      "enabled": true,
       "validation_status": "VERIFIED",
       "validated_at": "2026-09-24T22:17:32.220298Z",
       "evidence_url": "https://www.avanza.se/aktier/om-aktien.html/3873/microsoft"
@@ -285,7 +285,7 @@
       "quote_unit": "USD",
       "calendar_id": "XNYS",
       "timezone": "America/New_York",
-      "enabled": false,
+      "enabled": true,
       "validation_status": "VERIFIED",
       "validated_at": "2026-09-24T22:17:37.515698Z",
       "evidence_url": "https://www.avanza.se/aktier/om-aktien.html/952518/zoom-communications-a"
@@ -309,7 +309,7 @@
       "quote_unit": "USD",
       "calendar_id": "XNYS",
       "timezone": "America/New_York",
-      "enabled": false,
+      "enabled": true,
       "validation_status": "VERIFIED",
       "validated_at": "2026-09-24T22:17:40.026914Z",
       "evidence_url": "https://www.avanza.se/aktier/om-aktien.html/472095/alphabet-inc-class-a"
@@ -333,7 +333,7 @@
       "quote_unit": "USD",
       "calendar_id": "XNYS",
       "timezone": "America/New_York",
-      "enabled": false,
+      "enabled": true,
       "validation_status": "VERIFIED",
       "validated_at": "2026-09-24T22:17:42.557060Z",
       "evidence_url": "https://www.avanza.se/aktier/om-aktien.html/3986/amazon-com"
@@ -357,7 +357,7 @@
       "quote_unit": "USD",
       "calendar_id": "XNYS",
       "timezone": "America/New_York",
-      "enabled": false,
+      "enabled": true,
       "validation_status": "VERIFIED",
       "validated_at": "2026-09-24T22:17:44.935513Z",
       "evidence_url": "https://www.avanza.se/aktier/om-aktien.html/185896/netflix"
@@ -381,7 +381,7 @@
       "quote_unit": "USD",
       "calendar_id": "XNYS",
       "timezone": "America/New_York",
-      "enabled": false,
+      "enabled": true,
       "validation_status": "VERIFIED",
       "validated_at": "2026-09-24T22:17:47.017671Z",
       "evidence_url": "https://www.avanza.se/aktier/om-aktien.html/3323/apple"
@@ -429,7 +429,7 @@
       "quote_unit": "USD",
       "calendar_id": "XNYS",
       "timezone": "America/New_York",
-      "enabled": false,
+      "enabled": true,
       "validation_status": "VERIFIED",
       "validated_at": "2026-09-24T22:17:51.374433Z",
       "evidence_url": "https://www.avanza.se/aktier/om-aktien.html/4013/exxon-mobil"
@@ -453,7 +453,7 @@
       "quote_unit": "SEK",
       "calendar_id": "XSTO",
       "timezone": "Europe/Stockholm",
-      "enabled": false,
+      "enabled": true,
       "validation_status": "VERIFIED",
       "validated_at": "2026-09-24T22:17:53.741216Z",
       "evidence_url": "https://www.avanza.se/aktier/om-aktien.html/746877/international-petroleum-corp-"
@@ -477,7 +477,7 @@
       "quote_unit": "SEK",
       "calendar_id": "XSTO",
       "timezone": "Europe/Stockholm",
-      "enabled": false,
+      "enabled": true,
       "validation_status": "VERIFIED",
       "validated_at": "2026-09-24T22:17:55.845534Z",
       "evidence_url": "https://www.avanza.se/aktier/om-aktien.html/528238/lundin-gold"
@@ -501,7 +501,7 @@
       "quote_unit": "USD",
       "calendar_id": "XNYS",
       "timezone": "America/New_York",
-      "enabled": false,
+      "enabled": true,
       "validation_status": "VERIFIED",
       "validated_at": "2026-09-24T22:17:58.142384Z",
       "evidence_url": "https://www.avanza.se/aktier/om-aktien.html/3968/newmont"
@@ -525,7 +525,7 @@
       "quote_unit": "SEK",
       "calendar_id": "XSTO",
       "timezone": "Europe/Stockholm",
-      "enabled": false,
+      "enabled": true,
       "validation_status": "VERIFIED",
       "validated_at": "2026-09-24T22:18:01.241748Z",
       "evidence_url": "https://www.avanza.se/aktier/om-aktien.html/5241/swedbank-a"
@@ -549,7 +549,7 @@
       "quote_unit": "SEK",
       "calendar_id": "XSTO",
       "timezone": "Europe/Stockholm",
-      "enabled": false,
+      "enabled": true,
       "validation_status": "VERIFIED",
       "validated_at": "2026-09-24T22:18:04.284332Z",
       "evidence_url": "https://www.avanza.se/aktier/om-aktien.html/5247/investor-b"
@@ -573,7 +573,7 @@
       "quote_unit": "SEK",
       "calendar_id": "XSTO",
       "timezone": "Europe/Stockholm",
-      "enabled": false,
+      "enabled": true,
       "validation_status": "VERIFIED",
       "validated_at": "2026-09-24T22:18:06.766464Z",
       "evidence_url": "https://www.avanza.se/aktier/om-aktien.html/5234/atlas-copco-a"
@@ -597,7 +597,7 @@
       "quote_unit": "SEK",
       "calendar_id": "XSTO",
       "timezone": "Europe/Stockholm",
-      "enabled": false,
+      "enabled": true,
       "validation_status": "VERIFIED",
       "validated_at": "2026-09-24T22:18:09.302095Z",
       "evidence_url": "https://www.avanza.se/aktier/om-aktien.html/5447/abb"
@@ -621,7 +621,7 @@
       "quote_unit": "SEK",
       "calendar_id": "XSTO",
       "timezone": "Europe/Stockholm",
-      "enabled": false,
+      "enabled": true,
       "validation_status": "VERIFIED",
       "validated_at": "2026-09-24T22:18:11.827431Z",
       "evidence_url": "https://www.avanza.se/aktier/om-aktien.html/5537/addtech-b"
@@ -645,7 +645,7 @@
       "quote_unit": "SEK",
       "calendar_id": "XSTO",
       "timezone": "Europe/Stockholm",
-      "enabled": false,
+      "enabled": true,
       "validation_status": "VERIFIED",
       "validated_at": "2026-09-24T22:18:14.586818Z",
       "evidence_url": "https://www.avanza.se/aktier/om-aktien.html/5479/telia-company"
@@ -669,7 +669,7 @@
       "quote_unit": "SEK",
       "calendar_id": "XSTO",
       "timezone": "Europe/Stockholm",
-      "enabled": false,
+      "enabled": true,
       "validation_status": "VERIFIED",
       "validated_at": "2026-09-24T22:18:17.165118Z",
       "evidence_url": "https://www.avanza.se/aktier/om-aktien.html/26268/aak"
@@ -693,7 +693,7 @@
       "quote_unit": "SEK",
       "calendar_id": "XSTO",
       "timezone": "Europe/Stockholm",
-      "enabled": false,
+      "enabled": true,
       "validation_status": "VERIFIED",
       "validated_at": "2026-09-24T22:26:00.784470Z",
       "evidence_url": "https://www.avanza.se/aktier/om-aktien.html/5431/astrazeneca"

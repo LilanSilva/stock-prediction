@@ -10,7 +10,7 @@ a second run must change nothing.
 
 | Path | Contains |
 |---|---|
-| [docker-compose.yml](docker-compose.yml) | The whole local stack: Postgres, Neo4j, a one-shot Neo4j seed container, RabbitMQ, and the seven services |
+| [docker-compose.yml](docker-compose.yml) | Local data stores, graph seed and services, including the Market Data collector and optional LLM browser gateway |
 | [postgres/01-init-database.sql](postgres/01-init-database.sql) | Creates the six service-owned schemas and the `vector` extension. Tables are created by each service, not here |
 | [postgres-image/Dockerfile](postgres-image/Dockerfile) | Builds Postgres 16 + `pgvector` from the org-approved official base |
 | [rabbitmq/definitions.json](rabbitmq/definitions.json) | The exchange, queues, bindings, and DLQs — the full message topology |
@@ -18,14 +18,18 @@ a second run must change nothing.
 | [rabbitmq/render-definitions.sh](rabbitmq/render-definitions.sh) | Injects the broker user at startup and computes its password hash at runtime |
 | [neo4j/init/](neo4j/init/) | Seven Cypher scripts: constraints, then the causal graph seed data |
 | [assets/assets.json](assets/assets.json) | The deployed asset registry, mounted read-only at `/config/assets.json` |
-| [assets/avanza-listings.json](assets/avanza-listings.json) | Disabled, validated companion listing mappings; identity/version rules in [REF-02](../requirements/REF-02-asset-registry.md#avanza-companion-mappings) |
+| [assets/avanza-listings.json](assets/avanza-listings.json) | Validated companion listing mappings; identity/version rules in [REF-02](../requirements/REF-02-asset-registry.md#avanza-companion-mappings) |
 
 ## Bring up the stack
 
-The optional `snapshots` profile adds a browser worker. Deployment, CA setup, resource limits,
+The Market Data service hosts the Avanza collector. Source selection, deployment, CA setup, resource limits,
 rollout/rollback and recovery are owned by
 [SRS-05](../requirements/SRS-05-market-data.md#snapshot-deployment-and-recovery).
 Normal stack startup does not enable it.
+
+The optional `llm-browser-gateway` profile deploys the backend for the Windows Chrome extension.
+Its `.env` configuration, build, cutover and operation commands are owned by
+[SRS-11](../requirements/SRS-11-llm-browser-gateway.md#docker-desktop-deployment).
 
 ```bash
 cp infra/.env.example infra/.env   # then edit infra/.env with local values

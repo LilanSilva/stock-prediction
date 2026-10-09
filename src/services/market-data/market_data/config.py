@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class MarketDataSettings(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")
+    market_data_source: Literal["avanza_first", "finance"] = "avanza_first"
 
     # Shared infrastructure connection strings (from infra/.env).
     database_url: str = "postgresql://feed_user:local_dev_pw@localhost:5432/feed"

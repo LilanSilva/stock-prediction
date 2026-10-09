@@ -6,6 +6,7 @@ import json
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import asyncpg
 import structlog
@@ -13,6 +14,8 @@ from shared.messaging.client import RabbitMQClient
 from shared.reference import AssetReferenceSeries, resolve
 from shared.schemas.messages import IntradayBar, IntradayObserved, IntradayRequested
 
+from market_data.avanza import AvanzaPending, AvanzaReader
+from market_data.avanza import fallback_reason as avanza_failure_reason
 from market_data.config import MarketDataSettings
 from market_data.exceptions import InvalidObservationError
 from market_data.intraday_adapter import IntradayAdapter
@@ -28,6 +31,9 @@ CREATE TABLE IF NOT EXISTS market_data.intraday_streams (
 );
 CREATE INDEX IF NOT EXISTS intraday_streams_due
     ON market_data.intraday_streams(next_attempt_at) WHERE NOT done;
+ALTER TABLE market_data.intraday_streams ADD COLUMN IF NOT EXISTS source_mode TEXT
+    NOT NULL DEFAULT 'finance';
+ALTER TABLE market_data.intraday_streams ADD COLUMN IF NOT EXISTS fallback_reason TEXT;
 CREATE TABLE IF NOT EXISTS market_data.intraday_outbox (
     message_id UUID PRIMARY KEY, payload TEXT NOT NULL,
     delivered BOOLEAN NOT NULL DEFAULT false, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -42,20 +48,27 @@ class IntradayCollector:
         rabbit: RabbitMQClient,
         adapter: IntradayAdapter,
         settings: MarketDataSettings,
+        avanza: AvanzaReader | None = None,
     ) -> None:
         self.pool, self.rabbit, self.adapter, self.settings = pool, rabbit, adapter, settings
+        self.avanza = avanza
 
     async def register(self, request: IntradayRequested) -> None:
         series = resolve(request.asset_id)
-        if series.provider != "yahoo" or series.registry_version != request.registry_version:
+        sampled = self.avanza is not None and request.price_policy == "LAST_KNOWN_PRICE_V1"
+        if ((series.provider != "yahoo" and not sampled)
+                or series.registry_version != request.registry_version):
             raise ValueError("intraday request provider/registry mismatch")
         await self.pool.execute(
-            "INSERT INTO market_data.intraday_streams(stream_id, request, next_attempt_at,series) "
-            "VALUES($1, $2, $3, $4) ON CONFLICT DO NOTHING",
+            "INSERT INTO market_data.intraday_streams"
+            "(stream_id, request, next_attempt_at,series,source_mode) "
+            "VALUES($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING",
             request.stream_id,
             request.model_dump_json(),
             request.opens_at,
             series.model_dump_json(),
+            "avanza" if self.avanza and request.price_policy == "LAST_KNOWN_PRICE_V1"
+            else "finance",
         )
 
     async def publish_pending(self) -> None:
@@ -104,6 +117,11 @@ class IntradayCollector:
         raw = row["bars"]
         stored = json.loads(raw) if isinstance(raw, str) else raw
         previous = {k: IntradayBar.model_validate(v) for k, v in stored.items()}
+        source_mode = row.get("source_mode", "finance")
+        fallback_reason = row.get("fallback_reason")
+        replace = source_mode == "finance" and any(b.sample is not None for b in previous.values())
+        if source_mode == "avanza" and self.avanza is None:
+            source_mode, fallback_reason, replace = "finance", "FINANCE_MODE", True
         failure: str | None = None
         try:
             if now > deadline:
@@ -111,7 +129,27 @@ class IntradayCollector:
                 failure = "DATA_DEADLINE_EXPIRED"
             else:
                 series = AssetReferenceSeries.model_validate_json(row["series"])
-                fetched = await self.adapter.fetch(request, series, now)
+                if source_mode == "avanza" and self.avanza:
+                    try:
+                        day = request.opens_at.astimezone(ZoneInfo(series.timezone)).date()
+                        window = self.avanza.window(request.asset_id, day)
+                        if (window.opens_at != request.opens_at
+                                or window.closes_at != request.closes_at):
+                            raise ValueError("session window changed")
+                        fetched = await self.avanza.minutes(request.asset_id, day, now)
+                    except AvanzaPending:
+                        fetched = []
+                    except Exception as exc:
+                        source_mode = "finance"
+                        fallback_reason = avanza_failure_reason(exc)
+                        replace = True
+                        logger.warning("intraday_finance_fallback",
+                                       stream_id=str(request.stream_id),
+                                       reason=fallback_reason)
+                        fetched = await self.adapter.fetch(request, series, now)
+                else:
+                    fetched = await self.adapter.fetch(request, series, now)
+                    replace = any(b.sample is not None for b in previous.values())
         except InvalidObservationError:
             fetched = []
             failure = "INVALID_PROVIDER_DATA"
@@ -119,19 +157,30 @@ class IntradayCollector:
             # No provider exception text is persisted: URLs or credentials may be embedded in it.
             await self.pool.execute(
                 "UPDATE market_data.intraday_streams SET lease=NULL, "
-                "next_attempt_at=$3, last_error='PROVIDER_UNAVAILABLE' "
+                "next_attempt_at=$3, last_error='PROVIDER_UNAVAILABLE', "
+                "source_mode=$4, fallback_reason=$5 "
                 "WHERE stream_id=$1 AND lease=$2",
                 request.stream_id,
                 token,
                 now + timedelta(seconds=self.settings.intraday_poll_seconds),
+                source_mode,
+                fallback_reason,
             )
             logger.warning("intraday_fetch_retry", stream_id=str(request.stream_id))
             return
+        if replace:
+            previous = {}
         changed = [b for b in fetched if previous.get(b.start.isoformat()) != b]
         for bar in changed:
             previous[bar.start.isoformat()] = bar
         expected = int((request.closes_at - request.opens_at).total_seconds() / 60)
         complete = len(previous) == expected
+        if source_mode == "avanza":
+            originals = {b.sample.scheduled_at: b.sample for b in previous.values() if b.sample}
+            interval = next(iter(originals.values())).interval_seconds if originals else 600
+            expected_slots = {request.opens_at + timedelta(seconds=i)
+                              for i in range(0, expected * 60, interval)}
+            complete = set(originals) == expected_slots
         final = bool(failure) or (now >= final_after and complete) or now >= deadline
         if final and not complete and not failure:
             failure = "MISSING_BARS"
@@ -148,7 +197,7 @@ class IntradayCollector:
                 if owned is None:
                     return
                 revision = int(row["revision"])
-                if changed or final:
+                if changed or final or replace:
                     revision += 1
                     observed = IntradayObserved(
                         correlation_id=request.correlation_id,
@@ -161,6 +210,9 @@ class IntradayCollector:
                         bars=changed,
                         final=final,
                         failure=failure,
+                        source="avanza" if source_mode == "avanza" else "yahoo",
+                        fallback_reason=fallback_reason,
+                        replaces_previous=replace,
                     )
                     await conn.execute(
                         "INSERT INTO market_data.intraday_outbox(message_id,payload) VALUES($1,$2)",
@@ -169,7 +221,8 @@ class IntradayCollector:
                     )
                 await conn.execute(
                     "UPDATE market_data.intraday_streams SET bars=$3::jsonb, revision=$4, "
-                    "done=$5, lease=NULL, next_attempt_at=$6, last_error=$7, updated_at=now() "
+                    "done=$5, lease=NULL, next_attempt_at=$6, last_error=$7, updated_at=now(), "
+                    "source_mode=$8, fallback_reason=$9 "
                     "WHERE stream_id=$1 AND lease=$2",
                     request.stream_id,
                     token,
@@ -178,4 +231,6 @@ class IntradayCollector:
                     final,
                     now + timedelta(seconds=self.settings.intraday_poll_seconds),
                     failure,
+                    source_mode,
+                    fallback_reason,
                 )

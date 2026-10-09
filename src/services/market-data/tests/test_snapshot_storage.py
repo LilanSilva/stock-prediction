@@ -43,6 +43,23 @@ async def pool() -> Any:
     await db.close()
 
 
+async def test_provider_failure_starts_cooldown_at_fifth_failure(pool: Any) -> None:
+    store = SnapshotStore(pool)
+    now = datetime.now(UTC)
+    await pool.execute(
+        "UPDATE market_data.snapshot_control SET failure_count=0,cooldown_until=NULL WHERE id=1"
+    )
+    for _ in range(4):
+        await store.provider_failure(now)
+    row = await pool.fetchrow("SELECT * FROM market_data.snapshot_control WHERE id=1")
+    assert row["failure_count"] == 4
+    assert row["cooldown_until"] is None
+    await store.provider_failure(now)
+    row = await pool.fetchrow("SELECT * FROM market_data.snapshot_control WHERE id=1")
+    assert row["failure_count"] == 5
+    assert row["cooldown_until"] == now + timedelta(minutes=15)
+
+
 async def test_restart_leases_atomic_outbox_and_broker_replay(
     pool: Any, listing: Any, settings: Any
 ) -> None:
@@ -68,10 +85,10 @@ async def test_restart_leases_atomic_outbox_and_broker_replay(
     daily_before = await get_recent_closes(pool, listing.asset_id, 20)
     await store.install(config)
     await store.install(config)
-    await store.schedule(listing, "v1", window, now)
+    await store.schedule(listing, "v1", window, now, 600)
     restarted = SnapshotStore(pool)
-    await restarted.schedule(listing, "v1", window, now)
-    assert await pool.fetchval("SELECT count(*) FROM market_data.snapshot_jobs") == 7
+    await restarted.schedule(listing, "v1", window, now, 600)
+    assert await pool.fetchval("SELECT count(*) FROM market_data.snapshot_jobs") == 9
     claims = await asyncio.gather(store.claim(now), restarted.claim(now))
     assert sum(row is not None for row in claims) == 1
     old = next(row for row in claims if row is not None)
@@ -129,7 +146,7 @@ async def test_mapping_change_fences_old_jobs_and_preserves_currency_history(
     )
     store = SnapshotStore(pool)
     await store.install(MappingFile(mapping_version="v1", listings=[listing]))
-    await store.schedule(listing, "v1", window, now)
+    await store.schedule(listing, "v1", window, now, 900)
     row = await store.claim(now)
     quote = Quote(
         price=Decimal("100"),
@@ -139,10 +156,16 @@ async def test_mapping_change_fences_old_jobs_and_preserves_currency_history(
         status_text="open",
     )
     await store.install(MappingFile(mapping_version="v2", listings=[listing]))
+    assert await pool.fetchval(
+        "SELECT count(*) FROM market_data.snapshot_jobs WHERE version='v1' AND state='PENDING'"
+    ) == 0
     assert not await store.save(row, sample_message(row, quote, settings), "open")
     assert await pool.fetchval("SELECT count(*) FROM market_data.price_samples") == 0
     assert await pool.fetchval("SELECT count(*) FROM market_data.snapshot_mappings") == 2
-    await store.schedule(listing, "v2", window, now)
+    await store.schedule(listing, "v2", window, now, 600)
+    assert await pool.fetchval(
+        "SELECT count(*) FROM market_data.snapshot_jobs WHERE version='v2'"
+    ) == 9
     row = await store.claim(now)
     assert await store.save(row, sample_message(row, quote, settings), "open")
     await store.expire(window.closes_at + timedelta(minutes=10), 120)

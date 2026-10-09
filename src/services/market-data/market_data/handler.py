@@ -21,6 +21,7 @@ from shared.reference import resolve
 from shared.schemas.messages import CloseObservation
 
 from market_data.adapters.router import PriceAdapter
+from market_data.avanza import AvanzaFirstPrices
 from market_data.exceptions import PriceNotYetAvailableError
 from market_data.sessions import is_session_complete
 from market_data.storage import (
@@ -53,18 +54,33 @@ class PriceRequestProcessor:
         retry_backoff_base_seconds: float = 2.0,
         retry_backoff_max_seconds: float = 8.0,
         abandon_after_settlement_days: int = 7,
+        primary_prices: AvanzaFirstPrices | None = None,
     ) -> None:
         self._repository = repository
         self._adapter = adapter
         self._backoff_base = retry_backoff_base_seconds
         self._backoff_max = retry_backoff_max_seconds
         self._abandon_after_days = abandon_after_settlement_days
+        self._primary_prices = primary_prices
 
     async def process(
         self, request: PendingRequest, *, now: datetime | None = None
     ) -> ProcessOutcome:
         """Advance a single request as far as currently possible."""
         current_time = now or datetime.now(UTC)
+        if self._primary_prices is not None:
+            try:
+                baseline, settlement = await self._primary_prices.get_pair(
+                    request.asset_id, request.baseline_session,
+                    request.settlement_session, current_time,
+                )
+            except PriceNotYetAvailableError as exc:
+                abandoned = await self._defer_or_abandon(request, str(exc), current_time)
+                return ProcessOutcome(False, False, "abandoned" if abandoned else "pending_price")
+            published = await self._repository.complete_request(
+                build_price_observed(request, baseline, settlement)
+            )
+            return ProcessOutcome(True, published)
         series = resolve(request.asset_id)
 
         try:

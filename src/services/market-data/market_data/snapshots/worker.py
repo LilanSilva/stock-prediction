@@ -55,6 +55,7 @@ def sample_message(row: Any, quote: Quote, settings: SnapshotSettings) -> PriceS
         price=quote.price,
         currency=quote.currency,
         quote_unit=listing.quote_unit,
+        interval_seconds=settings.interval_seconds,
         kind=row["kind"],
         market_state=quote.market_state,
         quality=quality,
@@ -207,7 +208,8 @@ class SnapshotWorker:
                 try:
                     session_window = session_for(now, listing.calendar_id, listing.timezone)
                     await self.store.schedule(
-                        listing, self.config.mapping_version, session_window, now
+                        listing, self.config.mapping_version, session_window, now,
+                        self.settings.interval_seconds,
                     )
                 except (ValueError, KeyError):
                     await self.store.pool.execute(
@@ -269,9 +271,12 @@ async def relay(store: SnapshotStore, rabbit: RabbitMQClient, broker_url: str) -
         )
 
 
-async def run() -> None:
-    settings = SnapshotSettings()
-    setup_logging("market-data-snapshots", settings.log_level)
+async def run(
+    settings: SnapshotSettings | None = None, *, configure_logging: bool = True
+) -> None:
+    settings = settings or SnapshotSettings()
+    if configure_logging:
+        setup_logging("market-data-snapshots", settings.log_level)
     if not settings.enabled:
         logger.info("snapshot_worker_disabled")
         return

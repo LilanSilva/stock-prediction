@@ -260,6 +260,12 @@ services:
       dockerfile: src/services/market-data/Dockerfile
     image: feed-analyzer/market-data:0.1
     container_name: feed-market-data
+    init: true
+    restart: "on-failure"
+    cpus: 3
+    mem_limit: 4g
+    shm_size: 1g
+    pids_limit: 512
     depends_on:
       feed-postgres:
         condition: service_healthy
@@ -276,8 +282,14 @@ services:
       ASSET_REGISTRY_PATH: /config/assets.json
       # How often to re-drive pending requests whose settlement session has not yet completed.
       SETTLEMENT_POLL_INTERVAL_SECONDS: ${MARKET_DATA_SETTLEMENT_POLL_INTERVAL_SECONDS:-3600}
+      MARKET_DATA_SOURCE: ${MARKET_DATA_SOURCE:-avanza_first}
       INTRADAY_ENABLED: ${MARKET_DATA_INTRADAY_ENABLED:-false}
       INTRADAY_POLL_SECONDS: ${MARKET_DATA_INTRADAY_POLL_SECONDS:-60}
+      SNAPSHOT_MAPPINGS_PATH: /config/avanza-listings.json
+      SNAPSHOT_ENABLED: ${SNAPSHOT_ENABLED:-false}
+      SNAPSHOT_CONCURRENCY: ${SNAPSHOT_CONCURRENCY:-2}
+      SNAPSHOT_INTERVAL_SECONDS: ${SNAPSHOT_INTERVAL_SECONDS:-600}
+      SNAPSHOT_LOG_LEVEL: ${LOG_LEVEL:-INFO}
     ports:
       - "8004:8000"
     healthcheck:
@@ -290,36 +302,6 @@ services:
       - feed-net
     volumes:
       - ./assets/:/config/:ro
-
-  feed-market-data-snapshots:
-    profiles: ["snapshots"]
-    build:
-      context: ..
-      dockerfile: src/services/market-data/Dockerfile.snapshots
-    image: feed-analyzer/market-data-snapshots:0.1
-    init: true
-    restart: "on-failure:3"
-    cpus: 2
-    mem_limit: 3g
-    shm_size: 1g
-    pids_limit: 512
-    depends_on:
-      feed-postgres:
-        condition: service_healthy
-      feed-rabbitmq:
-        condition: service_healthy
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-feed_user}:${POSTGRES_PASSWORD:?set in .env}@feed-postgres:5432/${POSTGRES_DB:-feed}
-      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-feed_user}:${RABBITMQ_DEFAULT_PASS:?set in .env}@feed-rabbitmq:5672/
-      ASSET_REGISTRY_PATH: /config/assets.json
-      SNAPSHOT_MAPPINGS_PATH: /config/avanza-listings.json
-      SNAPSHOT_ENABLED: ${SNAPSHOT_ENABLED:-false}
-      SNAPSHOT_CONCURRENCY: ${SNAPSHOT_CONCURRENCY:-2}
-      SNAPSHOT_LOG_LEVEL: ${LOG_LEVEL:-INFO}
-    volumes:
-      - ./assets/:/config/:ro
-    networks:
-      - feed-net
 
   feed-verification:
     build:
@@ -334,6 +316,7 @@ services:
         condition: service_healthy
     environment:
       VERIFICATION_INTRADAY_MODE: ${VERIFICATION_INTRADAY_MODE:-OFF}
+      VERIFICATION_INTRADAY_PRICE_POLICY: ${VERIFICATION_INTRADAY_PRICE_POLICY:-LAST_KNOWN_PRICE_V1}
       VERIFICATION_INTRADAY_CALENDARS: '${VERIFICATION_INTRADAY_CALENDARS:-{}}'
       VERIFICATION_INTRADAY_TARGET_RETURN: ${VERIFICATION_INTRADAY_TARGET_RETURN:-0.003}
       VERIFICATION_INTRADAY_NEUTRAL_BAND: ${VERIFICATION_INTRADAY_NEUTRAL_BAND:-0.003}
@@ -443,6 +426,10 @@ services:
       # Meta Cloud API WhatsApp channel — leave empty to disable.
       META_ACCESS_TOKEN: ${META_ACCESS_TOKEN:-}
       META_PHONE_NUMBER_ID: ${META_PHONE_NUMBER_ID:-}
+      META_API_VERSION: ${META_API_VERSION:-v18.0}
+      META_PREDICTION_TEMPLATE: ${META_PREDICTION_TEMPLATE:-feed_prediction_alert_v1}
+      META_VERIFICATION_TEMPLATE: ${META_VERIFICATION_TEMPLATE:-feed_verification_alert_v1}
+      META_TEMPLATE_LANGUAGE: ${META_TEMPLATE_LANGUAGE:-en_US}
     ports:
       - "8010:8000"
     healthcheck:
@@ -456,6 +443,55 @@ services:
     volumes:
       - ./assets/:/config/:ro
       - ../src/services/notification/config/recipients/:/app/config/recipients/:ro
+
+  feed-llm-browser-gateway:
+    profiles: ["llm-browser-gateway"]
+    build:
+      context: ..
+      dockerfile: src/services/llm-browser-gateway/Dockerfile
+    image: feed-analyzer/llm-browser-gateway:0.1
+    container_name: feed-llm-browser-gateway
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    depends_on:
+      feed-postgres:
+        condition: service_healthy
+    environment:
+      # --env-file infra/.env supplies only these explicitly selected values.
+      # Empty required keys fail application validation when this optional service starts.
+      BROWSER_GATEWAY_API_KEY: ${BROWSER_GATEWAY_API_KEY:-}
+      BROWSER_GATEWAY_PAIRING_KEY: ${BROWSER_GATEWAY_PAIRING_KEY:-}
+      BROWSER_GATEWAY_EXTENSION_ID: ${BROWSER_GATEWAY_EXTENSION_ID:-}
+      BROWSER_GATEWAY_DATABASE_URL: postgresql://${POSTGRES_USER:-feed_user}:${POSTGRES_PASSWORD:?set in .env}@feed-postgres:5432/${POSTGRES_DB:-feed}
+      BROWSER_GATEWAY_DEPLOYMENT: container
+      BROWSER_GATEWAY_HOST: 0.0.0.0
+      BROWSER_GATEWAY_PORT: "8091"
+      BROWSER_GATEWAY_PROFILE_ID: ${BROWSER_GATEWAY_PROFILE_ID:-default}
+      BROWSER_GATEWAY_PRIORITY: ${BROWSER_GATEWAY_PRIORITY:-chatgpt,claude}
+      BROWSER_GATEWAY_TABS_PER_PROVIDER: ${BROWSER_GATEWAY_TABS_PER_PROVIDER:-2}
+      BROWSER_GATEWAY_MODEL_ALIAS: ${BROWSER_GATEWAY_MODEL_ALIAS:-browser-auto}
+      BROWSER_GATEWAY_DEADLINE_SECONDS: ${BROWSER_GATEWAY_DEADLINE_SECONDS:-180}
+      BROWSER_GATEWAY_RETRY_SECONDS: ${BROWSER_GATEWAY_RETRY_SECONDS:-900}
+      BROWSER_GATEWAY_QUEUE_SIZE: ${BROWSER_GATEWAY_QUEUE_SIZE:-16}
+      BROWSER_GATEWAY_MAX_BODY_BYTES: ${BROWSER_GATEWAY_MAX_BODY_BYTES:-262144}
+      BROWSER_GATEWAY_RETENTION_DAYS: ${BROWSER_GATEWAY_RETENTION_DAYS:-7}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      # The extension keeps its existing loopback WebSocket address.
+      - "127.0.0.1:8091:8091"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/health', timeout=3).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    networks:
+      - feed-net
 
 volumes:
   feed-postgres-data:

@@ -42,12 +42,12 @@ def session_for(now: datetime, calendar_id: str, timezone: str) -> Session:
     )
 
 
-def slots(window: Session) -> list[Slot]:
+def slots(window: Session, interval_seconds: int) -> list[Slot]:
     times = []
     at = window.opens_at
     while at < window.closes_at:
         times.append(Slot(scheduled_at=at, kind="REGULAR"))
-        at += timedelta(seconds=900)
+        at += timedelta(seconds=interval_seconds)
     return times + [
         Slot(scheduled_at=window.closes_at + timedelta(seconds=delay), kind="CLOSE_CHECK")
         for delay in (0, 120, 300)

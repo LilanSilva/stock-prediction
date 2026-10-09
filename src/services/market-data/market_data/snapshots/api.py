@@ -1,14 +1,53 @@
 """Read-only snapshot endpoints; existing price API response shapes stay untouched."""
 
+from datetime import UTC, date, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import AwareDatetime
-from shared.schemas.messages import AssetId, PriceSampleObserved
+from shared.schemas.messages import AssetId, IntradayBar, PriceSampleObserved
 
+from market_data.avanza import AvanzaPending, AvanzaReader, AvanzaUnavailable, SessionSummary
+from market_data.snapshots.config import SnapshotSettings
 from market_data.snapshots.storage import status
 
 router = APIRouter(prefix="/snapshots", tags=["snapshots"])
+
+
+def _reader(request: Request) -> AvanzaReader:
+    ctx = request.app.state.ctx
+    settings = SnapshotSettings(
+        database_url=ctx.settings.database_url, rabbitmq_url=ctx.settings.rabbitmq_url
+    )
+    return AvanzaReader(ctx.pool, settings.mappings_path)
+
+
+@router.get("/ohlc")
+async def session_ohlc(request: Request, asset_id: AssetId, session: date) -> SessionSummary:
+    """Observed session OHLC, including provisional state and explicit coverage gaps."""
+    try:
+        return await _reader(request).summary(asset_id, session, datetime.now(UTC))
+    except AvanzaPending as exc:
+        raise HTTPException(409, str(exc)) from None
+    except AvanzaUnavailable as exc:
+        raise HTTPException(503, str(exc)) from None
+    except Exception:
+        raise HTTPException(503, "AVANZA_READ_UNAVAILABLE") from None
+
+
+@router.get("/minutes")
+async def sampled_minutes(
+    request: Request, asset_id: AssetId, session: date,
+) -> list[IntradayBar]:
+    """Completed last-known-price minutes; each row retains its original observation."""
+    try:
+        return await _reader(request).minutes(asset_id, session, datetime.now(UTC))
+    except AvanzaPending as exc:
+        raise HTTPException(409, str(exc)) from None
+    except AvanzaUnavailable as exc:
+        raise HTTPException(503, str(exc)) from None
+    except Exception:
+        raise HTTPException(503, "AVANZA_READ_UNAVAILABLE") from None
 
 
 @router.get("/status")

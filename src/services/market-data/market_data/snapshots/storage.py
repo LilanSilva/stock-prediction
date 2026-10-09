@@ -56,6 +56,8 @@ CREATE TABLE IF NOT EXISTS market_data.price_samples (
 );
 CREATE INDEX IF NOT EXISTS price_samples_asset_time
  ON market_data.price_samples(asset_id,observed_at);
+CREATE INDEX IF NOT EXISTS price_samples_asset_session
+ ON market_data.price_samples(asset_id,session);
 CREATE TABLE IF NOT EXISTS market_data.snapshot_outbox (
  message_id UUID PRIMARY KEY, payload TEXT NOT NULL, delivered BOOLEAN NOT NULL DEFAULT false,
  attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -104,7 +106,8 @@ class SnapshotStore:
             )
 
     async def schedule(
-        self, listing: Listing, version: str, session_window: Session, now: datetime
+        self, listing: Listing, version: str, session_window: Session, now: datetime,
+        interval_seconds: int,
     ) -> None:
         registry_version = listing.check_registry()
         async with self.pool.acquire() as conn, conn.transaction():
@@ -117,7 +120,7 @@ class SnapshotStore:
                 version,
                 session_window.model_dump_json(),
             )
-            for slot in slots(session_window):
+            for slot in slots(session_window, interval_seconds):
                 key = f"{listing.asset_id}|{version}|{slot.kind}|{slot.scheduled_at.isoformat()}"
                 await conn.execute(
                     "INSERT INTO market_data.snapshot_jobs "
@@ -273,7 +276,7 @@ class SnapshotStore:
     async def provider_failure(self, now: datetime) -> None:
         await self.pool.execute(
             "UPDATE market_data.snapshot_control SET failure_count=failure_count+1,"
-            "cooldown_until=CASE WHEN failure_count>=4 THEN $1+interval '15 minutes' "
+            "cooldown_until=CASE WHEN failure_count>=4 THEN $1::timestamptz+interval '15 minutes' "
             "ELSE cooldown_until END WHERE id=1",
             now,
         )

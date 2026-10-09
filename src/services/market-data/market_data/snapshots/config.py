@@ -19,7 +19,7 @@ class SnapshotSettings(BaseSettings):
     rabbitmq_url: str = Field(validation_alias="RABBITMQ_URL")
     mappings_path: Path = Path("infra/assets/avanza-listings.json")
     concurrency: int = Field(default=2, ge=1, le=10)
-    interval_seconds: Literal[900] = 900
+    interval_seconds: int = Field(default=600, ge=600, le=600)
     timeout_seconds: int = Field(default=30, ge=1, le=30)
     retry_seconds: int = Field(default=10, ge=0, le=20)
     max_lateness_seconds: int = Field(default=120, ge=30, le=120)

@@ -16,6 +16,15 @@ from __future__ import annotations
 import asyncpg
 
 SCHEMA_DDL = """
+CREATE TABLE IF NOT EXISTS market_data.sampled_closes (
+    asset_id TEXT NOT NULL,
+    session DATE NOT NULL,
+    registry_version TEXT NOT NULL,
+    mapping_version TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    PRIMARY KEY(asset_id,session,registry_version,mapping_version)
+);
+
 CREATE TABLE IF NOT EXISTS market_data.price_requests (
     request_id          UUID PRIMARY KEY,
     prediction_id       UUID NOT NULL,

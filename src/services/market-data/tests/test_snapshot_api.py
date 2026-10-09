@@ -32,7 +32,7 @@ def test_legacy_api_compatibility_and_snapshot_status(
         rabbit=SimpleNamespace(is_connected=True),
         intraday=None,
         scheduler=SimpleNamespace(running=True),
-        settings=SimpleNamespace(intraday_enabled=False),
+        settings=SimpleNamespace(intraday_enabled=False, market_data_source="finance"),
         state=SimpleNamespace(
             last_poll_at=None, due_requests=0, last_published=0, consumed_total=0
         ),
@@ -49,6 +49,7 @@ def test_legacy_api_compatibility_and_snapshot_status(
         "last_published": 0,
         "consumed_total": 0,
         "intraday_enabled": False,
+        "price_source": "finance",
     }
     assert client.get("/ready").status_code == 200
     assert client.get("/snapshots/status").json() == {"status": collector_status}

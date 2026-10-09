@@ -182,6 +182,14 @@ class PriceRequestRepository:
         self, conn: asyncpg.Connection, asset_id: AssetId, observation: CloseObservation
     ) -> None:
         """Persist an immutable observation, ignoring a duplicate (asset, session, registry)."""
+        if observation.sample is not None:
+            await conn.execute(
+                "INSERT INTO market_data.sampled_closes VALUES($1,$2,$3,$4,$5) "
+                "ON CONFLICT DO NOTHING", str(asset_id), observation.session,
+                observation.registry_version, observation.sample.mapping_version,
+                observation.model_dump_json(),
+            )
+            return
         await conn.execute(
             """
             INSERT INTO market_data.close_observations (

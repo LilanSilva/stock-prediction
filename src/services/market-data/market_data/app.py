@@ -26,19 +26,20 @@ import httpx
 import structlog
 from aio_pika.abc import AbstractIncomingMessage
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from shared.logging import setup_logging
 from shared.messaging.client import RabbitMQClient
 from shared.messaging.exceptions import MessagePoisonError
 from shared.messaging.intraday_topology import ensure_intraday_topology
-from shared.reference import supported_assets
+from shared.reference import resolve, supported_assets
 from shared.schemas.messages import AssetId, IntradayRequested, PriceRequested
 
 from market_data.adapters.biquote import BiquoteAdapter
 from market_data.adapters.router import AdapterRouter
 from market_data.adapters.yahoo import YahooAdapter
+from market_data.avanza import AvanzaFirstPrices, AvanzaReader
 from market_data.config import MarketDataSettings
 from market_data.db import apply_schema, create_pool
 from market_data.exceptions import InvalidObservationError
@@ -47,6 +48,7 @@ from market_data.intraday import DDL as INTRADAY_DDL
 from market_data.intraday import IntradayCollector
 from market_data.intraday_adapter import IntradayAdapter
 from market_data.snapshots.api import router as snapshot_router
+from market_data.snapshots.config import SnapshotSettings
 from market_data.storage import (
     MAX_RECENT_SESSIONS,
     MIN_RECENT_SESSIONS,
@@ -63,6 +65,12 @@ class RecentClose(BaseModel):
 
     session: date
     close: Decimal
+    source: str | None = None
+    price_basis: str | None = None
+    currency: str | None = None
+    observed_at: datetime | None = None
+    quote_delay_seconds: int | None = None
+    fallback_reason: str | None = None
 
 
 class RecentClosesResponse(BaseModel):
@@ -94,6 +102,8 @@ class AppContext:
     consumer_task: asyncio.Task[None] | None = field(default=None)
     intraday: IntradayCollector | None = None
     intraday_task: asyncio.Task[None] | None = None
+    snapshot_task: asyncio.Task[None] | None = None
+    primary_prices: AvanzaFirstPrices | None = None
 
 
 async def _handle_price_request(app: FastAPI, message: AbstractIncomingMessage) -> None:
@@ -172,9 +182,27 @@ async def _consume_intraday(app: FastAPI) -> None:
     await ctx.rabbit.consume(ctx.settings.intraday_requests_queue, consume)
 
 
+async def _run_snapshot_loop(settings: SnapshotSettings, restart_delay: float = 10) -> None:
+    """Keep the Avanza collector running inside the Market Data service process."""
+    from market_data.snapshots.worker import run
+
+    while True:
+        try:
+            await run(settings, configure_logging=False)
+            logger.warning("snapshot_worker_stopped_or_standby")
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("snapshot_worker_failed")
+        await asyncio.sleep(restart_delay)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = MarketDataSettings()
+    snapshot_settings = SnapshotSettings(
+        database_url=settings.database_url, rabbitmq_url=settings.rabbitmq_url
+    )
     setup_logging("market-data", settings.log_level)
 
     pool = await create_pool(
@@ -205,19 +233,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         }
     )
     repository = PriceRequestRepository(pool)
+    primary_prices = (
+        AvanzaFirstPrices(AvanzaReader(pool, snapshot_settings.mappings_path), adapter)
+        if settings.market_data_source == "avanza_first" else None
+    )
     processor = PriceRequestProcessor(
         repository,
         adapter,
         retry_backoff_base_seconds=settings.retry_backoff_base_seconds,
         retry_backoff_max_seconds=settings.retry_backoff_max_seconds,
         abandon_after_settlement_days=settings.abandon_after_settlement_days,
+        primary_prices=primary_prices,
     )
     outbox = OutboxPublisher(pool, rabbit)
     intraday = None
     if settings.intraday_enabled:
         await ensure_intraday_topology(settings.rabbitmq_url)
         intraday = IntradayCollector(
-            pool, rabbit, IntradayAdapter(http, settings.yahoo_base_url), settings
+            pool, rabbit, IntradayAdapter(http, settings.yahoo_base_url), settings,
+            avanza=primary_prices.reader if primary_prices else None,
         )
 
     # Rehydrate durable work left by a previous run before scheduling or consuming anything new.
@@ -252,16 +286,29 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         processor=processor,
         outbox=outbox,
         state=ServiceState(),
+        primary_prices=primary_prices,
         intraday=intraday,
     )
     consumer_task = asyncio.create_task(_consume_loop(app))
     app.state.ctx.consumer_task = consumer_task
     intraday_task = asyncio.create_task(_consume_intraday(app)) if intraday else None
     app.state.ctx.intraday_task = intraday_task
+    snapshot_task = (
+        asyncio.create_task(_run_snapshot_loop(snapshot_settings))
+        if snapshot_settings.enabled
+        else None
+    )
+    app.state.ctx.snapshot_task = snapshot_task
     logger.info("market_data_started", queue=settings.price_requests_queue)
     try:
         yield
     finally:
+        if snapshot_task:
+            snapshot_task.cancel()
+            try:
+                await snapshot_task
+            except asyncio.CancelledError:
+                pass
         if intraday_task:
             intraday_task.cancel()
             try:
@@ -296,6 +343,7 @@ async def health() -> dict[str, object]:
         "last_published": state.last_published,
         "consumed_total": state.consumed_total,
         "intraday_enabled": ctx.settings.intraday_enabled,
+        "price_source": ctx.settings.market_data_source,
     }
 
 
@@ -322,7 +370,7 @@ async def ready() -> JSONResponse:
     return JSONResponse({"ready": ok, "checks": checks}, status_code=status_code)
 
 
-@app.get("/prices/recent")
+@app.get("/prices/recent", response_model_exclude_none=True)
 async def prices_recent(
     asset_id: Annotated[AssetId, Query(description="Canonical asset id (e.g. GOLD, BRENT_OIL).")],
     sessions: Annotated[
@@ -334,6 +382,23 @@ async def prices_recent(
     An unknown `asset_id` or out-of-range `sessions` is rejected by request validation (HTTP 422).
     """
     ctx: AppContext = app.state.ctx
+    primary = getattr(ctx, "primary_prices", None)
+    if primary is not None:
+        try:
+            observations = await primary.recent(asset_id, sessions, datetime.now(UTC))
+        except Exception:
+            logger.warning("recent_prices_unavailable", asset_id=str(asset_id))
+            raise HTTPException(503, "PRICE_SOURCES_UNAVAILABLE") from None
+        return RecentClosesResponse(asset_id=asset_id, closes=[
+            RecentClose(
+                session=o.session, close=o.close, source=o.source,
+                price_basis=o.price_kind.value,
+                currency=o.sample.currency if o.sample else resolve(asset_id).currency,
+                observed_at=o.sample.observed_at if o.sample else o.fetched_at,
+                quote_delay_seconds=o.sample.quote_delay_seconds if o.sample else None,
+                fallback_reason=o.fallback_reason,
+            ) for o in observations
+        ])
     pairs = await get_recent_closes(ctx.pool, asset_id, sessions)
     return RecentClosesResponse(
         asset_id=asset_id,

@@ -87,9 +87,8 @@ proving test is `Approved`, not `Implemented`. The update rules are in `requirem
 - Use canonical asset IDs at service boundaries. Provider symbols such as `XAUUSD` and `SAAB-B.ST`
   belong only inside market-data adapters. An asset ID absent from the loaded registry is rejected at
   every message boundary.
-- Market Data routes per asset on the registry's `provider` field: `biquote.io` for a curated list of
-  US mega-caps, `yahoo` for European markets and the US names biquote lacks. The Yahoo adapter must
-  send a browser User-Agent.
+- Market Data source selection and fallback follow [SRS-05](../requirements/SRS-05-market-data.md#avanza-first-price-reads).
+  Finance adapters retain registry-based routing, and Yahoo requests retain a browser User-Agent.
 - Verification alone produces `PriceRequested`, containing both baseline and settlement sessions.
   Market Data returns both immutable closes in one `PriceObserved`.
 - State-changing persistence plus publication requires an outbox or equivalent reconciliation.

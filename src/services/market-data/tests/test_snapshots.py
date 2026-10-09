@@ -55,6 +55,15 @@ def settings() -> Any:
     return SnapshotSettings(database_url="unused", rabbitmq_url="unused", retry_seconds=0)
 
 
+def test_snapshot_interval_accepts_compose_env(monkeypatch: Any) -> None:
+    monkeypatch.setenv("SNAPSHOT_INTERVAL_SECONDS", "600")
+    settings = SnapshotSettings(database_url="unused", rabbitmq_url="unused")
+    assert settings.interval_seconds == 600
+    monkeypatch.setenv("SNAPSHOT_INTERVAL_SECONDS", "900")
+    with pytest.raises(ValueError):
+        SnapshotSettings(database_url="unused", rabbitmq_url="unused")
+
+
 @pytest.fixture
 def job(listing: Any) -> Any:
     now = datetime.now(UTC)
@@ -110,6 +119,20 @@ def test_market_status_is_not_color_or_timetable() -> None:
     assert parse_delay("Kursen uppdateras i realtid") == 0
 
 
+def test_after_hours_heading_with_all_session_states() -> None:
+    timetable = (
+        "NASDAQ\n15:30\n22:00\nEfterhandelskurserna visas om: 30 minuter\n"
+        "Förhandelskurser\n10:00–11:00\nFörhandel\n11:00–15:30\n"
+        "Öppet\n15:30–22:00\nEfterhandel\n22:00–22:30\n"
+        "Efterhandelskurser\n22:30–02:00\nStängt\n02:00–10:00\n"
+        "Kursen uppdateras inte i realtid\nDu har 15 minuters kursfördröjning"
+    )
+    panel = "Marknaden är i efterhandel\n" + timetable
+    assert parse_status(panel) == "EXTENDED_HOURS"
+    assert parse_delay(panel) == 900
+    assert parse_status(timetable) == "UNKNOWN"
+
+
 def test_mapping_disabled_until_verified(listing: Any) -> None:
     with pytest.raises(ValueError):
         Listing.model_validate({**listing.model_dump(), "validation_status": "DRAFT"})
@@ -127,10 +150,10 @@ def test_mapping_disabled_until_verified(listing: Any) -> None:
 def test_calendar_early_close_and_holiday() -> None:
     session_window = session_for(datetime(2026, 11, 27, 15, tzinfo=UTC), "XNYS", "America/New_York")
     assert session_window.closes_at == datetime(2026, 11, 27, 18, tzinfo=UTC)
-    regular = [s for s in slots(session_window) if s.kind == "REGULAR"]
-    assert len(regular) == 14
-    assert regular[-1].scheduled_at == session_window.closes_at - timedelta(minutes=15)
-    assert [s.scheduled_at for s in slots(session_window)[-3:]] == [
+    regular = [s for s in slots(session_window, 600) if s.kind == "REGULAR"]
+    assert len(regular) == 21
+    assert regular[-1].scheduled_at == session_window.closes_at - timedelta(minutes=10)
+    assert [s.scheduled_at for s in slots(session_window, 600)[-3:]] == [
         session_window.closes_at + timedelta(seconds=s) for s in (0, 120, 300)
     ]
     holiday = session_for(datetime(2026, 11, 26, 15, tzinfo=UTC), "XNYS", "America/New_York")
@@ -139,6 +162,23 @@ def test_calendar_early_close_and_holiday() -> None:
         session_for(datetime.now(UTC), "XNYS", "Europe/Stockholm")
     with pytest.raises(ValueError, match="unsupported exchange calendar"):
         session_for(datetime.now(UTC), "UNKNOWN_TEST_CALENDAR", "America/New_York")
+
+
+def test_ten_minute_slots_keep_close_checks_separate() -> None:
+    opening = datetime(2026, 10, 1, 7, tzinfo=UTC)
+    session_window = Session(
+        session=opening.date(),
+        opens_at=opening,
+        closes_at=opening + timedelta(minutes=35),
+        next_open_at=opening + timedelta(days=1),
+    )
+    scheduled = slots(session_window, 600)
+    assert [slot.scheduled_at for slot in scheduled if slot.kind == "REGULAR"] == [
+        opening + timedelta(minutes=minute) for minute in (0, 10, 20, 30)
+    ]
+    assert [slot.scheduled_at for slot in scheduled if slot.kind == "CLOSE_CHECK"] == [
+        session_window.closes_at + timedelta(seconds=delay) for delay in (0, 120, 300)
+    ]
 
 
 def test_sample_preserves_currency_clock_and_unknown_freshness(job: Any, settings: Any) -> None:
@@ -153,6 +193,7 @@ def test_sample_preserves_currency_clock_and_unknown_freshness(job: Any, setting
     sample = sample_message(job, quote, settings)
     assert sample.quality == "FRESHNESS_UNKNOWN"
     assert sample.provider_quote_at is None and sample.quote_delay_seconds == 900
+    assert sample.interval_seconds == 600
     assert json.loads(sample.model_dump_json())["price"] == "100.13"
     assert sample.observed_at != sample.scheduled_at
     assert "high" not in sample.model_dump()
@@ -162,8 +203,8 @@ def test_calendar_dst_offsets_follow_exchange_and_close_is_not_a_bar() -> None:
     winter = session_for(datetime(2026, 3, 6, 12, tzinfo=UTC), "XNYS", "America/New_York")
     summer = session_for(datetime(2026, 3, 9, 12, tzinfo=UTC), "XNYS", "America/New_York")
     assert winter.opens_at.hour == 14 and summer.opens_at.hour == 13
-    assert len([slot for slot in slots(winter) if slot.kind == "REGULAR"]) == 26
-    assert slots(winter)[-1].scheduled_at == winter.closes_at + timedelta(minutes=5)
+    assert len([slot for slot in slots(winter, 600) if slot.kind == "REGULAR"]) == 39
+    assert slots(winter, 600)[-1].scheduled_at == winter.closes_at + timedelta(minutes=5)
 
 
 @pytest.mark.asyncio

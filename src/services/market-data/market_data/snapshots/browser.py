@@ -57,7 +57,9 @@ def parse_status(text: str) -> MarketState:
     if any("handelsstopp" in line or "handeln är stoppad" in line for line in heading):
         return "HALTED"
     if any(
-        "marknaden visar efterhandelskurser" in line or "marknaden är öppen för efterhandel" in line
+        "marknaden visar efterhandelskurser" in line
+        or "marknaden är öppen för efterhandel" in line
+        or line.strip() == "marknaden är i efterhandel"
         for line in heading
     ):
         return "EXTENDED_HOURS"
