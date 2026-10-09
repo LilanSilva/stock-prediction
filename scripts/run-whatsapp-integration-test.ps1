@@ -3,12 +3,13 @@
     Run the WhatsApp message-send integration tests against the Meta Cloud API.
 
 .DESCRIPTION
-    Sends real WhatsApp messages using credentials from infra/.env and recipients from
+    Sends real WhatsApp template messages using credentials from infra/.env and recipients from
     src/services/notification/config/recipients/whatsapp_recipients.json.
+    Both configured templates must be approved in the sender's WhatsApp Business Account.
 
     Tests run:
-      - test_send_alert_message_reaches_whatsapp      (prediction alert)
-      - test_send_verification_message_reaches_whatsapp (verification alert)
+      - test_send_alert_message_accepted_by_meta        (prediction alert)
+      - test_send_verification_message_accepted_by_meta (verification alert)
 
     Skipped automatically when META_ACCESS_TOKEN / META_PHONE_NUMBER_ID are missing
     or no recipients are configured.
@@ -50,4 +51,4 @@ try {
 }
 
 Write-Host ""
-Write-Host "All WhatsApp integration tests passed." -ForegroundColor Green
+Write-Host "Integration run completed. Passed tests confirm Meta acceptance; skipped tests send nothing. Check WhatsApp for delivery." -ForegroundColor Green

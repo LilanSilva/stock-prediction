@@ -85,6 +85,18 @@ async def test_is_elevated_false_on_empty_closes() -> None:
         await reader.close()
 
 
+async def test_price_gate_does_not_compare_sampled_prices_to_finance_closes() -> None:
+    payload = {"closes": [
+        {"close": "100", "source": "avanza", "price_basis": "AVANZA_SAMPLED_CLOSE"},
+        {"close": "50", "source": "yahoo", "price_basis": "PROVIDER_DAILY_CLOSE"},
+    ]}
+    reader = _reader(lambda _: httpx.Response(200, json=payload))
+    try:
+        assert await reader.is_elevated(AssetId.NEM_NYSE) is False
+    finally:
+        await reader.close()
+
+
 async def test_is_elevated_false_on_http_error() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(503)

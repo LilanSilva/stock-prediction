@@ -8,7 +8,7 @@
 | Scope | Whole system — seven implemented components plus one approved (Notification) |
 | Requirement ID prefix | `SYS` |
 | Status | `Implemented` (components 1–7); `Approved` (Notification); Gateway and Dashboard not built |
-| Version | `1.4.1` |
+| Version | `1.4.2` |
 | Last verified against code | `2026-08-12` |
 
 ## 2. Purpose and scope
@@ -138,6 +138,7 @@ then scores the result.
 | 5 | Market Data | Fetch provider closing prices | `market_data` | [SRS-05](SRS-05-market-data.md) |
 | 6 | Credibility | Learn from scored outcomes | `credibility` | [SRS-07](SRS-07-credibility.md) |
 | 7 | Notification | Dispatch prediction alerts via email and WhatsApp | None (file-based recipients) | [SRS-10](SRS-10-notification.md) |
+| Standalone | LLM Browser Gateway | Optional Windows-host OpenAI-compatible browser proxy; no pipeline integration; live acceptance pending | `llm_browser_gateway` | [SRS-11](SRS-11-llm-browser-gateway.md) |
 
 ### 4.3 Infrastructure
 
@@ -752,6 +753,7 @@ first things a new reader uses to orient.
 
 | Date | Version | Change | Driver |
 |---|---|---|---|
+| `2026-10-09` | `1.4.2` | Indexed the optional standalone browser LLM gateway; no pipeline integration | E16 / SRS-11 |
 | `2026-09-24` | `1.4.1` | Linked quality-gated cleansing and processing-version isolation in the walkthrough | SRS-03 quality remediation |
 | `2026-09-24` | `1.4.0` | Added separate intraday shadow streams and reports; existing daily learning and notifications remain live | Intraday verification |
 | `2026-08-05` | `1.0.0` | Initial system specification, written from the implemented E01–E07 code | E01–E07 complete; replaces the epic/task backlog structure |

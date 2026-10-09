@@ -11,13 +11,14 @@ read the SRS for a service before changing it.
 | Folder | Contains | Specification |
 |---|---|---|
 | [shared/](shared/) | Installable `shared` package every service imports: message schemas, messaging client, LLM gateway, graph client, session calendar, asset registry, structured logging, Unicode text cleanup | [SRS-01](../requirements/SRS-01-shared-foundation.md) |
-| [services/](services/) | The seven services, one folder each | one SRS each, see below |
+| [services/](services/) | The services, one folder each | one SRS each, see below |
 | [poc/](poc/) | Completed proof-of-concept harnesses — standalone, not part of the running system | [backlog/POC/](../backlog/POC/README.md) |
 
 ## Services
 
 Each service folder has the same shape: a `Dockerfile`, a `pyproject.toml`, the package itself, and a
-`tests/` directory.
+`tests/` directory. The LLM Browser Gateway also has an extension folder for Windows Chrome;
+its backend supports host and Docker Desktop operation as specified in SRS-11.
 
 | Service | Postgres schema | Specification |
 |---|---|---|
@@ -28,6 +29,7 @@ Each service folder has the same shape: a `Dockerfile`, a `pyproject.toml`, the 
 | [verification/](services/verification/) | `verification` | [SRS-06](../requirements/SRS-06-verification.md) |
 | [credibility/](services/credibility/) | `credibility` | [SRS-07](../requirements/SRS-07-credibility.md) |
 | [notification/](services/notification/) | none — file-based recipients | [SRS-10](../requirements/SRS-10-notification.md) |
+| [llm-browser-gateway/](services/llm-browser-gateway/README.md) | `llm_browser_gateway` | [SRS-11](../requirements/SRS-11-llm-browser-gateway.md) |
 
 A service writes **only** the schema it owns. Cross-service data moves by message, never by writing
 another service's tables.
@@ -56,14 +58,18 @@ by any service and does not run in the stack.
 | [poc/poc6/](poc/poc6/) | Does KG-plus-LLM arbitration beat graph-only within a fixed token budget? (`STOP`) |
 | [poc/poc7-biquote-market-data/](poc/poc7-biquote-market-data/) | Can biquote.io replace Yahoo as the price provider? |
 | [poc/poc8-freenewsapi/](poc/poc8-freenewsapi/) | Can FreeNewsApi.io replace GDELT as a news source? |
+| [poc/poc9-embedding-classifier/](poc/poc9-embedding-classifier/) | Can a tiny supervised head reuse existing BGE-M3 vectors for classification? Research only; not deployed. |
 
 Each has its own README with run commands and gate results.
 
 ## Working here
 
-The [Market Data snapshot package](services/market-data/market_data/snapshots/) contains the separate
-worker, browser adapter, scheduler, mapping CLI and read-only router; `Dockerfile.snapshots` and its
-hash-pinned `requirements-snapshots.txt` isolate browser dependencies from the API image.
+The [Market Data snapshot package](services/market-data/market_data/snapshots/) contains the Avanza
+worker, browser adapter, scheduler, mapping CLI and read-only router. The worker runs as a supervised
+background task inside `feed-market-data`; its hash-pinned browser dependencies are installed in the
+Market Data image.
+[avanza.py](services/market-data/market_data/avanza.py) owns source selection and derived-price reads;
+the optional minute stream and Verification's `intraday_policy.py` support tagged last-known values.
 [sampled.py](services/verification/verification/sampled.py) and
 [sampled_policy.py](services/verification/verification/sampled_policy.py) own the separate shadow path.
 Behavior and configuration are in [SRS-05](../requirements/SRS-05-market-data.md) and
@@ -75,6 +81,7 @@ Run each suite separately (their test-package names overlap):
 python -m pytest src/services/market-data/tests -m "not integration"
 python -m pytest src/services/verification/tests -m "not integration"
 python -m pytest src/shared/tests -m "not integration"
+python -m pytest src/services/llm-browser-gateway/tests -m "not integration"
 ```
 
 Optional snapshot SQL tests require `SNAPSHOT_TEST_DATABASE_URL` pointing to a disposable database

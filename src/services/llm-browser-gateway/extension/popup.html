@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>LLM Browser Gateway</title>
+<style>
+body{font:14px system-ui;width:320px;padding:14px;color:#17212b}label{display:block;margin-top:12px}
+input,button{box-sizing:border-box;width:100%;padding:8px;margin-top:6px}small{display:block;margin:6px 0}
+code{word-break:break-all}#status{white-space:pre-wrap}button{cursor:pointer}
+</style>
+<h2>LLM Browser Gateway</h2>
+<small>Extension ID (copy into the service configuration):</small><code id="extension-id"></code>
+<label>Profile name<input id="profile" value="default" maxlength="64"></label>
+<label>Pairing key<input id="key" type="password" autocomplete="off"></label>
+<button id="pair">Connect this Chrome profile</button>
+<small>Pair once. This Chrome profile remembers the key and reconnects automatically while the local
+gateway is running. Website scripts cannot read the stored key.</small>
+<button id="forget">Forget saved pairing</button>
+<hr><small>By default, requests use separate gateway tabs. Designating the current tab allows the
+gateway to replace its conversation with new requests.</small>
+<button id="chatgpt">Designate current ChatGPT tab</button>
+<button id="claude">Designate current Claude tab</button>
+<hr><button id="reset">Stop gateway work and clear blocked state</button>
+<p id="status" role="status"></p><p id="error" role="alert"></p>
+<script type="module" src="popup.js"></script></html>

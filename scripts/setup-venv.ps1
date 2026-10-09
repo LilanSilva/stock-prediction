@@ -64,7 +64,7 @@ function Invoke-Pip {
 # 2-4. Upgrade pip, install hash-verified dependencies, install the local packages editable.
 Invoke-Pip @("install", "--upgrade", "pip")
 Invoke-Pip @("install", "--require-hashes", "-r", "requirements.txt")
-foreach ($package in @("shared", "services\ingestion", "services\cleansing", "services\prediction", "services\market-data", "services\verification", "services\credibility", "services\notification")) {
+foreach ($package in @("shared", "services\ingestion", "services\cleansing", "services\prediction", "services\market-data", "services\verification", "services\credibility", "services\notification", "services\llm-browser-gateway")) {
     Invoke-Pip @("install", "-e", "src\$package", "--no-deps")
 }
 Invoke-Pip @("check")

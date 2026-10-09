@@ -11,6 +11,7 @@ for what the system does, how each service works, and which test proves each req
 | Path | Contains |
 |---|---|
 | [architectural-documents/](architectural-documents/) | The Mermaid diagrams listed below |
+| [llm-browser-gateway-verification.md](llm-browser-gateway-verification.md) | Dated browser gateway test results, deployment evidence and investigation findings |
 | `feed-analyzer-investor-presentation.pptx` | Investor-facing slide deck. A point-in-time presentation, not a specification — do not treat it as a source of truth |
 
 ## Architecture diagrams

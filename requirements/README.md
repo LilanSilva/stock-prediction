@@ -26,6 +26,7 @@ where to look.
 | [SRS-06-verification.md](SRS-06-verification.md) | Verification Service | [src/services/verification/](../src/services/verification/) |
 | [SRS-07-credibility.md](SRS-07-credibility.md) | Credibility Service | [src/services/credibility/](../src/services/credibility/) |
 | [SRS-10-notification.md](SRS-10-notification.md) | Notification Service | [src/services/notification/](../src/services/notification/) |
+| [SRS-11-llm-browser-gateway.md](SRS-11-llm-browser-gateway.md) | Standalone browser LLM gateway; verification coverage tracked in E16 | [src/services/llm-browser-gateway/](../src/services/llm-browser-gateway/) |
 
 Not yet built: API Gateway and Dashboard. Those remain in [backlog/](../backlog/) as E08 and E09;
 no SRS exists for them until they are implemented.
@@ -91,12 +92,14 @@ and its number is never reused.
 | `VER` | Verification |
 | `CRD` | Credibility |
 | `NTF` | Notification |
+| `BGW` | LLM Browser Gateway |
 
 ## Conventions
 
 The Avanza addition owns MKT-60–MKT-66, VER-46–VER-50 and SHR-94–SHR-95. Implementation and proving
-tests are in the respective SRS documents; the outstanding live pilot is tracked in
-[E14](../backlog/E14-Avanza-Price-Snapshots/README.md).
+tests are in the respective SRS documents. Avanza-first extensions own MKT-67–MKT-71,
+VER-51–VER-53 and SHR-96–SHR-97; completed deployment evidence is recorded in
+[SRS-05](SRS-05-market-data.md#avanza-first-deployment-evidence--2026-10-09).
 
 **Requirement wording** — every requirement is one testable statement using `shall`:
 

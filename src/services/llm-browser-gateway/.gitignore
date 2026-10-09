@@ -1,0 +1,9 @@
+extension/node_modules/
+extension/dist/
+extension/.pnpm-store/
+*.egg-info/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.runtime/

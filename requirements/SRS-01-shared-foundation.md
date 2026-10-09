@@ -109,6 +109,8 @@ Two parts:
 |---|---|---|---|
 | SHR-94 | The shared contract shall represent a point-price sample independently of daily closes and minute OHLC | Must | Implemented |
 | SHR-95 | Each sampled-evidence consumer shall own an independent durable queue and dedicated dead-letter route | Must | Implemented |
+| SHR-96 | Derived price values shall preserve original sample identity, time, delay and bounded availability | Must | Implemented |
+| SHR-97 | Sampled closes and carried-forward minutes shall be distinguishable from provider closes and genuine minute OHLC | Must | Implemented |
 
 | ID | Requirement | Priority | Status |
 |---|---|---|---|
@@ -478,7 +480,7 @@ Defined on `FeedMessage`, inherited by all domain messages.
 | `Horizon` | `ONE_TRADING_DAY` |
 | `ExtractionMethod` | `LOCAL`, `LLM_ASSISTED` |
 | `DecisionMethod` | `GRAPH_ONLY`, `LLM_ARBITRATED` |
-| `PriceKind` | `PROVIDER_DAILY_CLOSE`, `OFFICIAL_SETTLEMENT` |
+| `PriceKind` | `PROVIDER_DAILY_CLOSE`, `OFFICIAL_SETTLEMENT`, `AVANZA_SAMPLED_CLOSE` |
 | `LlmStatus` | `SUCCESS`, `FAILED` |
 | `EventPolarity` | `OCCURRENCE`, `RESOLUTION` |
 | `ConditionCode` | `TRANSPORT_AFFECTED`, `SAFE_HAVEN_ONLY`, `RISK_PREMIUM_ELEVATED`, `UPSTREAM_UP`, `UPSTREAM_DOWN` |
@@ -565,10 +567,41 @@ cannot disagree with the other.
 | `price_kind` | `PriceKind` | |
 | `is_adjusted` | bool | |
 | `registry_version` | non-empty string | Registry snapshot used |
+| `sample` | `SampleProvenance` or null | Required for `AVANZA_SAMPLED_CLOSE`; disallowed on provider closes |
+| `fallback_reason` | string or null | Safe reason for using finance instead of Avanza |
+
+### Derived price provenance
+
+`SampleProvenance` records `sample_id`, `scheduled_at`, `observed_at`, `expires_at`,
+`interval_seconds` (600 or historical 900), `mapping_version`, currency, nullable provider quote
+time/reported delay and `FRESH`/`FRESHNESS_UNKNOWN` quality. Its observation must arrive within
+120 seconds of its slot and before expiry. Expiry cannot exceed one collection interval.
+Unknown quote time remains unknown; claiming `FRESH` requires a provider timestamp.
+
+`AVANZA_SAMPLED_CLOSE` is an unadjusted session reference derived from collected prices. It requires
+source `avanza`, sample provenance and a null `provider_bar_time`. It is not an official close.
+`PriceObserved` rejects a sampled baseline paired with a finance settlement, or mismatched sampled
+currency/mapping versions. `PredictionScored.price_policy` distinguishes `DAILY_CLOSE_V1` (legacy
+default) from `AVANZA_SAMPLED_CLOSE_V1`; baseline/settlement retain their complete provenance.
+
+`IntradayBar` adds nullable `sample` and `carried_forward=false`. Tagged minutes require all four
+price fields to equal the last observed price. Their minute must lie between the actual observation
+minute and expiry; the carry flag must agree with whether this is a later minute. They are a
+last-known-price representation, not evidence of trading extrema or independent observations.
+Existing untagged provider bars retain their prior interpretation.
+
+`IntradayRequested.price_policy` defaults to `PROVIDER_MINUTE_V1` for historical compatibility;
+new last-known requests explicitly select `LAST_KNOWN_PRICE_V1`. `IntradayObserved` adds `source`
+(legacy default `yahoo`), nullable `fallback_reason` and `replaces_previous=false`. A replacement
+revision atomically resets the working series, while retaining earlier immutable events.
+All revisions still must arrive before final evaluation. Rebuild consumers before enabling a
+producer that emits the new enum/tagged values; field defaults preserve old messages but do not
+make old consumers understand new semantics.
 
 ### Intraday message contracts
 
-The six existing domain messages retain their meaning. `PredictionMade` adds nullable
+Existing provider-only messages retain their meaning; sampled extensions are defined above.
+`PredictionMade` adds nullable
 `publication_attempt_at` (UTC), filled immediately before each publisher attempt. It is neither a
 broker-confirmed timestamp nor user delivery time; `decision_at` remains immutable.
 
@@ -579,9 +612,10 @@ Two version-1.0 messages add isolated shadow collection; both retain the standar
 | `IntradayRequested` | `stream_id` UUID, canonical `asset_id`, `registry_version`, `calendar_id`, UTC `opens_at`/`closes_at` | `intraday.requested` |
 | `IntradayObserved` | `stream_id`, canonical `asset_id`, `registry_version`, positive integer `revision`, `bars`, `final=false`, nullable `failure` | `intraday.observed` |
 
-`bars` is a bounded (1500 maximum) list of completed unadjusted one-minute OHLC values. `start` is UTC,
+`bars` is a bounded (1500 maximum) list of completed unadjusted one-minute OHLC values or explicitly
+tagged last-known minutes. `start` is UTC,
 minute-aligned, and denotes the opening of the interval. Decimal prices must be finite and positive;
-low <= open/close <= high. Observations are ordered deltas, not complete session snapshots. The
+low <= open/close <= high. Observations are ordered deltas unless `replaces_previous` is true. The
 consumer must receive all revisions through FINAL before finalization. No provider symbols cross
 this boundary. New contract tests: `tests/test_intraday_contracts.py` and Market Data's
 `tests/test_intraday_adapter.py` (malformed evidence rejection).
@@ -597,7 +631,7 @@ this boundary. New contract tests: `tests/test_intraday_contracts.py` and Market
 | `opens_at`, `closes_at`, `scheduled_at`, `observed_at` | UTC timestamps; ordered window; observation at/after slot |
 | `provider_quote_at`, `quote_delay_seconds` | Nullable aware quote timestamp and nullable nonnegative reported delay; never inferred from observation time |
 | `price`, `currency`, `quote_unit` | Finite positive Decimal (JSON string), three uppercase currency letters, explicit nonempty denomination |
-| `source`, `interval_seconds` | Fixed `avanza`, `900` |
+| `source`, `interval_seconds` | Fixed `avanza`; 600 for new samples, 900 accepted for historical samples |
 | `kind` | `REGULAR` or `CLOSE_CHECK`; scheduled slot must lie in the relevant session range |
 | `market_state` | `PRE_OPEN`, `REGULAR_OPEN`, `REGULAR_CLOSED`, `EXTENDED_HOURS`, `HALTED`, `UNKNOWN` |
 | `quality` | `FRESH`, `STALE`, `FRESHNESS_UNKNOWN`, `SESSION_MISMATCH`; FRESH requires a provider timestamp |
@@ -895,6 +929,11 @@ Current version `multi-market-v2`: 14 groups, 29 assets,
 | `LOG_LEVEL` | `INFO` | Structured log threshold |
 
 ## 11. Verification
+
+SHR-96–SHR-97: `tests/test_last_known_contract.py` verifies JSON provenance, valid legacy defaults,
+carry flags, expiry and single-price constraints. Producer/consumer checks in Market Data's
+`test_avanza_primary.py` and Verification's `test_avanza_scoring.py` prove distinct price bases and
+reject mixed daily sources.
 
 SHR-94: `tests/test_snapshot_contract.py::test_sample_roundtrip_currency_and_timestamp_validation`.
 SHR-95: its static topology check plus `tests/test_snapshot_broker.py`, which tests real delivery,
